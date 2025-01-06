@@ -1,0 +1,29 @@
+*node_modules/*
+/FrontEnd/node_modules*
+/BackEnd/node_modules*
+
+.env.local
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Node modules
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Vite-specific
+.vite/

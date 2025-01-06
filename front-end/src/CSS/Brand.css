@@ -1,0 +1,141 @@
+.brands
+{
+    width: 80%;
+    margin: 0 auto;
+}
+
+.brand-details {
+
+    font-family: Arial, sans-serif;
+    width: 100%;
+    margin: 5px 0px;
+    padding: 5px 20px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    transition: all 0.3s;
+    transform: translate(-20px, 0px);
+  }
+
+  .brand-details:hover {
+    background-color: #f0f0f0;
+  }
+  
+  .brand-details h1 {
+    font-size: 1.5rem;
+    width: 50%;
+    margin-bottom: 2px;
+  }
+
+  .brand-details button
+  {
+    display: block;
+    background-color: #f9a826;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 10px 0;
+  }
+  
+  .brand-details a {
+    color: #007bff;
+    text-decoration: none;
+  }
+  
+  .brand-details a:hover {
+    text-decoration: underline;
+  }
+  
+  .brand-images img {
+    max-width: 100px;
+    margin-right: 10px;
+    border-radius: 4px;
+  }
+
+  .search-box
+  {
+    width: 100%;
+    height: 26px;
+    margin: 20px 0;
+    font-size: 16px;
+
+  }
+  
+  /* -------------------------------------------Checkbox Styling------------------------------------------- */
+  
+.checkbox-wrapper {
+  float: right;
+
+}
+
+.checkbox-wrapper-38 {
+  --toggleWidth: 50px;
+  --toggleHeight: 15px;
+  --switchSize: 15px;
+  --dotSize: 6px;
+
+  display: inline-flex;
+  align-items: center;
+  margin: 15px;
+}
+
+.checkbox-wrapper-38 .toggle-label {
+  position: relative;
+  width: var(--toggleWidth);
+  height: var(--toggleHeight);
+  border: 1px solid #cd2d27;
+  background-color: #ed352d;
+  border-radius: 3px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.checkbox-wrapper-38 .toggle-label:after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: var(--switchSize);
+  height: var(--switchSize);
+  background-color: white;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+  transition: left 0.2s;
+}
+
+.checkbox-wrapper-38 .toggle-label:before {
+  content: "";
+  position: absolute;
+  top: calc((var(--switchSize)/2) - 4px);
+  left: calc((var(--switchSize)/2) - 4px);
+  width: var(--dotSize);
+  height: var(--dotSize);
+  background: #d4d6db;
+  border-radius: 50%;
+  transition: left 0.2s;
+}
+
+.checkbox-wrapper-38 .toggle-input {
+  display: none;
+}
+
+.checkbox-wrapper-38 .toggle-input:checked + .toggle-label {
+  border-color: #2c8512;
+  background-color: #29a105;
+}
+
+.checkbox-wrapper-38 .toggle-input:checked + .toggle-label:after {
+  left: calc(var(--toggleWidth) - var(--switchSize));
+}
+
+.checkbox-wrapper-38 .toggle-input:checked + .toggle-label:before {
+  left: calc(var(--toggleWidth) - var(--switchSize) + 10px);
+}
+
+.checkbox-wrapper-38 span {
+  margin-left: 10px;
+  font-size: 14px;
+}
+
+ /* -------------------------------------------Checkbox Styling  End ------------------------------------------- */

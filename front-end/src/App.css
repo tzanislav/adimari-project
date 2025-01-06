@@ -1,0 +1,57 @@
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+    font-size: 12px
+}
+
+.link {
+    display: block;
+    text-decoration: none;
+    color: #007bff;
+    font-weight: 500;
+    transition: color 0.3s ease;
+    margin: 10px auto;
+    text-align: center;
+    
+}
+
+.link:hover {
+    color: #0056b3;
+    /* Darker blue on hover */
+    text-decoration: underline;
+    /* Underline on hover */
+}
+
+.link:active {
+    color: #003f7f;
+    /* Even darker blue on active */
+}
+
+button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+.button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    max-width: 200px;
+}
+
+.button:hover {
+    background-color: #0056b3;
+}
