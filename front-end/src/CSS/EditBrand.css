@@ -59,12 +59,46 @@
   
 
   /* Wrapper for checkboxes */
+.checkboxes
+{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.checkboxes label
+{
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+  position: relative;
+  width: 50%;
+}
+
+.checkboxes input[type="checkbox"]
+{
+
+  width: 20px;
+  height: 20px;
+  border: 2px solid #007bff;
+  border-radius: 4px;
+  outline: none;
+  margin: 15px;
+}
+
+
+
 .brand-checkboxes {
   margin-top: 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+
+
 
 .brand-checkboxes label {
   display: flex;

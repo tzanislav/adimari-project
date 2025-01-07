@@ -5,6 +5,7 @@ import Brands from './pages/Brands';
 import Models3D from './pages/Models3D';
 import BrandForm from './pages/BrandForm';
 import Model3DForm from './pages/Model3DForm';
+import ExampleForm from './pages/TestUploader';
 import Navbar from './components/Navbar'; // Optional navigation component
 import './App.css';
 
@@ -20,6 +21,7 @@ function App() {
         <Route path="/brands/new" element={<BrandForm />} />
         <Route path="/models/:id" element={<Model3DForm />} />
         <Route path="/models/new" element={<Model3DForm />} />
+        <Route path="/test" element={<ExampleForm />} />
       </Routes>
     </div>
   );

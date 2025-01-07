@@ -5,7 +5,7 @@ const brandSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String, default: null },
   website: { type: String, default: null },
-  images: { type: [String], default: null }, // Assuming multiple image URLs
+  files: { type: [String], default: null }, // Assuming multiple image URLs
   category: { type: String, required: true },
   class: { type: String, required: true },
   distributor: { type: String, default: null },

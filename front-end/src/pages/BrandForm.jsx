@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import FileUploader from '../components/FileUploader'; // Ensure correct import path
 import '../CSS/EditBrand.css';
+import { showOnlyName } from '../utils/utils';
 
 function BrandForm() {
   const { id } = useParams(); // Get ID from URL
@@ -12,8 +14,8 @@ function BrandForm() {
     name: '',
     description: '',
     website: '',
-    images: [],
-    category: '', // Default value
+    files: [], // Field for uploaded file URLs
+    category: '',
     class: 'Low',
     distributor: '',
     location: '',
@@ -21,8 +23,8 @@ function BrandForm() {
     email: '',
     phone: '',
     discount: 0,
-    tags: [], // Ensure this is always an array
-    models3D: [], // Ensure this is always an array
+    tags: [],
+    models3D: [],
     has3dmodels: false,
     hasDWGmodels: false,
   });
@@ -41,8 +43,9 @@ function BrandForm() {
           const data = response.data;
           setFormData({
             ...data,
-            tags: data.tags || [], // Default to an empty array
-            models3D: data.models3D || [], // Default to an empty array
+            tags: data.tags || [],
+            models3D: data.models3D || [],
+            files: data.files || [], // Ensure files are loaded
           });
         } catch (error) {
           console.error('Failed to fetch brand:', error);
@@ -68,10 +71,10 @@ function BrandForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = isEditing
-      ? `http://localhost:5000/brands/${id}` // PUT URL for editing
-      : 'http://localhost:5000/brands'; // POST URL for creating
+      ? `http://localhost:5000/brands/${id}`
+      : 'http://localhost:5000/brands';
 
-    const method = isEditing ? 'PUT' : 'POST'; // HTTP method
+    const method = isEditing ? 'PUT' : 'POST';
 
     try {
       const response = await axios({
@@ -86,21 +89,18 @@ function BrandForm() {
           ? `Brand "${response.data.name}" updated successfully!`
           : `Brand "${response.data.name}" created successfully!`
       );
-      //wait 0.5s before redirecting to the brands page
       setTimeout(() => {
         window.location.href = '/brands';
       }, 500);
 
-      setErrorMessage('');
       if (!isEditing) {
-        // Reset form for new creation
         setFormData({
           name: '',
           description: '',
           website: '',
-          images: [],
-          category: 'Low',
-          class: '',
+          files: [],
+          category: '',
+          class: 'Low',
           distributor: '',
           location: '',
           personToContact: '',
@@ -114,25 +114,21 @@ function BrandForm() {
         });
       }
     } catch (error) {
+      console.error('Error submitting form:', error);
       setErrorMessage('Failed to submit form: ' + error.message);
-      setSuccessMessage('');
-
     }
   };
 
-  //Delete brand
+  // Delete brand
   const handleDelete = async () => {
     try {
       await axios.delete(`http://localhost:5000/brands/${id}`);
       setSuccessMessage('Brand deleted successfully!');
-      setErrorMessage('');
-      //wait 0.5s before redirecting to the brands page
       setTimeout(() => {
         window.location.href = '/brands';
       }, 500);
     } catch (error) {
       setErrorMessage('Failed to delete brand: ' + error.message);
-      setSuccessMessage('');
     }
   };
 
@@ -181,47 +177,22 @@ function BrandForm() {
           </label>
 
           <label>
+            Distributor:
+            <input
+              name="distributor"
+              value={formData.distributor || ''}
+              onChange={handleChange}
+            />
+          </label>
+
+
+
+          <label>
             Website:
             <input
               type="url"
               name="website"
               value={formData.website || ''}
-              onChange={handleChange}
-            />
-          </label>
-
-          <label>
-            Category:
-            <input
-              type="text"
-              name="category"
-              value={formData.category || ''} // Ensure value is not null
-              onChange={handleChange}
-              required
-            />
-          </label>
-
-          <label>
-            Class:
-            <select
-              name="class"
-              value={formData.class || ''} // Ensure value is not null
-              onChange={handleChange}
-              required
-            >
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Luxury">Luxury</option>
-            </select>
-          </label>
-
-          <label>
-            Distributor:
-            <input
-              type="text"
-              name="distributor"
-              value={formData.distributor || ''}
               onChange={handleChange}
             />
           </label>
@@ -276,12 +247,111 @@ function BrandForm() {
             />
           </label>
 
+          {formData.name ? (
+            <label>
+              Files:
+              <FileUploader
+                folderName={formData.name}
+                onUploadComplete={(uploadedUrls) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    files: [...prev.files, ...uploadedUrls],
+                  }));
+                }} onRemove={(deletedUrl) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    files: prev.files.filter((url) => url !== deletedUrl),
+                  }));
+                }}
+              />
+            </label>) :
+
+            <label>
+              Files:
+              <p className='error' >Upload files after entering a name</p>
+            </label>
+
+          }
+
+
+          {formData.files.length > 0 && (
+            <>
+              <p>Existing files Files:</p>
+              <ul>
+                {formData.files.map((file, index) => (
+                  <li key={index}>
+                    <p>
+                      {showOnlyName(file)}
+                    </p>
+                    <button onClick={(e) => {
+                      e.preventDefault();
+                      setFormData((prev) => ({
+                        ...prev,
+                        files: prev.files.filter((_, i) => i !== index),
+                      }));
+                    }}>
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+
+          <label>
+            Category:
+            <input
+              type="text"
+              name="category"
+              value={formData.category || ''}
+              onChange={handleChange}
+              required
+            />
+          </label>
+
+          <label>
+            Class:
+            <select
+              name="class"
+              value={formData.class || ''}
+              onChange={handleChange}
+              required
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Luxury">Luxury</option>
+            </select>
+          </label>
+          <div className='checkboxes'>
+            <label>
+              <input
+                type="checkbox"
+                name="has3dmodels"
+                checked={formData.has3dmodels || false}
+                onChange={handleChange}
+              />
+              3D Models on Site
+            </label>
+
+            <label>
+              <input
+                type="checkbox"
+                name="hasDWGmodels"
+                checked={formData.hasDWGmodels || false}
+                onChange={handleChange}
+              />
+              DWG Models on Site
+            </label>
+          </div>
+
           <label>
             Tags (comma-separated):
             <input
               type="text"
               name="tags"
-              value={formData.tags?.join(', ') || ''} // Safe .join() usage
+              value={formData.tags?.join(', ') || ''}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
@@ -291,41 +361,7 @@ function BrandForm() {
             />
           </label>
 
-          <label>
-            3D Models:
-            <input
-              type="text"
-              name="models3D"
-              value={formData.models3D?.join(', ') || ''} // Safe .join() usage
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  models3D: e.target.value.split(',').map((model) => model.trim()),
-                }))
-              }
-            />
-          </label>
-
-          <label>
-            <input
-              type="checkbox"
-              name="has3dmodels"
-              checked={formData.has3dmodels || false}
-              onChange={handleChange}
-            />
-            3D Models on Site
-          </label>
-
-          <label>
-            <input
-              type="checkbox"
-              name="hasDWGmodels"
-              checked={formData.hasDWGmodels || false}
-              onChange={handleChange}
-            />
-            DWG Models on Site
-          </label>
-          <div className='buttons'>
+          <div className="buttons">
             <button type="submit">
               {isEditing ? 'Update Brand' : 'Create Brand'}
             </button>
@@ -335,17 +371,14 @@ function BrandForm() {
             </button>
 
             {isEditing && (
-              <button type="button" className='deleteButton' onClick={() => setIsDeleting(true)}>
+              <button type="button" className="deleteButton" onClick={() => setIsDeleting(true)}>
                 Delete Brand
               </button>
-
             )}
-
           </div>
           {successMessage && <p className="success">{successMessage}</p>}
           {errorMessage && <p className="error">{errorMessage}</p>}
         </form>
-
       )}
     </div>
   );

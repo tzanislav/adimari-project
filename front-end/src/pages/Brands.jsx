@@ -10,7 +10,7 @@ function Brands() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filteredBrands, setFilteredBrands] = useState([]);
-
+    
 
 
     useEffect(() => {
@@ -23,7 +23,6 @@ function Brands() {
                 const data = await response.json();
                 setBrands(data);
                 setFilteredBrands(data);
-
             } catch (err) {
                 setError(err.message);
             } finally {
