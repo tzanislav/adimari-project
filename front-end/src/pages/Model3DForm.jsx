@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import FileUploader from '../components/FileUploader'; // Ensure correct import path
 import '../CSS/EditBrand.css';
+import { showOnlyName } from '../utils/utils';
 
-function Model3DForm() {
+function Model3dForm() {
   const { id } = useParams(); // Get ID from URL
   const isEditing = Boolean(id); // Check if the page is for editing
+  const [isDeleting, setIsDeleting] = useState(false); // State for delete confirmation
+  const [brands, setBrands] = useState([]); // State for brand data
 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    images: [], // This will now hold uploaded image URLs
+    images: [], // Field for uploaded image URLs
     category: '',
     class: 'Low',
     tags: [],
@@ -19,32 +23,18 @@ function Model3DForm() {
     path: '',
   });
 
-  const [imageFiles, setImageFiles] = useState([]); // For file uploads
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [brands, setBrands] = useState([]);
-
-  // Fetch brands for dropdown
-  useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        const response = await axios.get('http://localhost:5000/brands');
-        setBrands(response.data);
-      } catch (error) {
-        console.error('Failed to fetch brands:', error);
-      }
-    };
-    fetchBrands();
-  }, []);
+  
 
   // Fetch model data if editing
   useEffect(() => {
     if (isEditing) {
-      const fetchModel = async () => {
+      const fetchModel3d = async () => {
         setLoading(true);
         try {
-          const response = await axios.get(`http://localhost:5000/models/${id}`);
+          const response = await axios.get(`http://localhost:5000/models3d/${id}`);
           const data = response.data;
           setFormData({
             ...data,
@@ -58,107 +48,116 @@ function Model3DForm() {
           setLoading(false);
         }
       };
-      fetchModel();
+      fetchModel3d();
     }
   }, [id, isEditing]);
 
+
+//Fetch brands data
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/brands');
+        setBrands(response.data);
+      } catch (error) {
+        console.error('Failed to fetch brands:', error);
+        setErrorMessage('Failed to fetch brand data.');
+      }
+    };
+    fetchBrands();
+  }, []);
+
+
+
   // Handle input changes
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'number' ? parseFloat(value) : value,
     }));
-  };
-
-  // Handle file selection
-  const handleFileChange = (e) => {
-    setImageFiles(e.target.files);
   };
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    setSuccessMessage('Working...');
-
     const url = isEditing
-        ? `http://localhost:5000/models/${id}`
-        : 'http://localhost:5000/models';
+      ? `http://localhost:5000/models3d/${id}`
+      : 'http://localhost:5000/models3d';
 
     const method = isEditing ? 'PUT' : 'POST';
 
     try {
-        let uploadedImageUrls = [];
+      const response = await axios({
+        url,
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        data: formData,
+      });
 
-        // If images were selected, upload them
-        if (imageFiles.length > 0) {
-            const uploadFormData = new FormData();
-            Array.from(imageFiles).forEach((file) => {
-                uploadFormData.append('images', file);
-                console.log('Uploading image:', file.name);
-            });
+      setSuccessMessage(
+        isEditing
+          ? `Model "${response.data.name}" updated successfully!`
+          : `Model "${response.data.name}" created successfully!`
+      );
+      setTimeout(() => {
+        window.location.href = '/models3d';
+      }, 500);
 
-            // Wait for the image upload to complete
-            const uploadResponse = await axios.post(
-                'http://localhost:5000/models/upload-images',
-                uploadFormData,
-                { headers: { 'Content-Type': 'multipart/form-data' } }
-            );
-
-            // Capture uploaded image URLs
-            uploadedImageUrls = uploadResponse.data.imageUrls;
-            console.log('Uploaded images:', uploadedImageUrls);
-        }
-
-        // Combine uploaded image URLs with the existing ones
-        const finalFormData = {
-            ...formData,
-            images: [...formData.images, ...uploadedImageUrls],
-        };
-
-        // Submit the rest of the data to the backend
-        const response = await axios({
-            url,
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            data: finalFormData,
+      if (!isEditing) {
+        setFormData({
+          name: '',
+          description: '',
+          images: [],
+          category: '',
+          class: 'Low',
+          tags: [],
+          brand: '',
+          price: 0,
+          path: '',
         });
-
-        setSuccessMessage(
-            isEditing
-                ? `Model "${response.data.name}" updated successfully!`
-                : `Model "${response.data.name}" created successfully!`
-        );
-
-        setErrorMessage('');
-        if (!isEditing) {
-            // Reset form for new creation
-            setFormData({
-                name: '',
-                description: '',
-                images: [],
-                category: '',
-                class: 'Low',
-                tags: [],
-                brand: '',
-                price: 0,
-                path: '',
-            });
-            setImageFiles([]);
-        }
+      }
     } catch (error) {
-        console.error('Error during form submission:', error);
-        setErrorMessage('Failed to submit form: ' + error.message);
-        setSuccessMessage('');
+      console.error('Error submitting form:', error);
+      setErrorMessage('Failed to submit form: ' + error.message);
     }
-};
+  };
+
+  // Delete model
+  const handleDelete = async () => {
+    try {
+      await axios.delete(`http://localhost:5000/models3d/${id}`);
+      setSuccessMessage('Model deleted successfully!');
+      setTimeout(() => {
+        window.location.href = '/models3d';
+      }, 500);
+    } catch (error) {
+      setErrorMessage('Failed to delete model: ' + error.message);
+    }
+  };
 
   return (
     <div className="brand-form">
-      <h2>{isEditing ? 'Edit 3D Model' : 'Create New 3D Model'}</h2>
-
+      <h2>{isEditing ? 'Edit Model' : 'Create New Model'}</h2>
       {loading && <p>Loading model data...</p>}
+
+      <div className="delete-box">
+        {isDeleting && (
+          <>
+            <div className="overlay"></div>
+            <div className="delete-box-content">
+              <p>Are you sure you want to delete this model?</p>
+              <button type="button" onClick={() => setIsDeleting(false)}>
+                Cancel
+              </button>
+              <button type="button" className="deleteButton" onClick={handleDelete}>
+                Delete Model
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
       {!loading && (
         <form onSubmit={handleSubmit}>
           <label>
@@ -181,16 +180,55 @@ function Model3DForm() {
             />
           </label>
 
-          <label>
-            Upload Images:
-            <input
-              type="file"
-              name="images"
-              multiple
-              onChange={handleFileChange}
-              accept="image/*"
-            />
-          </label>
+          {formData.name ? (
+            <label>
+              Images:
+              <FileUploader
+                folderName={formData.name}
+                onUploadComplete={(uploadedUrls) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    images: [...prev.images, ...uploadedUrls],
+                  }));
+                }} onRemove={(deletedUrl) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    images: prev.images.filter((url) => url !== deletedUrl),
+                  }));
+                }}
+              />
+            </label>) :
+
+            <label>
+              Files:
+              <p className='error' >Upload files after entering a name</p>
+            </label>
+
+          }
+
+          {formData.images.length > 0 && (
+            <>
+              <p>Existing Images:</p>
+              <ul>
+                {formData.images.map((image, index) => (
+                  <li key={index}>
+                    <p>{showOnlyName(image)}</p>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setFormData((prev) => ({
+                          ...prev,
+                          images: prev.images.filter((_, i) => i !== index),
+                        }));
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
           <label>
             Category:
@@ -233,24 +271,32 @@ function Model3DForm() {
             />
           </label>
 
-          <div className="brand-search">
-            <label>
-              Select Brand:
-              <select
-                name="brand"
-                value={formData.brand || ''}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select a brand</option>
-                {brands.map((brand) => (
-                  <option key={brand._id} value={brand.name}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label>
+            Brand:
+            <input
+              type="text"
+              name="brand"
+              value={formData.brand || ''}
+              onChange={handleChange}
+            />
+          </label>
+
+          
+          <label>
+            Existing Brand:
+            <select
+              name="brand"
+              value={formData.brand || ''}
+              onChange={handleChange}
+            >
+              <option value="">Select a brand</option>
+              {brands.map((brand) => (
+                <option key={brand._id} value={brand.name}>
+                  {brand.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <label>
             Price:
@@ -276,11 +322,21 @@ function Model3DForm() {
             <button type="submit">
               {isEditing ? 'Update Model' : 'Create Model'}
             </button>
+
             <button type="button" onClick={() => window.history.back()}>
               Back
             </button>
-          </div>
 
+            {isEditing && (
+              <button
+                type="button"
+                className="deleteButton"
+                onClick={() => setIsDeleting(true)}
+              >
+                Delete Model
+              </button>
+            )}
+          </div>
           {successMessage && <p className="success">{successMessage}</p>}
           {errorMessage && <p className="error">{errorMessage}</p>}
         </form>
@@ -289,4 +345,4 @@ function Model3DForm() {
   );
 }
 
-export default Model3DForm;
+export default Model3dForm;

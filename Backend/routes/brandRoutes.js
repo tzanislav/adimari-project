@@ -1,5 +1,6 @@
 const express = require('express');
 const Brand = require('../models/brand');
+const Model3d = require('../models/model3d');
 
 const router = express.Router();
 
@@ -64,6 +65,20 @@ router.delete('/:id', async (req, res) => {
         }
     } catch (err) {
         res.status(500).send({ error: 'Failed to delete brand', details: err });
+    }
+});
+
+// Fetch all models of a brand
+router.get('/:id/models', async (req, res) => {
+    try {
+        const brand = await Brand.findById(req.params.id);
+        if (!brand) {
+            return res.status(404).send({ message: 'Brand not found' });
+        }
+        const models = await Model3d.find({ brand: brand.name });
+        res.status(200).send(models);
+    } catch (err) {
+        res.status(500).send({ error: 'Failed to fetch models', details: err });
     }
 });
 

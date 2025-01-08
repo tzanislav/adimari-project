@@ -15,7 +15,6 @@ const brandSchema = new mongoose.Schema({
   phone: { type: String, default: null },
   discount: { type: Number, default: null }, // Assuming discount is a numerical value
   tags : { type: [String], default: null },
-  models3D: { type: [String], default: null }, // Renamed to avoid leading underscore
   has3dmodels: { type: Boolean, default: false }, // Added a boolean field
   hasDWGmodels: { type: Boolean, default: false }, // Added a boolean field
 });

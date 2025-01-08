@@ -1,0 +1,116 @@
+.model-page-container {
+    margin: 0 auto;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+}
+
+.model-page-container h1 {
+    margin: 20px;
+    font-size: 4em;
+    font-weight: 700;
+    color: #333;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.model-data-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    margin: 40px 0;
+    height: 80vh; /* Make container match viewport height */
+}
+
+.hero-image-container {
+    width: 60%;
+    max-height: 100%; /* Ensures it doesn't exceed parent height */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.hero-image-container img.hero-image {
+    width: 100%;
+    max-height: 80%; /* Allow space for thumbnails */
+    object-fit: contain;
+    margin-bottom: 10px;
+}
+
+.thumbnails {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 10px;
+    overflow-y: auto;
+    max-height: 20%;
+}
+
+.thumbnails img {
+    width: 64px;
+    height: 64px;
+    margin: 5px;
+    padding: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background-color: rgba(206, 206, 206, 0);
+    background-size: cover;
+    object-fit: cover;
+}
+
+.thumbnails img:hover {
+    background-color: rgb(71, 71, 71);
+}
+
+.model-show-data {
+    width: 35%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-end;
+    overflow-y: auto;
+}
+
+.model-show-data p {
+    margin: 10px 0;
+    font-size: 1.2em;
+    text-align: right;
+}
+
+.model-page-container a {
+    margin: 20px 0;
+    padding: 10px 20px;
+    font-size: 1.5em;
+    font-weight: 400;
+    color: #333;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: right;
+    text-decoration: none;
+    background-color: #cacaca;
+    align-self: flex-end;
+}
+
+.model-page-container a:hover {
+    background-color: #4b4b4b;
+    text-decoration: none;
+}
+
+@media screen and (max-width: 1200px) {
+    .model-data-container {
+        flex-direction: column;
+        height: auto; /* Allow height to adjust naturally */
+    }
+
+    .hero-image-container {
+        width: 100%;
+        max-height: auto;
+    }
+
+    .model-show-data {
+        width: 100%;
+        align-items: center;
+    }
+}

@@ -11,6 +11,7 @@ function Brands() {
     const [search, setSearch] = useState('');
     const [filteredBrands, setFilteredBrands] = useState([]);
     
+    
 
 
     useEffect(() => {

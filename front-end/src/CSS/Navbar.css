@@ -47,6 +47,7 @@ body {
     text-decoration: none;
     font-size: 1rem;
     transition: color 0.3s;
+    background: none;
   }
   
   .navbar-links li a:hover {

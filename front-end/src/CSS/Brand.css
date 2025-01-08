@@ -10,8 +10,6 @@
     width: 100%;
     margin: 5px 0px;
     padding: 5px 20px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
     background-color: #f9f9f9;
     transition: all 0.3s;
     transform: translate(-20px, 0px);
@@ -23,6 +21,9 @@
   
   .brand-details h1 {
     font-size: 1.5rem;
+    text-transform: uppercase;
+    margin: 10px 0;
+    letter-spacing: 2px;
     width: 50%;
     margin-bottom: 2px;
   }
@@ -39,10 +40,6 @@
     margin: 10px 0;
   }
   
-  .brand-details a {
-    color: #007bff;
-    text-decoration: none;
-  }
   
   .brand-details a:hover {
     text-decoration: underline;

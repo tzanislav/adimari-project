@@ -24,7 +24,6 @@ function BrandForm() {
     phone: '',
     discount: 0,
     tags: [],
-    models3D: [],
     has3dmodels: false,
     hasDWGmodels: false,
   });

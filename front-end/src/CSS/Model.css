@@ -1,0 +1,55 @@
+.models
+{
+    width: 80%;
+    margin: 0 auto;
+}
+
+.models-container
+{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    align-items: center;
+    gap: 20px;
+    
+}
+
+.model-data
+{
+    text-align: center;
+}
+
+
+
+.model-details
+{
+    margin: 5px;
+    padding: 20px;
+    background-color: #f9f9f9;
+
+    width: 240px;
+
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    text-align: center;
+    transition: all 0.5s;
+}
+
+.model-details:hover
+{
+    background-color: #cfcfcf;
+}
+
+.model-details .hero-image-thumbnail
+{
+    height: 250px;
+    width: 250px;
+    margin: 0 auto;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+
+    background-size: cover;
+    object-fit: cover;
+}

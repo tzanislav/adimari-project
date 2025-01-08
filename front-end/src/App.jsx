@@ -6,6 +6,7 @@ import Models3D from './pages/Models3D';
 import BrandForm from './pages/BrandForm';
 import Model3DForm from './pages/Model3DForm';
 import ExampleForm from './pages/TestUploader';
+import ShowModel from './pages/ShowModel'; // Optional component to show a single model
 import Navbar from './components/Navbar'; // Optional navigation component
 import './App.css';
 
@@ -16,11 +17,12 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/brands" element={<Brands />} />
-        <Route path="/models" element={<Models3D />} />
         <Route path="/brands/:id" element={<BrandForm />} />
         <Route path="/brands/new" element={<BrandForm />} />
-        <Route path="/models/:id" element={<Model3DForm />} />
-        <Route path="/models/new" element={<Model3DForm />} />
+        <Route path="/models3d/" element={<Models3D />} />
+        <Route path="/models3d/:id" element={<ShowModel />} />
+        <Route path="/models3d/edit/:id" element={<Model3DForm />} />
+        <Route path="/models3d/new" element={<Model3DForm />} />
         <Route path="/test" element={<ExampleForm />} />
       </Routes>
     </div>

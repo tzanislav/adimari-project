@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import logo from '../assets/LogoBlack.png';
+import '../CSS/Home.css';
 
 function Home() {
   return (
-    <div>
-      <h1>Home Page</h1>
-      <p>Welcome to the Home page!</p>
-      <Link to="/test">Test Uploads</Link>
+    <div className="home">
+      <img src={logo} alt="Adimari Logo" />
+      <h1>Welcome to the Adimari Database!</h1>
     </div>
   );
 }

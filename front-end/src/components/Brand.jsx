@@ -10,6 +10,12 @@ function Brand({ brandId }) {
 
     const [images, setImages] = useState([]);
     const [files, setFiles] = useState([]);
+
+    const [models, setModels] = useState([]);
+
+
+
+
     // Helper function to filter image files
     const filterImages = (files) => {
         if (!files || !Array.isArray(files)) return [];
@@ -39,6 +45,26 @@ function Brand({ brandId }) {
 
         fetchBrand();
     }, [brandId]);
+
+
+    // Fetch models data for this brand
+    useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                const response = await fetch(`http://localhost:5000/brands/${brandId}/models`); 
+                if (!response.ok) {
+                    throw new Error('Failed to fetch models');
+                }
+                const data = await response.json();
+                setModels(data);
+            } catch (err) {
+                setError(err.message);
+            }
+        };
+
+        fetchModels();
+    }, [brandId]);
+                
 
     if (loading) {
         return <p>Loading...</p>;
@@ -99,7 +125,7 @@ function Brand({ brandId }) {
                         <p><strong>Phone:</strong> {brand.phone || 'N/A'}</p>
                         <p><strong>Discount:</strong> {brand.discount !== null ? `${brand.discount}%` : 'N/A'}</p>
                         <p><strong>Tags:</strong> {brand.tags?.join(', ') || 'N/A'}</p>
-                        <p><strong>3D Models:</strong> {brand.models3D?.join(', ') || 'N/A'}</p>
+                        <p><strong>Files:</strong> {brand.models3D?.join(', ') || 'N/A'}</p>
                         {brand.images?.length > 0 && (
                             <div className="brand-images">
                                 <h3>Images:</h3>
@@ -126,6 +152,13 @@ function Brand({ brandId }) {
                                 </ul>
                             </div>
                         )}
+
+                        <div className="brand-models">
+                            <h3>Models:</h3>
+                            {models.map((model) => (
+                                <Link key={model._id} to={`/models3d/${model._id}`}>{model.name}</Link>
+                            ))}
+                        </div>
 
 
                     </>
