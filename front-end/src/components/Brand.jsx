@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showOnlyName } from '../utils/utils';
+import '../CSS/Brand.css';
 
-function Brand({ brandId }) {
+
+function Brand({ brandId, handleClickItem }) {
     const [brand, setBrand] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -21,6 +23,12 @@ function Brand({ brandId }) {
         if (!files || !Array.isArray(files)) return [];
         setFiles(files);
         return files.filter((file) => file.match(/\.(jpeg|jpg|gif|png|webp)$/i));
+    };
+
+    const handleClickProperty = (property) => {
+        if (handleClickProperty) {
+            handleClickItem(property);
+        }
     };
 
 
@@ -51,7 +59,7 @@ function Brand({ brandId }) {
     useEffect(() => {
         const fetchModels = async () => {
             try {
-                const response = await fetch(`http://localhost:5000/brands/${brandId}/models`); 
+                const response = await fetch(`http://localhost:5000/brands/${brandId}/models`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch models');
                 }
@@ -64,7 +72,7 @@ function Brand({ brandId }) {
 
         fetchModels();
     }, [brandId]);
-                
+
 
     if (loading) {
         return <p>Loading...</p>;
@@ -80,52 +88,89 @@ function Brand({ brandId }) {
 
     return (
 
-        <div className="brand-details" onClick={() => setShowDetails(!showDetails)} >
+        <div className="brand-details"  >
 
             <div className='brand-data'>
-                <h1>{brand.name}</h1>
+                <div className="brand-above-fold">
+                    {images.length > 0 ? (
+                        <img src={images[0]} className='thumbnail' alt={`${brand.name} image`} onClick={() => setShowDetails(!showDetails)} />) : (
+                            <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/300px-No_image_available.svg.png' className='thumbnail' alt='placeholder' onClick={() => setShowDetails(!showDetails)} />)}
+                    <h1>{brand.name}</h1>
 
-                {/* Styled Checkboxes */}
-                <div className="checkbox-wrapper">
-                    <div className="checkbox-wrapper-38">
-                        <input
-                            className="toggle-input"
-                            id="has3dmodels"
-                            type="checkbox"
-                            checked={brand.has3dmodels}
-                            disabled
-                        />
-                        <label className="toggle-label" htmlFor="has3dmodels"></label>
-                        <span>3D Models on Site</span>
+                    <div className="brand-property">
+                        <h4>Category:</h4>
+                        <p className='brand-property-button' onClick={() => { handleClickProperty(brand.category) }}>{brand.category}</p>
                     </div>
 
-                    <div className="checkbox-wrapper-38">
-                        <input
-                            className="toggle-input"
-                            id="hasDWGmodels"
-                            type="checkbox"
-                            checked={brand.hasDWGmodels}
-                            disabled
-                        />
-                        <label className="toggle-label" htmlFor="hasDWGmodels"></label>
-                        <span>DWG Models on Site</span>
+                    <div className="brand-property">
+                        <h4>Class:</h4>
+                        <p className='brand-property-button' onClick={() => { handleClickProperty(brand.class) }}>{brand.class}</p>
+                    </div>
+                    <div className="brand-property">
+                        <h4>Distributor:</h4>
+                        <p className='brand-property-button' onClick={() => handleClickProperty(brand.distributor)}>{brand.distributor || 'N/A'}</p>
+                    </div>
+                    <div className='brand-checkboxes'>
+                        <div className="brand-checkbox">
+                            <p>3D Models on Site</p>
+                            <input
+                                className="toggle-input"
+                                id="has3dmodels"
+                                type="checkbox"
+                                checked={brand.has3dmodels}
+                                disabled
+                            />
+                            <label className="toggle-label" htmlFor="has3dmodels"></label>
+                        </div>
+
+                        <div className="brand-checkbox">
+                            <p>DWG Models on Site</p>
+                            <input
+                                className="toggle-input"
+                                id="hasDWGmodels"
+                                type="checkbox"
+                                checked={brand.hasDWGmodels}
+                                disabled
+                            />
+                            <label className="toggle-label" htmlFor="hasDWGmodels"></label>
+                        </div>
                     </div>
                 </div>
-                <p><strong>Category:</strong> {brand.category}</p>
-                <p><strong>Class:</strong> {brand.class}</p>
 
+                <button className="show-details-button" onClick={() => setShowDetails(!showDetails)}>{showDetails ? 'Hide Details' : 'Show Details'}</button>
                 {showDetails && (
                     <>
-                        <p><strong>Description:</strong> {brand.description || 'N/A'}</p>
-                        <p><strong>Website:</strong> <a href={brand.website} target="_blank" rel="noopener noreferrer">{brand.website || 'N/A'}</a></p>
-                        <p><strong>Distributor:</strong> {brand.distributor || 'N/A'}</p>
-                        <p><strong>Location:</strong> {brand.location || 'N/A'}</p>
-                        <p><strong>Contact:</strong> {brand.personToContact || 'N/A'}</p>
-                        <p><strong>Email:</strong> {brand.email || 'N/A'}</p>
-                        <p><strong>Phone:</strong> {brand.phone || 'N/A'}</p>
-                        <p><strong>Discount:</strong> {brand.discount !== null ? `${brand.discount}%` : 'N/A'}</p>
-                        <p><strong>Tags:</strong> {brand.tags?.join(', ') || 'N/A'}</p>
-                        <p><strong>Files:</strong> {brand.models3D?.join(', ') || 'N/A'}</p>
+                        <p><strong>Description:</strong></p>
+                        <p>{brand.description || 'N/A'}</p>
+
+                        <p><strong>Website:</strong></p>
+                        <p className='brand-property-button' onClick={() => window.open(brand.website, '_blank', 'noopener noreferrer')}>{brand.website || 'N/A'}</p>
+
+                        <p><strong>Location:</strong></p>
+                        <p className='brand-property-button' onClick={() => handleClickProperty(brand.location)}>{brand.location || 'N/A'}</p>
+
+                        <p><strong>Contact:</strong></p>
+                        <p className='brand-property-button' onClick={() => handleClickProperty(brand.personToContact)}>{brand.personToContact || 'N/A'}</p>
+
+                        <p><strong>Email:</strong></p>
+                        <p>{brand.email || 'N/A'}</p>
+
+                        <p><strong>Phone:</strong></p>
+                        <p>{brand.phone || 'N/A'}</p>
+
+                        <p><strong>Discount:</strong></p>
+                        <p>{brand.discount !== null ? `${brand.discount}%` : 'N/A'}</p>
+
+                        <p><strong>Tags:</strong></p>
+                        <div className='tags'>
+                            {brand.tags?.map((tag, index) => (
+                                <p className='brand-property-button' onClick={() => handleClickProperty(tag)}>{tag}</p>
+                            ))}
+                        </div>
+
+                        <p><strong>Files:</strong></p>
+                        <p className='brand-property-button' onClick={() => handleClickProperty(brand.models3D?.join(', '))}>{brand.models3D?.join(', ') || 'N/A'}</p>
+
                         {brand.images?.length > 0 && (
                             <div className="brand-images">
                                 <h3>Images:</h3>
@@ -153,19 +198,21 @@ function Brand({ brandId }) {
                             </div>
                         )}
 
-                        <div className="brand-models">
+                        <div className="brand-models thumbnails">
                             <h3>Models:</h3>
                             {models.map((model) => (
-                                <Link key={model._id} to={`/models3d/${model._id}`}>{model.name}</Link>
+                                model.images.length > 0 ? (
+                                    <Link key={model._id} to={`/models3d/${model._id}`}><img src={`${model.images[0]}`} alt={`${model.name} image`} className='thumbnail' /></Link>
+                                ) : (
+                                    <Link key={model._id} to={`/modelsdwg/${model._id}`}>{model.name}</Link>
+                                )
                             ))}
                         </div>
-
-
+                        <Link to={`/brands/${brandId}`} className="edit-link brand-button">Edit</Link>
                     </>
                 )}
-                <Link to={`/brands/${brandId}`} className="edit-link">Edit</Link>
             </div>
-        </div>
+        </div >
     );
 }
 

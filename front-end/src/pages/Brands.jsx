@@ -2,7 +2,6 @@ import React from 'react';
 import { useEffect, useState } from 'react';
 import Brand from '../components/Brand';
 import { Link } from 'react-router-dom';
-import '../CSS/Brand.css';
 
 function Brands() {
     const [brands, setBrands] = useState([]);
@@ -88,10 +87,14 @@ function Brands() {
     return (
         <div className="brands">
             <h1>Brands Page</h1>
-            <input className='search-box' type="text" placeholder="Search Brands" onChange={(e) => setSearch(e.target.value)} />
             <Link className='link button' to="/brands/new">Add New Brand</Link>
+            <input className='search-box' type="text" placeholder="Search Brands" value={search}  onChange={(e) => setSearch(e.target.value)} />
+            {search != "" ? (<button className='search-button' onClick={() => setSearch('')}>Clear</button>) : null}
+            {filteredBrands.length === 0 && <p>No brands found.</p>}
             {filteredBrands.map((brand) => (
-                <Brand key={brand._id} brandId={brand._id} />
+                <Brand key={brand._id} brandId={brand._id} handleClickItem={(property) => {
+                    setSearch(property);
+                }}/>
             ))}
         </div>
     );

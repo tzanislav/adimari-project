@@ -189,7 +189,7 @@ function BrandForm() {
           <label>
             Website:
             <input
-              type="url"
+              type="text"
               name="website"
               value={formData.website || ''}
               onChange={handleChange}

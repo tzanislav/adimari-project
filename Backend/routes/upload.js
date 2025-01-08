@@ -1,19 +1,32 @@
 const express = require('express');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
-const s3 = require('../config/awsConfig');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { RekognitionClient, DetectLabelsCommand } = require('@aws-sdk/client-rekognition');
+const axios = require('axios');
 const router = express.Router();
-const AWS = require("aws-sdk");
-const fs = require("fs");
+require('dotenv').config();
 
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+
+// AWS Configuration
+const s3 = new S3Client({
   region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
 });
 
-const rekognition = new AWS.Rekognition();
+const rekognition = new RekognitionClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
 router.use(express.json());
+
 
 
 // Configure multer to use S3 for storage
@@ -42,6 +55,11 @@ const upload = multer({
   }),
 });
 
+//test get route
+router.get('/', (req, res) => {
+  res.send('Welcome to Upload API');
+});
+
 // Define the multiple files upload route
 router.post('/', upload.array('files', 10), (req, res) => {
   const folder = req.query.folder || 'default'; // Extract folder from query param
@@ -55,7 +73,10 @@ router.post('/', upload.array('files', 10), (req, res) => {
   }
 });
 
-app.post("/analyze-image", async (req, res) => {
+
+// Analyze image with Rekognition
+router.post("/analyze-image", async (req, res) => {
+  console.log(req.body);
   try {
     const { imageUrl } = req.body;
 
@@ -63,27 +84,67 @@ app.post("/analyze-image", async (req, res) => {
       return res.status(400).json({ error: "Image URL is required." });
     }
 
+    // Validate URL
+    const isValidUrl = (url) => {
+      try {
+        const validUrl = new URL(url);
+        return validUrl.protocol === "http:" || validUrl.protocol === "https:";
+      } catch {
+        return false;
+      }
+    };
+
+    if (!isValidUrl(imageUrl)) {
+      return res.status(400).json({ error: "Invalid image URL." });
+    }
+
     // Fetch the image as a buffer
     const imageResponse = await axios.get(imageUrl, { responseType: "arraybuffer" });
     const imageBuffer = Buffer.from(imageResponse.data, "binary");
 
     // Rekognition call
+    const command = new DetectLabelsCommand({
+      Image: { Bytes: imageBuffer },
+    });
+
+    const response = await rekognition.send(command);
+    res.json(response.Labels);
+  } catch (error) {
+    console.error("Error processing image URL:", error);
+    res.status(500).json({ error: "Failed to analyze image." });
+  }
+});
+
+// Analyze S3 image route (Optional)
+router.get("/analyze-s3-image", async (req, res) => {
+  try {
+    const { key } = req.query;
+
+    if (!key) {
+      return res.status(400).json({ error: "S3 key is required." });
+    }
+
+    const s3Params = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: key,
+    };
+
+    // Get the image from S3
+    const command = new GetObjectCommand(s3Params);
+    const s3Object = await s3.send(command);
     const params = {
       Image: {
-        Bytes: imageBuffer,
+        Bytes: s3Object.Body,
       },
     };
 
-    rekognition.detectLabels(params, (err, data) => {
-      if (err) {
-        console.error("AWS Rekognition error:", err);
-        return res.status(500).json({ error: "Failed to analyze image." });
-      }
-      res.json(data);
-    });
+    const rekognitionCommand = new DetectLabelsCommand(params);
+    const rekognitionData = await rekognition.send(rekognitionCommand);
+
+    res.json(rekognitionData.Labels);
   } catch (error) {
-    console.error(error.message);
-    res.status(500).json({ error: "Error processing image URL." });
+    console.error("Error analyzing S3 image:", error);
+    res.status(500).json({ error: "Failed to analyze S3 image." });
   }
 });
 

@@ -7,6 +7,14 @@ const router = express.Router();
 // Route to add a brand
 router.post('/', async (req, res) => {
     try {
+        //Check if brand already exists by name
+        const existingBrand = await
+            Brand.findOne({ name: req
+                .body.name });
+        if (existingBrand) {
+            return res.status(400).send({ message: 'Brand already exists' });
+        }
+
         const newBrand = new Brand(req.body);
         const result = await newBrand.save();
         res.status(201).send({ message: 'Brand added successfully!', brand: result });

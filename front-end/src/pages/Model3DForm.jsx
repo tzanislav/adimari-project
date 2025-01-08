@@ -10,6 +10,7 @@ function Model3dForm() {
   const isEditing = Boolean(id); // Check if the page is for editing
   const [isDeleting, setIsDeleting] = useState(false); // State for delete confirmation
   const [brands, setBrands] = useState([]); // State for brand data
+  const [analysedImage, setAnalysedImage] = useState(false); // State for analyzed image data
 
   const [formData, setFormData] = useState({
     name: '',
@@ -66,6 +67,53 @@ function Model3dForm() {
     };
     fetchBrands();
   }, []);
+
+  // Analyze image with Rekognition
+  const analyzeImage = async (imageUrl) => {
+    if (formData.tags.length > 0) {
+      return;
+    }
+
+    //Check if imageUrl is a valid image
+    const isValidImageUrl = (url) => {
+      return /\.(jpg|jpeg|png|gif|bmp)$/i.test(url);
+    };
+
+    if (!isValidImageUrl(imageUrl)) {
+      setErrorMessage('Invalid image URL.');
+      return;
+    }
+  
+
+    setFormData((prev) => ({
+      ...prev,
+      tags: ["Analyzing..."],
+    }));
+    try {
+      const response = await axios.post('http://localhost:5000/upload/analyze-image', {
+        imageUrl,
+      });
+  
+      // Extract top-level names
+      const topLevelNames = response.data
+        .filter((item) => item.Confidence > 80)
+        .map((item) => item.Name);
+  
+      // Set the analysis and tags
+      setAnalysedImage(true);
+      setFormData((prev) => ({
+        ...prev,
+        tags: topLevelNames,
+      }));
+    } catch (error) {
+      console.error('Failed to analyze image:', error);
+      setFormData((prev) => ({
+        ...prev,
+        tags: [],
+      }));
+      setErrorMessage('Failed to analyze image.');
+    }
+  };
 
 
 
@@ -190,6 +238,8 @@ function Model3dForm() {
                     ...prev,
                     images: [...prev.images, ...uploadedUrls],
                   }));
+                  analyzeImage(uploadedUrls[0]);               
+
                 }} onRemove={(deletedUrl) => {
                   setFormData((prev) => ({
                     ...prev,

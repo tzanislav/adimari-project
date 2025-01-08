@@ -18,11 +18,11 @@ const FileUploader = ({ folderName, onUploadComplete, onRemove }) => {
   const isImage = (url) => url.match(/\.(jpeg|jpg|gif|png|webp)$/) != null;
 
   const handleFileUpload = async (files) => {
-    const maxSize = 1 * 1024 * 1024;
+    const maxSize = 4 * 1024 * 1024;
     const oversizedFiles = Array.from(files).filter((file) => file.size > maxSize);
 
     if (oversizedFiles.length > 0) {
-      setError('Some files exceed the 2MB size limit.');
+      setError('Some files exceed the 4MB size limit.');
       return;
     }
 

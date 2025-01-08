@@ -50,5 +50,28 @@ button:hover {
     background-color: #4b4b4b;
 }
 
+.thumbnails {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    overflow-y: auto;
+    max-height: 20%;
+}
 
+.thumbnails img {
+    width: 64px;
+    height: 64px;
+    margin: 5px;
+    padding: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background-color: rgba(206, 206, 206, 0);
+    background-size: cover;
+    object-fit: cover;
+}
+
+.thumbnails img:hover {
+    background-color: rgb(71, 71, 71);
+}
 

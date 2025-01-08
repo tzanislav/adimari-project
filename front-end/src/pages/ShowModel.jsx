@@ -60,6 +60,7 @@ function ShowModel() {
     return (
         <div className="model-page-container">
             <h1>{model.name}</h1>
+            <button onClick={() => window.history.back()}>Back</button>
             <div className="model-data-container">
                 {model.images.length > 0 ? (
 
