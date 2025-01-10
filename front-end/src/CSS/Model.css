@@ -53,3 +53,52 @@
     background-size: cover;
     object-fit: cover;
 }
+
+.model-details .hero-image-thumbnail:hover
+{
+    cursor: pointer;
+}
+
+.model-image
+{
+    position: relative;
+}
+
+
+.model-image button:hover
+{
+    background-color: rgb(197, 197, 197);
+}
+
+
+.add-button
+{
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    margin: 0px;
+    padding: 10px 20px;
+    background-color: #f86437;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #333;
+    transition: all 0.5s;
+}
+
+.remove-button
+{
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    margin: 0px;
+    padding: 10px 20px;
+    background-color: #a8a5a3;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #333;
+    transition: all 0.5s;
+}

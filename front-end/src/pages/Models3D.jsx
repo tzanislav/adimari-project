@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import Model from '../components/Model';
 import { Link } from 'react-router-dom';
 import '../CSS/Model.css';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 function Models() {
     const [models, setModels] = useState([]);
@@ -9,6 +11,8 @@ function Models() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filteredModels, setFilteredModels] = useState([]);
+    const [activeSelectionObject, setActiveSelectionObject] = useState(null);
+    const { activeSelection } = useActiveSelection();
 
     useEffect(() => {
         const fetchModels = async () => {
@@ -29,6 +33,30 @@ function Models() {
 
         fetchModels();
     }, []);
+
+    //Get active selection
+    useEffect(() => {
+        const fetchActiveProject = async () => {
+            if(activeSelection === null) {
+                console.log('No active project selected');
+                return;
+            }
+            try {
+                const response = await fetch(`http://localhost:5000/selects/${activeSelection[2]}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch active project');
+                }
+                const data = await response.json();
+                console.log('Active project response:', data.name);
+                setActiveSelectionObject(data);
+            } catch (err) {
+                setError(err.message);
+            }
+        };
+
+        fetchActiveProject();
+
+    }, [activeSelection]);
 
     useEffect(() => {
         if (search !== '') {
@@ -57,6 +85,58 @@ function Models() {
         }
     }, [search, models]);
 
+
+    const handleAddToSelection = (model_id, isAdding) => {
+        if (!activeSelectionObject) {
+            console.error("activeSelectionObject is not defined");
+            return;
+        }
+    
+        console.log(
+            `${isAdding ? "Add" : "Remove"} model to selection ${activeSelectionObject.name} model: ${model_id}`
+        );
+    
+        // Modify the models array based on `isAdding`
+        const updatedModels = isAdding
+            ? [...(activeSelectionObject.models || []), model_id] // Add model
+            : (activeSelectionObject.models || []).filter((id) => id !== model_id); // Remove model
+    
+        const newSelection = {
+            ...activeSelectionObject,
+            models: updatedModels,
+        };
+    
+        // Update state
+        setActiveSelectionObject(newSelection);
+        console.log('New selection: ', newSelection);
+    
+        // Update the backend
+        const updateSelection = async () => {
+            try {
+                const response = await fetch(`http://localhost:5000/selects/${activeSelectionObject._id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newSelection),
+                });
+    
+                if (!response.ok) {
+                    throw new Error('Failed to update selection');
+                }
+    
+                console.log('Selection updated successfully');
+            } catch (err) {
+                setError(err.message);
+            }
+        };
+    
+        updateSelection();
+    };
+    
+    
+    
+
     if (loading) {
         return <p>Loading...</p>;
     }
@@ -76,7 +156,7 @@ function Models() {
             />
             <Link className='link button' to="/models3d/new">Add New Model</Link>
             {filteredModels.map((model) => (
-                <Model key={model._id} modelId={model._id} />
+                <Model key={model._id} modelId={model._id} handleAddModel = {handleAddToSelection} _selection = {activeSelectionObject}/>
             ))}
         </div>
     );

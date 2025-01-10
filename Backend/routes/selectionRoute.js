@@ -1,5 +1,6 @@
 const express = require('express');
 const Selection = require('../models/selection');
+const Model = require('../models/model3d');
 const Project = require('../models/project');
 const router = express.Router();
 
@@ -53,19 +54,33 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Route to fetch a single selection
+// Route to fetch a single selection along with models in the models array
 router.get('/:id', async (req, res) => {
     try {
+        // Fetch the selection by its ID
         const selection = await Selection.findById(req.params.id);
+
         if (!selection) {
-            res.status(404).send({ message: 'Selection not found' });
-        } else {
-            res.status(200).send(selection);
+            return res.status(404).send({ message: 'Selection not found' });
         }
+
+        // Fetch the models whose IDs are in the selection's models array
+        const modelsInSelection = await Model.find({
+            _id: { $in: selection.models }
+        });
+
+        // Combine selection with the models' detailed information
+        const response = {
+            ...selection.toObject(),
+            detailedModels: modelsInSelection,
+        };
+
+        res.status(200).send(response);
     } catch (err) {
         res.status(500).send({ error: 'Failed to fetch selection', details: err });
     }
 });
+
 
 // Route to delete a selection
 router.delete('/:id', async (req, res) => {

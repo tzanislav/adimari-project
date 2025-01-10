@@ -1,0 +1,63 @@
+.project-page
+{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+.selection-list
+{
+    width: 80%;
+    margin: auto;
+    padding: 10px 40px;
+    font-size: .7em;
+    font-weight: normal;
+}
+
+
+
+.selection-list button
+{
+    margin: 0 45px;
+    height: 25px;
+    font-size: 12px;
+    padding: 3px 10px;
+    background:none;
+
+}
+
+.selection-item
+{
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 45px;
+    width: 60%;
+    border-radius: 20px;
+    margin: 5px auto;
+    font-size: 1.5em;
+    font-weight: bold;
+    background-color: rgb(172, 197, 155);
+    transition: all .3s;
+    text-transform: capitalize;
+}
+.selection-item:hover
+{
+    background-color: rgb(170, 170, 170);
+}
+
+.create-selection
+{
+    width: 60%;
+    background-color: rgb(219, 219, 219);
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+.create-selection input
+{
+    width: 80%;
+}

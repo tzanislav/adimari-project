@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from "react";
 import { Link } from "react-router-dom";
-
+import ListProject from "../components/ListProject";
+import '../CSS/Projects.css';
 
 function Projects() {
     const [projects, setProjects] = useState([]);
@@ -20,6 +21,18 @@ function Projects() {
             });
     }, []);
 
+
+    const handleDelete = async (id) => {
+        try {
+            await fetch(`http://localhost:5000/projects/${id}`, {
+                method: 'DELETE',
+            });
+            setProjects((prev) => prev.filter((project) => project._id !== id));
+        } catch (error) {
+            console.error("Failed to delete project:", error);
+        }
+    };
+
     if (loading) {
         return <p>Loading...</p>;
     }
@@ -29,18 +42,16 @@ function Projects() {
     }
 
     return (
-        <div>
+        <div className="projects-page"> 
             <h1>Projects</h1>
             <Link to="/projects/new">Create a new project</Link>
-            <ul>
+
                 {projects.map((project) => (
-                    <li key={project.id}>
-                        <h2>{project.name}</h2>
-                        <p>{project.description}</p>
-                        <Link to={`/projects/${project._id}`}>Open</Link>
-                    </li>
+                    <div key={project._id} className='list-project-container'>
+                        <ListProject _project={project} onDelete={handleDelete} />
+                    </div>
                 ))}
-            </ul>
+
         </div>
     );
 }

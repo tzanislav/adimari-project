@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-
 import axios from "axios";
-import { Link } from "react-router-dom";
+import '../CSS/EditBox.css';
 
 
-function SelectForm({ id, parent, onSuccess }) {
+
+
+function EditSelection({ id, parent, onSuccess }) {
 
     const isEditing = Boolean(id); // Check if the page is for editing
     const [isDeleting, setIsDeleting] = useState(false); // State for delete confirmation
@@ -39,6 +40,10 @@ function SelectForm({ id, parent, onSuccess }) {
             fetchProject();
         }
     }, [id, isEditing]);
+
+    
+
+   
 
     // Handle input changes
     const handleChange = (e) => {
@@ -112,17 +117,11 @@ function SelectForm({ id, parent, onSuccess }) {
     }
 
     return (
-        <div className="brand-form" >
-            <h2>{isEditing ? 'Edit Selection' : 'Create New Selection'}</h2>
-
+        <div >
             {!loading && (
                 <>
-                {successMessage && <p className="success">{successMessage}</p>}
-                {errorMessage && <p className="error">{errorMessage}</p>}
-                { id ? (<p> Editing selection: {id}</p>) : null }
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit} className="edit-form" >
                     <label>
-                        Name:
                         <input
                             type="text"
                             name="name"
@@ -131,7 +130,10 @@ function SelectForm({ id, parent, onSuccess }) {
                         />
                     </label>
                     <button type="submit">Save</button>
+                    
                 </form>
+                {successMessage && <p className="success">{successMessage}</p>}
+                {errorMessage && <p className="error">{errorMessage}</p>}
                 </>
             )}
 
@@ -142,4 +144,4 @@ function SelectForm({ id, parent, onSuccess }) {
 
 }
 
-export default SelectForm;
+export default EditSelection;

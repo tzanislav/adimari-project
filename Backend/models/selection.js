@@ -14,10 +14,13 @@ const selectionSchema = new mongoose.Schema({
         ref: 'Project',
         required: true,
     },
-    models3d: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Model3d',
-    }],
+    models: {
+        type: [String], default: null 
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
 
 });
 

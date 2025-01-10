@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showOnlyName } from '../utils/utils';
 import '../CSS/Model.css';
+import { useActiveSelection } from "../components/selectionContext";
 
-function Model({ modelId }) {
+function Model({ modelId, handleAddModel, _selection }) {
     const [model, setModel] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
-
     const [images, setImages] = useState([]);
     const [files, setFiles] = useState([]);
+    const { activeSelection } = useActiveSelection();
 
     // Helper function to filter image files
     const filterImages = (files) => {
@@ -41,11 +42,13 @@ function Model({ modelId }) {
     }, [modelId]);
 
 
+
     const handleCLick = () => {
         //Open model page
         window.location.href = `/models3d/${modelId}`;
 
     }
+
 
 
 
@@ -62,10 +65,45 @@ function Model({ modelId }) {
     }
 
     return (
-        <div className="model-details" onClick={() => handleCLick()} >
+        <div className="model-details">
 
             <div className='model-data'>
-                <img src={images[0]} className='hero-image-thumbnail' alt={model.name} />
+                <div className='model-image'>
+                    <img src={images[0]} className='hero-image-thumbnail' alt={model.name} onClick={() => handleCLick()} />
+                    {activeSelection &&
+
+                        <>
+                            {_selection?.models?.includes(modelId) ? (
+                                // Remove Button
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        if (handleAddModel) {
+                                            handleAddModel(modelId, false); // Pass false for Remove
+                                        }
+                                    }}
+                                    className="remove-button"
+                                >
+                                    Remove
+                                </button>
+                            ) : (
+                                // Add Button
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        if (handleAddModel) {
+                                            handleAddModel(modelId, true); // Pass true for Add
+                                        }
+                                    }}
+                                    className="add-button"
+                                >
+                                    Add
+                                </button>
+                            )}
+                        </>
+
+                    }
+                </div>
                 <h1>{model.name}</h1>
 
                 <p><strong>Category:</strong> {model.category}</p>
@@ -108,6 +146,8 @@ function Model({ modelId }) {
                     </>
                 )}
                 <Link to={`/models3d/edit/${modelId}`} className="edit-link">Edit</Link>
+
+
             </div>
         </div>
     );

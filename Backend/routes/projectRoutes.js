@@ -17,18 +17,22 @@ router.post('/', async (req, res) => {
 // Route to update a project
 router.put('/:id', async (req, res) => {
     try {
-        console.log("Updating project with selection:", req.body);
+        console.log("Updating project with data:", req.body);
 
-        // Fetch the selection (assumes `Selection.add` creates or retrieves the selection)
-        const sel = await Selection.findById(req.body.selection);
-        if (!sel) {
-            return res.status(404).send({ message: 'Selection not found' });
-        }
+        // Build the update object dynamically from the request body
+        const updateFields = {};
 
-        // Find the project and add the selection to the `selections` array
+        // Add other fields to the update object dynamically
+        Object.keys(req.body).forEach((key) => {
+            if (key !== 'selections') {
+                updateFields[key] = req.body[key];
+            }
+        });
+
+        // Find the project and apply updates
         const project = await Project.findByIdAndUpdate(
             req.params.id,
-            { $addToSet: { selections: sel._id } }, // Add the selection ID, ensuring no duplicates
+            updateFields,
             { new: true } // Return the updated project
         );
 
@@ -43,6 +47,7 @@ router.put('/:id', async (req, res) => {
         res.status(500).send({ error: 'Failed to update project', details: err });
     }
 });
+
 
 // Route to fetch all projects
 router.get('/', async (req, res) => {
@@ -75,6 +80,10 @@ router.delete('/:id', async (req, res) => {
         if (!project) {
             res.status(404).send({ message: 'Project not found' });
         } else {
+            const selections = await Selection.find({ parentProject: req.params.id });
+            if (selections.length > 0) {
+                await Selection.deleteMany({ parentProject: req.params.id });
+            }
             res.status(200).send({ message: 'Project deleted successfully!', project });
         }
     } catch (err) {
@@ -90,7 +99,6 @@ router.get ('/:id/selections', async (req, res) => {
             res.status(404).send({ message: 'Project not found' });
         } else {
             const selections = await Selection.find({ parentProject: req.params.id });
-            console.log("Selections found:", selections);
             res.status(200).send(selections);
         }
     } catch (err) {
