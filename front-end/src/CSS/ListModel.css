@@ -1,0 +1,37 @@
+.list-model-item {
+    width: 75%;
+    margin: 10px auto;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.list-model-item img {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+}
+
+.list-model-part
+{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+
+.list-model-item h3 {
+    margin: 0 ;
+    font-size: 1.5em;
+}
+
+.list-model-part-info {
+    margin: 0 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: left;
+    align-items: start;
+}

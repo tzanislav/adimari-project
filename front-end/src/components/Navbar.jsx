@@ -35,8 +35,8 @@ function Navbar() {
       <div className='selection-bar' style={{ top: activeSelection ? '0' : '-100px' }}>
         {!activeSelection ? <h3>No active selection</h3> :
           <>
-            <h3>{activeSelection[1]}</h3>
-            <h2>{activeSelection[0]}</h2>
+            <Link to={`/projects/${activeSelection[3]}`} className='active-selection-button-smaller'>{activeSelection[1]}</Link>
+            <Link to={`/selections/${activeSelection[2]}`} className='active-selection-button-bigger'>{activeSelection[0]}</Link>
           </>
         }
         <button onClick={() => clearActiveSelection()} className='active-selection-button'>Clear</button>

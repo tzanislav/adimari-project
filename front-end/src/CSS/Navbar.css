@@ -86,10 +86,29 @@ body {
     position: relative;
     z-index: 1000;
     padding: 2px 25px;
-    margin: 0;
+    margin: 10px;
     background: none;
     font-size: 10px;
   }
+
+  .active-selection-button-bigger, .active-selection-button-smaller
+  {
+    display: block;
+    color: white;
+    padding: 3px 20px;
+  }
+  .active-selection-button-bigger
+  {
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+
+  .active-selection-button-bigger:hover, .active-selection-button-smaller:hover
+  {
+    color: black;
+    border-radius: 5px;
+  }
+
   
   /* Responsive Styles */
   @media (max-width: 768px) {

@@ -10,6 +10,7 @@ import ShowModel from './pages/ShowModel'; // Optional component to show a singl
 import Projects from './pages/Projects'; // Optional component to show projects
 import ProjectForm from './pages/ProjectForm';
 import ShowProject from './pages/ShowProject'; // Optional component to show a single project
+import ShowSelection from './pages/ShowSelection';
 import Navbar from './components/Navbar'; // Optional navigation component
 import { ActiveSelectionProvider } from "./components/selectionContext";
 import './App.css';
@@ -32,6 +33,7 @@ function App() {
           <Route path="/projects/:id" element={<ShowProject />} />
           <Route path="/projects/edit/:id" element={<ProjectForm />} />
           <Route path="/projects/new" element={<ProjectForm />} />
+          <Route path="/selections/:id" element={<ShowSelection />} />
           <Route path="/test" element={<ExampleForm />} />
         </Routes>
       </ActiveSelectionProvider>
