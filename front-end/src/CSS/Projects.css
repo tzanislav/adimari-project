@@ -1,13 +1,10 @@
 .projects-page
 {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
+    width: 80%;
+    margin: 0 auto;
 }
 
-.projects-page button, .projects-page a
+.projects-page button, .list-project-item a
 {
     margin: 0 45px;
     font-size: 12px;

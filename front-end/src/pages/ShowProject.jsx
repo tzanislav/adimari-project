@@ -1,7 +1,8 @@
-import React, { useState, useEffect, act } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useActiveSelection } from "../components/selectionContext";
 import EditSelection from "../components/EditSelection";
+import DeleteBox from "../components/DeleteBox";
 import axios from "axios";
 import '../CSS/EditProject.css';
 
@@ -14,24 +15,40 @@ function ProjectPage() {
     const [editId, setEditId] = useState(null);
     const [selections, setSelections] = useState([]);
     const [refreshKey, setRefreshKey] = useState(0); // Trigger re-fetches
-    const { setActiveSelection } = useActiveSelection();
-    const { clearActiveSelection } = useActiveSelection();
+    const { setActiveSelection, clearActiveSelection } = useActiveSelection();
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Fetch project data
     useEffect(() => {
         const fetchProject = async () => {
             try {
+                // Fetch project data
                 const response = await axios.get(`http://localhost:5000/projects/${id}`);
-                setProject(response.data);
+                console.log("Project response:", response.data);
+
+                if (!response.data) {
+                    console.error("Project data is undefined in the API response");
+                    setProject(null); // Explicitly set project to null
+                    return;
+                }
+
+                setProject(response.data); // Update project state
 
                 // Fetch selections
                 const selectionResponse = await axios.get(`http://localhost:5000/projects/${id}/selections`);
-                const sortedSelections = selectionResponse.data.sort(
-                    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-                );
-                setSelections(sortedSelections);
+
+                if (!selectionResponse.data) {
+                    console.warn("Selections data is undefined or empty in the API response");
+                    setSelections([]); // Explicitly set selections to an empty array
+                } else {
+                    const sortedSelections = selectionResponse.data.sort(
+                        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+                    );
+                    setSelections(sortedSelections);
+                }
+
             } catch (error) {
-                console.error("Failed to load project:", error);
+                console.error("Failed to load project or selections:", error);
                 setError(error);
             } finally {
                 setLoading(false);
@@ -40,6 +57,7 @@ function ProjectPage() {
 
         fetchProject();
     }, [id, refreshKey]); // Trigger whenever `id` or `refreshKey` changes
+
 
     // Handle successful creation or edit of a selection
     const onSuccessfulSelectionEdit = async (selectionId) => {
@@ -63,20 +81,27 @@ function ProjectPage() {
         }
     };
 
-    const handleDelete = async (deleteId) => {
+    const handleDelete = async () => {
         try {
-            await axios.delete(`http://localhost:5000/selects/${deleteId}`);
-            project.selections = project.selections.filter((selection) => selection._id !== deleteId);
+            console.log("Deleting selection with ID:", editId);
+
+            // Perform the deletion
+            await axios.delete(`http://localhost:5000/selects/${editId}`);
+
+            // Update the selections state directly
+            setSelections((prevSelections) =>
+                prevSelections.filter((selection) => selection._id !== editId)
+            );
 
             setEditId(null);
-            setIsEditingSelection(false);
-            setRefreshKey((prev) => prev + 1); // Increment refreshKey to refetch
+            setIsDeleting(false);
             clearActiveSelection();
         } catch (error) {
             console.error("Failed to delete selection:", error);
             setError(error);
         }
     };
+
 
 
 
@@ -105,7 +130,13 @@ function ProjectPage() {
                     <EditSelection parent={id} onSuccess={onSuccessfulSelectionEdit} />
                 </div>
             )}
+            {isDeleting && (
+                <DeleteBox deleteFunction={handleDelete} closeFunction={() => setIsDeleting(false)} itemName="Selection" />
+            )
 
+            }
+
+            {selections.length === 0 && <p>No selections available.</p>}
 
             <ul className="selection-list">
                 {selections.map((selection) => (
@@ -120,14 +151,11 @@ function ProjectPage() {
                             <>
                                 <h3>{selection.name}</h3>
                                 <div className="selection-item-buttons">
-                                    <button onClick={() => handleDelete(selection._id)}>
+                                    <button onClick={() => { setIsDeleting(true); setEditId(selection._id) }}>
                                         Delete
                                     </button>
                                     <button onClick={() => { setEditId(selection._id); setIsEditingSelection(true); }}>
                                         Rename
-                                    </button>
-                                    <button onClick={() => { setEditId(selection._id); setIsEditingSelection(true); }}>
-                                        Open
                                     </button>
                                     <button onClick={() => setActiveSelection([selection.name, project.name, selection._id, project._id])}>Select</button>
                                 </div>

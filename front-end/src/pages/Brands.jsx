@@ -87,9 +87,9 @@ function Brands() {
     return (
         <div className="brands">
             <h1>Brands Page</h1>
-            <Link className='link button' to="/brands/new">Add New Brand</Link>
             <input className='search-box' type="text" placeholder="Search Brands" value={search}  onChange={(e) => setSearch(e.target.value)} />
             {search != "" ? (<button className='search-button' onClick={() => setSearch('')}>Clear</button>) : null}
+            <Link className='link button' to="/brands/new">Add New Brand</Link>
             {filteredBrands.length === 0 && <p>No brands found.</p>}
             {filteredBrands.map((brand) => (
                 <Brand key={brand._id} brandId={brand._id} handleClickItem={(property) => {

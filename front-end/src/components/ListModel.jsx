@@ -24,7 +24,7 @@ function ListModel({ model }) {
                     <h3>{model.name}</h3>
                     <p> Price: {model.price} EUR</p>
                     <p> Brand: {model.brand}</p>
-
+                    <p> Class: {model.class}</p>
                 </div>
             </div>
             <button onClick={copyToClipboard}>

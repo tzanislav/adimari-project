@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import DeleteBox from '../components/DeleteBox';
 import axios from 'axios';
 import '../CSS/EditBrand.css';
 
@@ -107,22 +108,14 @@ function ProjectForm() {
       <h2>{isEditing ? 'Edit Project' : 'Create New Project'}</h2>
       {loading && <p>Loading project data...</p>}
 
-      <div className="delete-box">
-        {isDeleting && (
-          <>
-            <div className="overlay"></div>
-            <div className="delete-box-content">
-              <p>Are you sure you want to delete this model?</p>
-              <button type="button" onClick={() => setIsDeleting(false)}>
-                Cancel
-              </button>
-              <button type="button" className="deleteButton" onClick={handleDelete}>
-                Delete Model
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+      {isDeleting && (
+        <DeleteBox
+          itemName="Project"
+          deleteFunction={handleDelete}
+          closeFunction={() => setIsDeleting(false)}
+        />
+      )}
+
 
       {!loading && (
         <form onSubmit={handleSubmit}>

@@ -4,6 +4,7 @@ import axios from 'axios';
 import FileUploader from '../components/FileUploader'; // Ensure correct import path
 import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
+import DeleteBox from "../components/DeleteBox";
 
 function BrandForm() {
   const { id } = useParams(); // Get ID from URL
@@ -51,6 +52,7 @@ function BrandForm() {
           setErrorMessage('Failed to fetch brand data.');
         } finally {
           setLoading(false);
+          setIsDeleting(false);
         }
       };
       fetchBrand();
@@ -136,22 +138,14 @@ function BrandForm() {
       <h2>{isEditing ? 'Edit Brand' : 'Create New Brand'}</h2>
       {loading && <p>Loading brand data...</p>}
 
-      <div className="delete-box">
+
         {isDeleting && (
-          <>
-            <div className="overlay"></div>
-            <div className="delete-box-content">
-              <p>Are you sure you want to delete this brand?</p>
-              <button type="button" onClick={() => setIsDeleting(false)}>
-                Cancel
-              </button>
-              <button type="button" className="deleteButton" onClick={handleDelete}>
-                Delete Brand
-              </button>
-            </div>
-          </>
+          <DeleteBox
+            itemName="Brand"
+            deleteFunction={handleDelete}
+            closeFunction={() => setIsDeleting(false)}
+          />
         )}
-      </div>
 
       {!loading && (
         <form onSubmit={handleSubmit}>

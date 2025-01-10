@@ -1,4 +1,4 @@
-import React , {useState, useEffect} from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import ListModel from "../components/ListModel";
@@ -10,6 +10,20 @@ const ShowSelection = () => {
 
     //Fetch selection data
     const [selection, setSelection] = useState(null);
+    const [totalPrice, setTotalPrice] = useState(0);
+    const [brandsUsed, setBrandsUsed] = useState([]);
+
+
+    useEffect(() => {
+        if (selection) {
+            const total = selection.detailedModels.reduce((sum, model) => sum + model.price, 0);
+            setTotalPrice(total);
+
+            const brands = selection.detailedModels.map((model) => model.brand);
+            setBrandsUsed([...new Set(brands)]);
+
+        }
+    }, [selection]);
 
     useEffect(() => {
         axios.get(`http://localhost:5000/selects/${id}`)
@@ -20,7 +34,7 @@ const ShowSelection = () => {
                 console.error(error);
             });
     }
-    , [id]);
+        , [id]);
 
     if (!selection) {
         return <div>Loading...</div>;
@@ -32,6 +46,23 @@ const ShowSelection = () => {
             {selection.detailedModels.map((model) => (
                 <ListModel key={model._id} model={model} />
             ))}
+            <div className="show-selection-summary">
+                <div className="show-selection-brands">
+                    <p>Brands Used:</p>
+                    <hr />
+                    <ul>
+                        {brandsUsed.map((brand) => (
+                            <li key={brand}>{brand}</li>
+                        ))}
+                    </ul>
+                </div>
+                <div className="show-selection-total">
+                    <p>Total Price:</p>
+                    <hr />
+                    <h1>{totalPrice} EUR</h1>
+                </div>
+
+            </div>
 
         </div>
     );
