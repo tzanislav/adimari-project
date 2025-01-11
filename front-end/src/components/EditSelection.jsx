@@ -64,6 +64,7 @@ function EditSelection({ id, parent, onSuccess }) {
     // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
+        e.stopPropagation();
         const url = isEditing
             ? `http://localhost:5000/selects/${id}`
             : 'http://localhost:5000/selects';

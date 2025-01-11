@@ -60,7 +60,8 @@ function ProjectPage() {
 
 
     // Handle successful creation or edit of a selection
-    const onSuccessfulSelectionEdit = async (selectionId) => {
+    const onSuccessfulSelectionEdit = async (e, selectionId) => {
+        e.stopPropagation();
         console.log("Received selection ID:", selectionId);
 
         try {
@@ -140,7 +141,11 @@ function ProjectPage() {
 
             <ul className="selection-list">
                 {selections.map((selection) => (
-                    <li key={selection._id} className="selection-item">
+                    <li
+                        key={selection._id}
+                        className="selection-item"
+                        onClick={() => window.location.href = `/selections/${selection._id}`}
+                    >
                         {isEditingSelection && editId === selection._id ? (
                             <EditSelection
                                 id={selection._id}
@@ -151,19 +156,44 @@ function ProjectPage() {
                             <>
                                 <h3>{selection.name}</h3>
                                 <div className="selection-item-buttons">
-                                    <button onClick={() => { setIsDeleting(true); setEditId(selection._id) }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent triggering the parent `onClick`
+                                            setIsDeleting(true);
+                                            setEditId(selection._id);
+                                        }}
+                                    >
                                         Delete
                                     </button>
-                                    <button onClick={() => { setEditId(selection._id); setIsEditingSelection(true); }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent triggering the parent `onClick`
+                                            setEditId(selection._id);
+                                            setIsEditingSelection(true);
+                                        }}
+                                    >
                                         Rename
                                     </button>
-                                    <button onClick={() => setActiveSelection([selection.name, project.name, selection._id, project._id])}>Select</button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent triggering the parent `onClick`
+                                            setActiveSelection([
+                                                selection.name,
+                                                project.name,
+                                                selection._id,
+                                                project._id,
+                                            ]);
+                                        }}
+                                    >
+                                        Select
+                                    </button>
                                 </div>
                             </>
                         )}
                     </li>
                 ))}
             </ul>
+
         </div>
     );
 }

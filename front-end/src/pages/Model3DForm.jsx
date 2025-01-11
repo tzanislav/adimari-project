@@ -4,6 +4,7 @@ import axios from 'axios';
 import FileUploader from '../components/FileUploader'; // Ensure correct import path
 import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
+import DeleteBox from '../components/DeleteBox';
 
 function Model3dForm() {
   const { id } = useParams(); // Get ID from URL
@@ -189,22 +190,15 @@ function Model3dForm() {
       <h2>{isEditing ? 'Edit Model' : 'Create New Model'}</h2>
       {loading && <p>Loading model data...</p>}
 
-      <div className="delete-box">
+      
         {isDeleting && (
-          <>
-            <div className="overlay"></div>
-            <div className="delete-box-content">
-              <p>Are you sure you want to delete this model?</p>
-              <button type="button" onClick={() => setIsDeleting(false)}>
-                Cancel
-              </button>
-              <button type="button" className="deleteButton" onClick={handleDelete}>
-                Delete Model
-              </button>
-            </div>
-          </>
+          <DeleteBox
+            itemName={formData.name}
+            deleteFunction={handleDelete}
+            closeFunction={() => setIsDeleting(false)}
+          />
         )}
-      </div>
+      
 
       {!loading && (
         <form onSubmit={handleSubmit}>
