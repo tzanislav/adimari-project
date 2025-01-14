@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import FileUploader from '../components/FileUploader'; // Ensure correct import path
@@ -20,6 +20,13 @@ function ItemForm() {
     distributor: [],
     brand: []
   });
+
+  const formRefs = {
+    name: useRef(null),
+    brand: useRef(null),
+    distributor: useRef(null),
+    category: useRef(null),
+  };
 
 
   const [formData, setFormData] = useState({
@@ -111,7 +118,29 @@ function ItemForm() {
     }
   };
 
+  const handleBlur = (field) => {
+    setTimeout(() => {
+      setSuggestions((prev) => ({
+        ...prev,
+        [field]: [],
+      }));
+    }, 100); // Delay to allow onClick events to process
+  };
 
+  const handleFocus = (field) => {
+    if (formData[field]) {
+      const filteredSuggestions = [...new Set(
+        items
+          .map((item) => item[field])
+          .filter((val) => val && val.toLowerCase().includes(formData[field].toLowerCase()))
+      )];
+
+      setSuggestions((prev) => ({
+        ...prev,
+        [field]: filteredSuggestions,
+      }));
+    }
+  };
 
 
   const handleSuggestionClick = (field, value) => {
@@ -250,56 +279,69 @@ function ItemForm() {
           <label>
             Name:
             <input
+              ref={formRefs.name}
               type="text"
               name="name"
+              autoComplete="off"
               value={formData.name || ''}
               onChange={handleChange}
+              onBlur={() => handleBlur('name')}
+              onFocus={() => handleFocus('name')}
               required
             />
           </label>
           <SuggestionsBox
             suggestions={suggestions["name"]}
             onSuggestionClick={(value) => {
-              setFormData((prev) => ({ ...prev, category: value }));
-              setSuggestions((prev) => ({ ...prev, category: [] })); // Clear suggestions
+              setFormData((prev) => ({ ...prev, name: value }));
+              setSuggestions((prev) => ({ ...prev, name: [] }));
             }}
-            onClose={() => setSuggestions((prev) => ({ ...prev, category: [] }))}
+            onClose={() => setSuggestions((prev) => ({ ...prev, name: [] }))}
           />
 
           <label>
             Brand:
             <input
+              ref={formRefs.brand}
               type="text"
               name="brand"
               value={formData.brand || ''}
               onChange={handleChange}
+              onBlur={() => handleBlur('brand')}
+              onFocus={() => handleFocus('brand')}
+              autoComplete="off"
               required
             />
           </label>
           <SuggestionsBox
             suggestions={suggestions["brand"]}
             onSuggestionClick={(value) => {
-              setFormData((prev) => ({ ...prev, category: value }));
-              setSuggestions((prev) => ({ ...prev, category: [] })); // Clear suggestions
+              setFormData((prev) => ({ ...prev, brand: value }));
+              setSuggestions((prev) => ({ ...prev, brand: [] }));
             }}
-            onClose={() => setSuggestions((prev) => ({ ...prev, category: [] }))}
+            onClose={() => setSuggestions((prev) => ({ ...prev, brand: [] }))}
           />
 
           <label>
             Distributor:
             <input
+              ref={formRefs.distributor}
+              type="text"
               name="distributor"
               value={formData.distributor || ''}
+              autoComplete="off"
               onChange={handleChange}
+              onBlur={() => handleBlur('distributor')}
+              onFocus={() => handleFocus('distributor')}
             />
           </label>
           <SuggestionsBox
             suggestions={suggestions["distributor"]}
             onSuggestionClick={(value) => {
-              setFormData((prev) => ({ ...prev, category: value }));
-              setSuggestions((prev) => ({ ...prev, category: [] })); // Clear suggestions
+              setFormData((prev) => ({ ...prev, distributor: value }));
+              setSuggestions((prev) => ({ ...prev, distributor: [] }));
             }}
-            onClose={() => setSuggestions((prev) => ({ ...prev, category: [] }))}
+            onClose={() => setSuggestions((prev) => ({ ...prev, distributor: [] }))}
           />
 
           <label>
@@ -321,7 +363,7 @@ function ItemForm() {
             />
           </label>
 
-          {formData.name ? (
+          {formData.name.length > 2 ? (
             <label>
               Images:
               <FileUploader
@@ -332,22 +374,21 @@ function ItemForm() {
                     files: [...prev.files, ...uploadedUrls],
                   }));
                   analyzeImage(uploadedUrls[0]);
-
-                }} onRemove={(deletedUrl) => {
+                }}
+                onRemove={(deletedUrl) => {
                   setFormData((prev) => ({
                     ...prev,
                     files: prev.files.filter((url) => url !== deletedUrl),
                   }));
                 }}
               />
-            </label>) :
-
+            </label>
+          ) : (
             <label>
               Files:
-              <p className='error' >Upload files after entering a name</p>
+              <p className='error'>Upload files after entering a name</p>
             </label>
-
-          }
+          )}
 
           {formData.files.length > 0 && (
             <ul>
@@ -373,10 +414,14 @@ function ItemForm() {
           <label>
             Category:
             <input
+              ref={formRefs.category}
               type="text"
               name="category"
               value={formData.category || ''}
               onChange={handleChange}
+              onBlur={() => handleBlur('category')}
+              onFocus={() => handleFocus('category')}
+              autoComplete="off"
               required
             />
           </label>
@@ -384,7 +429,7 @@ function ItemForm() {
             suggestions={suggestions["category"]}
             onSuggestionClick={(value) => {
               setFormData((prev) => ({ ...prev, category: value }));
-              setSuggestions((prev) => ({ ...prev, category: [] })); // Clear suggestions
+              setSuggestions((prev) => ({ ...prev, category: [] }));
             }}
             onClose={() => setSuggestions((prev) => ({ ...prev, category: [] }))}
           />

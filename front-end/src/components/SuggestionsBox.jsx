@@ -1,14 +1,19 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import "../CSS/SuggestionsBox.css";
 
 const SuggestionsBox = ({ suggestions, onSuggestionClick, onClose }) => {
   const boxRef = useRef(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (boxRef.current && !boxRef.current.contains(event.target)) {
+        setIsFocused(false);
         onClose();
+      }
+      else {
+        setIsFocused(true);
       }
     };
 
@@ -22,6 +27,7 @@ const SuggestionsBox = ({ suggestions, onSuggestionClick, onClose }) => {
 
   return (
     <div className="suggestions-box" ref={boxRef}>
+      <h3 className="suggestions-box-title">Suggestions:</h3>
       {suggestions.map((suggestion, index) => (
         <div
           key={index}
