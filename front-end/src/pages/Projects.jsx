@@ -11,7 +11,7 @@ function Projects() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        fetch('http://localhost:5000/projects')
+        fetch('http://adimari-tzani:5000/projects')
             .then((response) => response.json())
             .then((data) => {
                 setProjects(data);
@@ -27,7 +27,7 @@ function Projects() {
 
     const handleDelete = async (id) => {
         try {
-            await fetch(`http://localhost:5000/projects/${id}`, {
+            await fetch(`http://adimari-tzani:5000/projects/${id}`, {
                 method: 'DELETE',
             });
             setProjects((prev) => prev.filter((project) => project._id !== id));

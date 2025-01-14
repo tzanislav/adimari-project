@@ -24,7 +24,7 @@ function EditSelection({ id, parent, onSuccess }) {
             const fetchProject = async () => {
                 setLoading(true);
                 try {
-                    const response = await axios.get(`http://localhost:5000/selects/${id}`);
+                    const response = await axios.get(`http://adimari-tzani:5000/selects/${id}`);
                     const data = response.data;
                     setFormData({
                         name: data.name || '',
@@ -66,8 +66,8 @@ function EditSelection({ id, parent, onSuccess }) {
         e.preventDefault();
         e.stopPropagation();
         const url = isEditing
-            ? `http://localhost:5000/selects/${id}`
-            : 'http://localhost:5000/selects';
+            ? `http://adimari-tzani:5000/selects/${id}`
+            : 'http://adimari-tzani:5000/selects';
 
         const method = isEditing ? 'PUT' : 'POST';
 
@@ -98,7 +98,7 @@ function EditSelection({ id, parent, onSuccess }) {
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
-            await axios.delete(`http://localhost:5000/selects/${id}`);
+            await axios.delete(`http://adimari-tzani:5000/selects/${id}`);
             setSuccessMessage('Project deleted successfully.');
         } catch (error) {
             console.error('Failed to delete selection:', error);

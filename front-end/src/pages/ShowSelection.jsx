@@ -26,7 +26,7 @@ const ShowSelection = () => {
     }, [selection]);
 
     useEffect(() => {
-        axios.get(`http://localhost:5000/selects/${id}`)
+        axios.get(`http://adimari-tzani:5000/selects/${id}`)
             .then((response) => {
                 setSelection(response.data);
             })

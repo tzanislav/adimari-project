@@ -1,12 +1,12 @@
-.brands {
+.items {
   width: 80%;
   margin: 0 auto;
 }
-.brand-data {
+.item-data {
   padding: 15px;
 }
 
-.brand-above-fold {
+.item-above-fold {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -14,7 +14,7 @@
   margin: 0 0;
 }
 
-.brand-checkbox {
+.item-checkbox {
   display: inline-flex;
   flex-direction: column;
   font-size: .7rem;
@@ -24,7 +24,7 @@
   margin-bottom: 2px;
 }
 
-.brand-property {
+.item-property {
   display: inline-flex;
   flex-direction: column;
   font-size: .5rem;
@@ -34,7 +34,7 @@
   margin-bottom: 2px;
 }
 
-.brand-property-button {
+.item-property-button {
   text-transform: uppercase;
   color: #4b4b4b;
   display: inline;
@@ -44,13 +44,13 @@
   transition: all 0.3s;
 }
 
-.brand-property-button:hover {
+.item-property-button:hover {
   background-color: #c4c4c4;
   font-size: .7rem;
   font-weight: bold;
 }
 
-.brand-details {
+.item-details {
 
   font-family: Arial, sans-serif;
   width: 100%;
@@ -62,11 +62,11 @@
   transform: translate(-20px, 0px);
 }
 
-.brand-details:hover {
+.item-details:hover {
   background-color: #f0f0f0;
 }
 
-.brand-details h1 {
+.item-details h1 {
   display: inline;
   font-size: 1.5rem;
   text-transform: uppercase;
@@ -90,18 +90,29 @@
 }
 
 
-.brand-details button {
+.item-details button {
   font-size: .5rem;
   margin: 10px 0;
 }
 
-
-.brand-details a:hover {
+.item-models-container
+{
+  display: block;
+}
+.item-details a:hover {
   text-decoration: underline;
 }
+.item-images
+{
+  width: 100%; /* or set a specific width */
+  overflow-x: scroll; /* enables horizontal scrolling */
+  white-space: nowrap; /* prevents wrapping of the contents */
 
-.brand-images img {
-  max-width: 100px;
+  
+}
+.item-images img {
+  display: inline-block; /* keeps the image in a single line */
+  height: 480px;
   margin-right: 10px;
   border-radius: 4px;
 }
@@ -114,7 +125,7 @@
 
 }
 
-.brand-button
+.item-button
 {
   background-color: #4b4b4b;
   text-transform: uppercase;
@@ -126,30 +137,30 @@
 }
 
 @media screen and (max-width: 1200px) {
-  .brand-above-fold {
+  .item-above-fold {
     flex-direction: column;
     text-align: center;
   }
 
-  .brand-property-button {
+  .item-property-button {
     transform: translate(0px, 0px);
   }
 
-  .brand-data {
+  .item-data {
     text-align: center;
   }
 
-  .brand-property {
+  .item-property {
 
     margin: 2px 25px;
   }
 
-  .brands h4
+  .items h4
   {
     margin: 5px 0;
   }
 
-  .brands p
+  .items p
   {
     margin: 5px 0;
   }

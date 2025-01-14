@@ -36,7 +36,7 @@ const FileUploader = ({ folderName, onUploadComplete, onRemove }) => {
 
     try {
       const response = await axios.post(
-        `http://localhost:5000/upload?folder=${encodeURIComponent(folderName)}`,
+        `http://adimari-tzani:5000/upload?folder=${encodeURIComponent(folderName)}`,
         formData,
         {
           headers: {

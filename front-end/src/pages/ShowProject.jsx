@@ -23,7 +23,7 @@ function ProjectPage() {
         const fetchProject = async () => {
             try {
                 // Fetch project data
-                const response = await axios.get(`http://localhost:5000/projects/${id}`);
+                const response = await axios.get(`http://adimari-tzani:5000/projects/${id}`);
                 console.log("Project response:", response.data);
 
                 if (!response.data) {
@@ -35,7 +35,7 @@ function ProjectPage() {
                 setProject(response.data); // Update project state
 
                 // Fetch selections
-                const selectionResponse = await axios.get(`http://localhost:5000/projects/${id}/selections`);
+                const selectionResponse = await axios.get(`http://adimari-tzani:5000/projects/${id}/selections`);
 
                 if (!selectionResponse.data) {
                     console.warn("Selections data is undefined or empty in the API response");
@@ -65,7 +65,7 @@ function ProjectPage() {
         console.log("Received selection ID:", selectionId);
 
         try {
-            const response = await axios.put(`http://localhost:5000/projects/${id}`, {
+            const response = await axios.put(`http://adimari-tzani:5000/projects/${id}`, {
                 selection: selectionId,
             });
             // Update the project state with the updated selection data
@@ -87,7 +87,7 @@ function ProjectPage() {
             console.log("Deleting selection with ID:", editId);
 
             // Perform the deletion
-            await axios.delete(`http://localhost:5000/selects/${editId}`);
+            await axios.delete(`http://adimari-tzani:5000/selects/${editId}`);
 
             // Update the selections state directly
             setSelections((prevSelections) =>

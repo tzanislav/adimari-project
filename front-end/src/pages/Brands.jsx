@@ -16,7 +16,7 @@ function Brands() {
     useEffect(() => {
         const fetchBrands = async () => {
             try {
-                const response = await fetch('http://localhost:5000/brands');
+                const response = await fetch('http://adimari-tzani:5000/brands');
                 if (!response.ok) {
                     throw new Error('Failed to fetch brands');
                 }

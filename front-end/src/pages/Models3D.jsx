@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Model from '../components/Model';
 import { Link } from 'react-router-dom';
 import '../CSS/Model.css';
+import '../CSS/ListPage.css';
 import { useActiveSelection } from "../components/selectionContext";
 
 
@@ -17,7 +18,7 @@ function Models() {
     useEffect(() => {
         const fetchModels = async () => {
             try {
-                const response = await fetch('http://localhost:5000/models3d');
+                const response = await fetch('http://adimari-tzani:5000/models3d');
                 if (!response.ok) {
                     throw new Error('Failed to fetch models');
                 }
@@ -37,12 +38,12 @@ function Models() {
     //Get active selection
     useEffect(() => {
         const fetchActiveProject = async () => {
-            if(activeSelection === null) {
+            if (activeSelection === null) {
                 console.log('No active project selected');
                 return;
             }
             try {
-                const response = await fetch(`http://localhost:5000/selects/${activeSelection[2]}`);
+                const response = await fetch(`http://adimari-tzani:5000/selects/${activeSelection[2]}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch active project');
                 }
@@ -91,51 +92,51 @@ function Models() {
             console.error("activeSelectionObject is not defined");
             return;
         }
-    
+
         console.log(
             `${isAdding ? "Add" : "Remove"} model to selection ${activeSelectionObject.name} model: ${model_id}`
         );
-    
+
         // Modify the models array based on `isAdding`
         const updatedModels = isAdding
             ? [...(activeSelectionObject.models || []), model_id] // Add model
             : (activeSelectionObject.models || []).filter((id) => id !== model_id); // Remove model
-    
+
         const newSelection = {
             ...activeSelectionObject,
             models: updatedModels,
         };
-    
+
         // Update state
         setActiveSelectionObject(newSelection);
         console.log('New selection: ', newSelection);
-    
+
         // Update the backend
         const updateSelection = async () => {
             try {
-                const response = await fetch(`http://localhost:5000/selects/${activeSelectionObject._id}`, {
+                const response = await fetch(`http://adimari-tzani:5000/selects/${activeSelectionObject._id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(newSelection),
                 });
-    
+
                 if (!response.ok) {
                     throw new Error('Failed to update selection');
                 }
-    
+
                 console.log('Selection updated successfully');
             } catch (err) {
                 setError(err.message);
             }
         };
-    
+
         updateSelection();
     };
-    
-    
-    
+
+
+
 
     if (loading) {
         return <p>Loading...</p>;
@@ -146,17 +147,19 @@ function Models() {
     }
 
     return (
-        <div className="models">
+        <div className="items-container">
             <h1>Models Page</h1>
-            <input
-                className='search-box'
-                type="text"
-                placeholder="Search Models"
-                onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="search-container">
+                <input
+                    className='search-box'
+                    type="text"
+                    placeholder="Search Models"
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+            </div>
             <Link className='link button' to="/models3d/new">Add New Model</Link>
             {filteredModels.map((model) => (
-                <Model key={model._id} modelId={model._id} handleAddModel = {handleAddToSelection} _selection = {activeSelectionObject}/>
+                <Model key={model._id} modelId={model._id} handleAddModel={handleAddToSelection} _selection={activeSelectionObject} />
             ))}
         </div>
     );

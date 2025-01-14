@@ -24,7 +24,7 @@ function ProjectForm() {
       const fetchProject = async () => {
         setLoading(true);
         try {
-          const response = await axios.get(`http://localhost:5000/projects/${id}`);
+          const response = await axios.get(`http://adimari-tzani:5000/projects/${id}`);
           const data = response.data;
           setFormData({
             name: data.name || '',
@@ -55,8 +55,8 @@ function ProjectForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = isEditing
-      ? `http://localhost:5000/projects/${id}`
-      : 'http://localhost:5000/projects';
+      ? `http://adimari-tzani:5000/projects/${id}`
+      : 'http://adimari-tzani:5000/projects';
 
     const method = isEditing ? 'PUT' : 'POST';
 
@@ -93,7 +93,7 @@ function ProjectForm() {
   // Delete model
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/projects/${id}`);
+      await axios.delete(`http://adimari-tzani:5000/projects/${id}`);
       setSuccessMessage('Model deleted successfully!');
       setTimeout(() => {
         window.location.href = '/projects';

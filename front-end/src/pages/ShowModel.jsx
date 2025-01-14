@@ -18,7 +18,7 @@ function ShowModel() {
     useEffect(() => {
         const fetchModel = async () => {
             try {
-                const response = await fetch(`http://localhost:5000/models3d/${id}`);
+                const response = await fetch(`http://adimari-tzani:5000/models3d/${id}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch model data');
                 }

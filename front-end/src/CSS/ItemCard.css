@@ -1,0 +1,140 @@
+.item-data
+{
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: center;
+}
+.item-container {
+
+  width: 250px;
+  background-color: #ffffff;
+  box-shadow: 0px 0px 10px 0px #00000010;
+  margin: 10px;
+  padding: 25px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.item-container h1 {
+  text-align: start;
+}
+
+.item-properties-above-fold {
+  width: 80%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: start;
+  flex-wrap: wrap;
+  margin: 0 0;
+}
+
+.thumbnail {
+  height: 240px;
+  width: 240px;
+
+  object-fit: contain;
+  margin-bottom: 10px;
+  transition: all 0.3s;
+}
+
+.thumbnail:hover {
+  transform: scale(1.1);
+}
+
+.item-property {
+  display: flex;
+  flex-direction: column;
+  align-items: baseline;
+  font-size: .5rem;
+  text-transform: uppercase;
+  
+  letter-spacing: 2px;
+}
+
+.item-property h4
+{
+  font-size: .6rem;
+  color: #4b4b4b;
+  text-transform: lowercase;
+  margin: 0;
+}
+
+.item-above-fold {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: space-around;
+}
+
+
+.item-checkboxes {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  margin: 10px 0px;
+}
+
+.item-checkbox {
+  margin: 0px 10px;
+}
+
+.item-images {
+  width: 70vw;
+  /* or set a specific width */
+  overflow-x: auto;
+  /* enables horizontal scrolling */
+  white-space: nowrap;
+  /* prevents wrapping of the contents */
+
+
+}
+
+.item-images img {
+  display: inline-block;
+  /* keeps the image in a single line */
+  height: 480px;
+  margin-right: 10px;
+  border-radius: 4px;
+}
+
+.item-property-button {
+  text-transform: uppercase;
+  color: #4b4b4b;
+  display: inline;
+  font-size: .7rem;
+  margin: 15px 0;
+  padding: 5px 25px;
+  transform: translate(-25px, 0);
+  transition: all 0.3s;
+}
+
+
+
+.item-property-button:hover {
+  background-color: #c4c4c4;
+  font-size: .7rem;
+  font-weight: bold;
+}
+
+.edit-link
+{
+  margin: 25px 0;
+  padding: 10px 25px;
+  text-decoration: none;
+  color: #4b4b4b;
+  border: 1px solid #4b4b4b;
+  transition: all 0.3s;
+}
+
+.edit-link:hover
+{
+  background-color: #4b4b4b;
+  color: #ffffff;
+}

@@ -4,67 +4,126 @@ import axios from 'axios';
 import FileUploader from '../components/FileUploader'; // Ensure correct import path
 import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
-import DeleteBox from "../components/DeleteBox";
+import DeleteBox from '../components/DeleteBox';
 
-function BrandForm() {
+function Model3dForm() {
   const { id } = useParams(); // Get ID from URL
   const isEditing = Boolean(id); // Check if the page is for editing
   const [isDeleting, setIsDeleting] = useState(false); // State for delete confirmation
+  const [brands, setBrands] = useState([]); // State for brand data
+  const [analysedImage, setAnalysedImage] = useState(false); // State for analyzed image data
 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    website: '',
-    files: [], // Field for uploaded file URLs
+    images: [], // Field for uploaded image URLs
     category: '',
     class: 'Low',
-    distributor: '',
-    location: '',
-    personToContact: '',
-    email: '',
-    phone: '',
-    discount: 0,
     tags: [],
-    has3dmodels: false,
-    hasDWGmodels: false,
+    brand: '',
+    price: 0,
+    path: '',
   });
 
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  
 
-  // Fetch brand data if editing
+  // Fetch model data if editing
   useEffect(() => {
     if (isEditing) {
-      const fetchBrand = async () => {
+      const fetchModel3d = async () => {
         setLoading(true);
         try {
-          const response = await axios.get(`http://localhost:5000/brands/${id}`);
+          const response = await axios.get(`http://adimari-tzani:5000/models3d/${id}`);
           const data = response.data;
           setFormData({
             ...data,
             tags: data.tags || [],
-            models3D: data.models3D || [],
-            files: data.files || [], // Ensure files are loaded
+            images: data.images || [],
           });
         } catch (error) {
-          console.error('Failed to fetch brand:', error);
-          setErrorMessage('Failed to fetch brand data.');
+          console.error('Failed to fetch model:', error);
+          setErrorMessage('Failed to fetch model data.');
         } finally {
           setLoading(false);
-          setIsDeleting(false);
         }
       };
-      fetchBrand();
+      fetchModel3d();
     }
   }, [id, isEditing]);
 
-  // Handle input changes
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+
+//Fetch brands data
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const response = await axios.get('http://adimari-tzani:5000/brands');
+        setBrands(response.data);
+      } catch (error) {
+        console.error('Failed to fetch brands:', error);
+        setErrorMessage('Failed to fetch brand data.');
+      }
+    };
+    fetchBrands();
+  }, []);
+
+  // Analyze image with Rekognition
+  const analyzeImage = async (imageUrl) => {
+    if (formData.tags.length > 0) {
+      return;
+    }
+
+    //Check if imageUrl is a valid image
+    const isValidImageUrl = (url) => {
+      return /\.(jpg|jpeg|png|gif|bmp)$/i.test(url);
+    };
+
+    if (!isValidImageUrl(imageUrl)) {
+      setErrorMessage('Invalid image URL.');
+      return;
+    }
+  
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      tags: ["Analyzing..."],
+    }));
+    try {
+      const response = await axios.post('http://adimari-tzani:5000/upload/analyze-image', {
+        imageUrl,
+      });
+  
+      // Extract top-level names
+      const topLevelNames = response.data
+        .filter((item) => item.Confidence > 80)
+        .map((item) => item.Name);
+  
+      // Set the analysis and tags
+      setAnalysedImage(true);
+      setFormData((prev) => ({
+        ...prev,
+        tags: topLevelNames,
+      }));
+    } catch (error) {
+      console.error('Failed to analyze image:', error);
+      setFormData((prev) => ({
+        ...prev,
+        tags: [],
+      }));
+      setErrorMessage('Failed to analyze image.');
+    }
+  };
+
+
+
+  // Handle input changes
+  const handleChange = (e) => {
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'number' ? parseFloat(value) : value,
     }));
   };
 
@@ -72,8 +131,8 @@ function BrandForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = isEditing
-      ? `http://localhost:5000/brands/${id}`
-      : 'http://localhost:5000/brands';
+      ? `http://adimari-tzani:5000/models3d/${id}`
+      : 'http://adimari-tzani:5000/models3d';
 
     const method = isEditing ? 'PUT' : 'POST';
 
@@ -87,31 +146,24 @@ function BrandForm() {
 
       setSuccessMessage(
         isEditing
-          ? `Brand "${response.data.name}" updated successfully!`
-          : `Brand "${response.data.name}" created successfully!`
+          ? `Model "${response.data.name}" updated successfully!`
+          : `Model "${response.data.name}" created successfully!`
       );
       setTimeout(() => {
-        window.location.href = '/brands';
+        window.location.href = '/models3d';
       }, 500);
 
       if (!isEditing) {
         setFormData({
           name: '',
           description: '',
-          website: '',
-          files: [],
+          images: [],
           category: '',
           class: 'Low',
-          distributor: '',
-          location: '',
-          personToContact: '',
-          email: '',
-          phone: '',
-          discount: 0,
           tags: [],
-          models3D: [],
-          has3dmodels: false,
-          hasDWGmodels: false,
+          brand: '',
+          price: 0,
+          path: '',
         });
       }
     } catch (error) {
@@ -120,32 +172,33 @@ function BrandForm() {
     }
   };
 
-  // Delete brand
+  // Delete model
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/brands/${id}`);
-      setSuccessMessage('Brand deleted successfully!');
+      await axios.delete(`http://adimari-tzani:5000/models3d/${id}`);
+      setSuccessMessage('Model deleted successfully!');
       setTimeout(() => {
-        window.location.href = '/brands';
+        window.location.href = '/models3d';
       }, 500);
     } catch (error) {
-      setErrorMessage('Failed to delete brand: ' + error.message);
+      setErrorMessage('Failed to delete model: ' + error.message);
     }
   };
 
   return (
     <div className="brand-form">
-      <h2>{isEditing ? 'Edit Brand' : 'Create New Brand'}</h2>
-      {loading && <p>Loading brand data...</p>}
+      <h2>{isEditing ? 'Edit Model' : 'Create New Model'}</h2>
+      {loading && <p>Loading model data...</p>}
 
-
+      
         {isDeleting && (
           <DeleteBox
-            itemName="Brand"
+            itemName={formData.name}
             deleteFunction={handleDelete}
             closeFunction={() => setIsDeleting(false)}
           />
         )}
+      
 
       {!loading && (
         <form onSubmit={handleSubmit}>
@@ -169,91 +222,22 @@ function BrandForm() {
             />
           </label>
 
-          <label>
-            Distributor:
-            <input
-              name="distributor"
-              value={formData.distributor || ''}
-              onChange={handleChange}
-            />
-          </label>
-
-
-
-          <label>
-            Website:
-            <input
-              type="text"
-              name="website"
-              value={formData.website || ''}
-              onChange={handleChange}
-            />
-          </label>
-
-          <label>
-            Location:
-            <input
-              type="text"
-              name="location"
-              value={formData.location || ''}
-              onChange={handleChange}
-            />
-          </label>
-
-          <label>
-            Contact Person:
-            <input
-              type="text"
-              name="personToContact"
-              value={formData.personToContact || ''}
-              onChange={handleChange}
-            />
-          </label>
-
-          <label>
-            Email:
-            <input
-              type="email"
-              name="email"
-              value={formData.email || ''}
-              onChange={handleChange}
-            />
-          </label>
-
-          <label>
-            Phone:
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone || ''}
-              onChange={handleChange}
-            />
-          </label>
-
-          <label>
-            Discount:
-            <input
-              type="number"
-              name="discount"
-              value={formData.discount || '0'}
-              onChange={handleChange}
-            />
-          </label>
-
           {formData.name ? (
             <label>
-              Files:
+              Images:
               <FileUploader
                 folderName={formData.name}
                 onUploadComplete={(uploadedUrls) => {
                   setFormData((prev) => ({
                     ...prev,
-                    files: [...prev.files, ...uploadedUrls],
+                    images: [...prev.images, ...uploadedUrls],
                   }));
+                  analyzeImage(uploadedUrls[0]);               
+
                 }} onRemove={(deletedUrl) => {
                   setFormData((prev) => ({
                     ...prev,
-                    files: prev.files.filter((url) => url !== deletedUrl),
+                    images: prev.images.filter((url) => url !== deletedUrl),
                   }));
                 }}
               />
@@ -266,23 +250,22 @@ function BrandForm() {
 
           }
 
-
-          {formData.files.length > 0 && (
+          {formData.images.length > 0 && (
             <>
-              <p>Existing files Files:</p>
+              <p>Existing Images:</p>
               <ul>
-                {formData.files.map((file, index) => (
+                {formData.images.map((image, index) => (
                   <li key={index}>
-                    <p>
-                      {showOnlyName(file)}
-                    </p>
-                    <button onClick={(e) => {
-                      e.preventDefault();
-                      setFormData((prev) => ({
-                        ...prev,
-                        files: prev.files.filter((_, i) => i !== index),
-                      }));
-                    }}>
+                    <p>{showOnlyName(image)}</p>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setFormData((prev) => ({
+                          ...prev,
+                          images: prev.images.filter((_, i) => i !== index),
+                        }));
+                      }}
+                    >
                       Remove
                     </button>
                   </li>
@@ -290,7 +273,6 @@ function BrandForm() {
               </ul>
             </>
           )}
-
 
           <label>
             Category:
@@ -317,27 +299,6 @@ function BrandForm() {
               <option value="Luxury">Luxury</option>
             </select>
           </label>
-          <div className='checkboxes'>
-            <label>
-              <input
-                type="checkbox"
-                name="has3dmodels"
-                checked={formData.has3dmodels || false}
-                onChange={handleChange}
-              />
-              3D Models on Site
-            </label>
-
-            <label>
-              <input
-                type="checkbox"
-                name="hasDWGmodels"
-                checked={formData.hasDWGmodels || false}
-                onChange={handleChange}
-              />
-              DWG Models on Site
-            </label>
-          </div>
 
           <label>
             Tags (comma-separated):
@@ -354,9 +315,56 @@ function BrandForm() {
             />
           </label>
 
+          <label>
+            Brand:
+            <input
+              type="text"
+              name="brand"
+              value={formData.brand || ''}
+              onChange={handleChange}
+            />
+          </label>
+
+          
+          <label>
+            Existing Brand:
+            <select
+              name="brand"
+              value={formData.brand || ''}
+              onChange={handleChange}
+            >
+              <option value="">Select a brand</option>
+              {brands.map((brand) => (
+                <option key={brand._id} value={brand.name}>
+                  {brand.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Price:
+            <input
+              type="number"
+              name="price"
+              value={formData.price || 0}
+              onChange={handleChange}
+            />
+          </label>
+
+          <label>
+            Path:
+            <input
+              type="text"
+              name="path"
+              value={formData.path || ''}
+              onChange={handleChange}
+            />
+          </label>
+
           <div className="buttons">
             <button type="submit">
-              {isEditing ? 'Update Brand' : 'Create Brand'}
+              {isEditing ? 'Update Model' : 'Create Model'}
             </button>
 
             <button type="button" onClick={() => window.history.back()}>
@@ -364,8 +372,12 @@ function BrandForm() {
             </button>
 
             {isEditing && (
-              <button type="button" className="deleteButton" onClick={() => setIsDeleting(true)}>
-                Delete Brand
+              <button
+                type="button"
+                className="deleteButton"
+                onClick={() => setIsDeleting(true)}
+              >
+                Delete Model
               </button>
             )}
           </div>
@@ -377,4 +389,4 @@ function BrandForm() {
   );
 }
 
-export default BrandForm;
+export default Model3dForm;

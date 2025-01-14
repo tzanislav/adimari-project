@@ -24,7 +24,7 @@ function Model({ modelId, handleAddModel, _selection }) {
         // Fetch model data by ID
         const fetchModel = async () => {
             try {
-                const response = await fetch(`http://localhost:5000/models3d/${modelId}`); // Adjust API endpoint
+                const response = await fetch(`http://adimari-tzani:5000/models3d/${modelId}`); // Adjust API endpoint
                 if (!response.ok) {
                     throw new Error('Failed to fetch model data');
                 }

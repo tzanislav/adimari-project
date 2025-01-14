@@ -6,6 +6,7 @@ const uploadRoutes = require('./routes/upload'); // Import upload route
 const modelRoutes = require('./routes/modelRoutes'); // Import model routes
 const projectRoutes = require('./routes/projectRoutes'); // Import project routes
 const selectRoutes = require('./routes/selectionRoute'); // Import select routes
+const itemRoutes = require('./routes/itemRoutes'); // Import item routes
 const cors = require('cors');
 require('dotenv').config();
 
@@ -37,9 +38,10 @@ app.use('/upload', uploadRoutes); // Routes start with /upload
 app.use('/models3d', modelRoutes); // Routes start with /models3d
 app.use('/projects', projectRoutes); // Routes start with /projects
 app.use('/selects', selectRoutes); // Routes start with /selects
+app.use('/items', itemRoutes); // Routes start with /items
 
 // Start the server
 const PORT = 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://adimari-tzani:${PORT}`);
 });
