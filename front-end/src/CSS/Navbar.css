@@ -1,14 +1,12 @@
 /* General Styles */
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-  }
 
   .navbar
   {
     position: relative;
     width: 100%;
     z-index: 500;
+
+
   }
   .navbar-top
   {
@@ -64,22 +62,21 @@ body {
     color: #f9a826;
   }
 
-  .selection-bar
-  {
+  .selection-bar {
+    position: fixed; /* Stick the bar to the viewport */
+    z-index: 400; /* Ensure it is above most content but below the navbar */
+    background-color: rgb(173, 86, 59);
 
-    position: relative;
-    z-index: -100;
-    background-color: #d13d10;
     color: white;
-    width: 200px;
+    width: 350px; /* Span the full width of the screen */
+    left: 50%; /* Center the bar */
+    transform: translate(-50%, 0); /* Center the bar */
     text-align: center;
     padding: 6px;
-    top: -0px;
-    left: 70%;
-    border-radius: 0px 0px 10px 10px; 
-    transition: all .3s;
-
+    border-radius: 0px 0px 10px 10px;
+    transition: all 0.3s;
   }
+  
   
   .active-selection-button
   {

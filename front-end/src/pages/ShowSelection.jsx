@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
-import ListModel from "../components/ListModel";
+import ListItem from "../components/ListItem";
 import "../CSS/ShowSelection.css";
 import { useActiveSelection } from "../components/selectionContext";
 
@@ -18,12 +18,11 @@ const ShowSelection = () => {
 
     useEffect(() => {
         if (selection) {
-            const total = selection.detailedModels.reduce((sum, model) => sum + model.price, 0);
+            const total = selection.itemDetails.reduce((sum, model) => sum + model.price, 0);
             setTotalPrice(total);
 
-            const brands = selection.detailedModels.map((model) => model.brand);
+            const brands = selection.itemDetails.map((model) => model.brand);
             setBrandsUsed([...new Set(brands)]);
-
         }
     }, [selection]);
 
@@ -45,8 +44,8 @@ const ShowSelection = () => {
     return (
         <div className="show-selection">
             <h1>{selection.name}</h1>
-            {selection.detailedModels.map((model) => (
-                <ListModel key={model._id} model={model} />
+            {selection.itemDetails?.map((item) => (
+                <ListItem key={item._id} item={item} />                             
             ))}
             <div className="show-selection-summary">
                 <div className="show-selection-brands">

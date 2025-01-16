@@ -5,8 +5,8 @@ import '../CSS/ItemCard.css';
 import { useActiveSelection } from "../components/selectionContext";
 
 
-function Item({ itemId: itemId, handleClickItem }) {
-    const [item, setItem] = useState(null);
+function Item({ item, handleClickItem }) {
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
@@ -14,7 +14,7 @@ function Item({ itemId: itemId, handleClickItem }) {
     const [files, setFiles] = useState([]);
     const [models, setModels] = useState([]);
     const parentRef = useRef(null);
-    const {serverUrl} = useActiveSelection();
+    const { activeSelection, setActiveSelection, serverUrl } = useActiveSelection();
 
     // Helper function to filter image files
     const filterImages = (files) => {
@@ -29,29 +29,6 @@ function Item({ itemId: itemId, handleClickItem }) {
         }
     };
 
-
-
-    useEffect(() => {
-        // Fetch item data by ID
-        const fetchItems = async () => {
-            try {
-                const response = await fetch(`${serverUrl}/api/items/${itemId}`); // Adjust API endpoint
-                if (!response.ok) {
-                    throw new Error('Failed to fetch items data');
-                }
-                const data = await response.json();
-                setItem(data); // Set the full item data
-                setImages(filterImages(data.files)); // Filter and set images
-            } catch (err) {
-                setError(err.message); // Handle and display errors
-            } finally {
-                setLoading(false); // Set loading to false in all cases
-            }
-        };
-
-        fetchItems();
-    }, [itemId]);
-
     const handleImageClick = () => {
         setShowDetails(!showDetails);
 
@@ -62,8 +39,61 @@ function Item({ itemId: itemId, handleClickItem }) {
         }, 150); // 0.3 seconds delay
     };
 
-    
+
+    const handleAddModel = (isAdding) => {
+        if (!activeSelection) {
+            console.error("activeSelection is not defined");
+            return;
+        }
+
+        console.log(
+            `${isAdding ? "Add" : "Remove"} model to selection ${activeSelection[2]} model: ${item._id}`
+        );
+
+        // Modify the models array based on `isAdding`
+        const updatedItems = isAdding
+            ? [...(activeSelection.items || []), item._id] // Add model
+            : (activeSelection.items || []).filter((id) => id !== item._id); // Remove model
+
+        const newSelection = {
+            ...activeSelection,
+            items: updatedItems,
+        };
+
+        // Update state
+        setActiveSelection(newSelection);
+        console.log('New selection: ', newSelection);
+
+        // Update the backend
+        const updateSelection = async () => {
+            try {
+                const response = await fetch(`${serverUrl}/api/selects/${activeSelection[2]}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newSelection),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update selection');
+                }
+
+                console.log('Selection updated successfully');
+            } catch (err) {
+                setError(err.message);
+            }
+        };
+
+        updateSelection();
+    };
+
+
     if (loading) {
+        if (item) {
+            setImages(filterImages(item.files));
+            setLoading(false); // Set loading to false in all cases
+        }
         return <p>Loading...</p>;
     }
 
@@ -82,29 +112,65 @@ function Item({ itemId: itemId, handleClickItem }) {
             style={showDetails ? { width: '100%' } : {}}
             ref={parentRef}
         >
+
+
+
+
             <div className='item-data'>
                 <div className="item-property">
                     <p className='item-property-button' onClick={() => { handleClickProperty(item.category) }}>{item.category}</p>
                 </div>
                 <h1>{item.name}</h1>
                 <div className="item-above-fold" >
-                    {images.length > 0 ? (
-                        <img
-                            src={images[0]}
-                            className='thumbnail'
-                            alt={`${item.name} image`}
+                    <div className='thumbnail-container'>
+                        {activeSelection &&
+                            <>
+                                {activeSelection.items?.includes(item._id) ? (
+                                    // Remove Button
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            if (handleAddModel) {
+                                                handleAddModel(false); // Pass false for Remove
+                                            }
+                                        }}
+                                        className="remove-button"
+                                    >
+                                        Remove
+                                    </button>
+                                ) : (
+                                    // Add Button
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            if (handleAddModel) {
+                                                handleAddModel(true); // Pass true for Add
+                                            }
+                                        }}
+                                        className="add-button"
+                                    >
+                                        Add
+                                    </button>
+                                )}
+                            </>
+                        }
+                        {images.length > 0 ? (
+                            <img
+                                src={images[0]}
+                                className='thumbnail'
+                                alt={`${item.name} image`}
+                                onClick={handleImageClick}
+                            />
+                        ) : (
+                            <img
+                                src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/300px-No_image_available.svg.png'
+                                className='thumbnail'
+                                alt='placeholder'
 
-                            onClick={handleImageClick}
-                        />
-                    ) : (
-                        <img
-                            src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/300px-No_image_available.svg.png'
-                            className='thumbnail'
-                            alt='placeholder'
-
-                            onClick={handleImageClick}
-                        />
-                    )}
+                                onClick={handleImageClick}
+                            />
+                        )}
+                    </div>
                     <div className="item-properties-above-fold">
                         <div className="item-property">
                             <h4>Brand:</h4>
@@ -198,7 +264,7 @@ function Item({ itemId: itemId, handleClickItem }) {
                             </div>
                         </div>
 
-                        <Link to={`/items/${itemId}`} className="edit-link item-button">Edit</Link>
+                        <Link to={`/items/${item._id}`} className="edit-link item-button">Edit</Link>
                     </div>
                 )}
             </div>

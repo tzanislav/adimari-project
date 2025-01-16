@@ -12,6 +12,7 @@ const brandSchema = new mongoose.Schema({
   class: { type: String, required: true },
   price: { type: Number, default: null }, // Assuming discount is a numerical value
   tags : { type: [String], default: null },
+  modelPath: { type: String, default: null }, // Assuming a single 3D mode
   has3dmodels: { type: Boolean, default: false }, // Added a boolean field
   hasDWGmodels: { type: Boolean, default: false }, // Added a boolean field
   createdAt : { type: Date, default: Date.now }

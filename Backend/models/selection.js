@@ -14,7 +14,7 @@ const selectionSchema = new mongoose.Schema({
         ref: 'Project',
         required: true,
     },
-    models: {
+    items: {
         type: [String], default: null 
     },
     createdAt: {

@@ -21,7 +21,7 @@ function App() {
   return (
     <div>
       <ActiveSelectionProvider>
-        <Navbar /> {/* Optional: Add navigation bar */}
+        <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/brands" element={<Brands />} />

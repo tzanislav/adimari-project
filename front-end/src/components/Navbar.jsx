@@ -32,7 +32,7 @@ function Navbar() {
           </ul>
         </div>
       </div>
-      <div className='selection-bar' style={{ top: activeSelection ? '0' : '-100px' }}>
+      <div className='selection-bar' style={{ top: activeSelection ? '0px' : '-200px' }}>
         {!activeSelection ? <h3>No active selection</h3> :
           <>
             <Link to={`/projects/${activeSelection[3]}`} className='active-selection-button-smaller'>{activeSelection[1]}</Link>

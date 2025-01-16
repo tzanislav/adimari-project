@@ -105,7 +105,7 @@ function Items() {
             <div className='items-container-list'>
                 {filteredItems.length === 0 && <p>No items found.</p>}
                 {filteredItems.map((item) => (
-                    <Item key={item._id} itemId={item._id} handleClickItem={(property) => {
+                    <Item key={item._id} item={item} handleClickItem={(property) => {
                         setSearch(property);
                     }} />
                 ))}

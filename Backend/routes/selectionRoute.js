@@ -1,6 +1,6 @@
 const express = require('express');
 const Selection = require('../models/selection');
-const Model = require('../models/model3d');
+const Item = require('../models/item');
 const Project = require('../models/project');
 const router = express.Router();
 
@@ -65,17 +65,17 @@ router.get('/:id', async (req, res) => {
         }
 
         // Fetch the models whose IDs are in the selection's models array
-        const modelsInSelection = await Model.find({
-            _id: { $in: selection.models }
+        const itemsInSelection = await Item.find({
+            _id: { $in: selection.items }
         });
 
         // Combine selection with the models' detailed information
         const response = {
             ...selection.toObject(),
-            detailedModels: modelsInSelection,
+            itemDetails: itemsInSelection,
         };
-
         res.status(200).send(response);
+
     } catch (err) {
         res.status(500).send({ error: 'Failed to fetch selection', details: err });
     }
