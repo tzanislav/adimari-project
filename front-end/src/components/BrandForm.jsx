@@ -73,7 +73,7 @@ function BrandForm() {
     e.preventDefault();
     const url = isEditing
       ? `${serverUrl}/api/brands/${id}`
-      : '${serverUrl}/api/brands';
+      : `${serverUrl}/api/brands`;
 
     const method = isEditing ? 'PUT' : 'POST';
 

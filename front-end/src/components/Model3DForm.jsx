@@ -60,7 +60,7 @@ function Model3dForm() {
   useEffect(() => {
     const fetchBrands = async () => {
       try {
-        const response = await axios.get('${serverUrl}/api/brands');
+        const response = await axios.get(`${serverUrl}/api/brands`);
         setBrands(response.data);
       } catch (error) {
         console.error('Failed to fetch brands:', error);
@@ -92,7 +92,7 @@ function Model3dForm() {
       tags: ["Analyzing..."],
     }));
     try {
-      const response = await axios.post('${serverUrl}/api/upload/analyze-image', {
+      const response = await axios.post(`${serverUrl}/api/upload/analyze-image`, {
         imageUrl,
       });
   
@@ -133,7 +133,7 @@ function Model3dForm() {
     e.preventDefault();
     const url = isEditing
       ? `${serverUrl}/api/models3d/${id}`
-      : '${serverUrl}/api/models3d';
+      : `${serverUrl}/api/models3d`;
 
     const method = isEditing ? 'PUT' : 'POST';
 
@@ -151,7 +151,7 @@ function Model3dForm() {
           : `Model "${response.data.name}" created successfully!`
       );
       setTimeout(() => {
-        window.location.href = '/api/models3d';
+        window.location.href = '/models3d';
       }, 500);
 
       if (!isEditing) {

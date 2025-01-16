@@ -3,15 +3,17 @@ import { Link } from "react-router-dom";
 import ListProject from "../components/ListProject";
 import DeleteBox from "../components/DeleteBox";
 import '../CSS/projects.css';
+import { useActiveSelection } from "../components/selectionContext";
 
 function Projects() {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const {serverUrl} = useActiveSelection();
 
     useEffect(() => {
-        fetch('${serverUrl}/api/projects')
+        fetch(`${serverUrl}/api/projects`)
             .then((response) => response.json())
             .then((data) => {
                 setProjects(data);
@@ -48,7 +50,7 @@ function Projects() {
     return (
         <div className="projects-page"> 
             <h1>Projects</h1>
-            <Link to="/api/projects/new" className="link">Add a new project</Link>
+            <Link to="/projects/new" className="link">Add a new project</Link>
 
             {isDeleting && (
                 <DeleteBox itemName="project" deleteFunction={() => handleDelete(isDeleting)} closeFunction={() => setIsDeleting(false)}/>

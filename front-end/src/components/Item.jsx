@@ -10,18 +10,11 @@ function Item({ itemId: itemId, handleClickItem }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
-
     const [images, setImages] = useState([]);
     const [files, setFiles] = useState([]);
-
     const [models, setModels] = useState([]);
-
     const parentRef = useRef(null);
     const {serverUrl} = useActiveSelection();
-
-
-
-
 
     // Helper function to filter image files
     const filterImages = (files) => {
@@ -75,7 +68,7 @@ function Item({ itemId: itemId, handleClickItem }) {
     }
 
     if (error) {
-        return <p>Error is: {error}</p>;
+        return <p className='error'>Error : {error}</p>;
     }
 
     if (!item) {
@@ -89,8 +82,6 @@ function Item({ itemId: itemId, handleClickItem }) {
             style={showDetails ? { width: '100%' } : {}}
             ref={parentRef}
         >
-
-
             <div className='item-data'>
                 <div className="item-property">
                     <p className='item-property-button' onClick={() => { handleClickProperty(item.category) }}>{item.category}</p>
@@ -115,16 +106,11 @@ function Item({ itemId: itemId, handleClickItem }) {
                         />
                     )}
                     <div className="item-properties-above-fold">
-
-
-
                         <div className="item-property">
                             <h4>Brand:</h4>
                             <p className='item-property-button' onClick={() => { handleClickProperty(item.brand) }}>{item.brand}</p>
                         </div>
                     </div>
-
-
                 </div>
 
 
@@ -156,7 +142,6 @@ function Item({ itemId: itemId, handleClickItem }) {
                                 </ul>
                             </div>
                         )}
-
 
                         <div className="item-property">
                             <h4>Class:</h4>
@@ -212,7 +197,6 @@ function Item({ itemId: itemId, handleClickItem }) {
                                 ))}
                             </div>
                         </div>
-
 
                         <Link to={`/items/${itemId}`} className="edit-link item-button">Edit</Link>
                     </div>

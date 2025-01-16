@@ -5,7 +5,7 @@ function ListProject({ _project, onDelete }) {
     const navigate = useNavigate();
 
     const handleClick = () => {
-        navigate(`/api/projects/${_project._id}`);
+        navigate(`/projects/${_project._id}`);
     };
 
     return (

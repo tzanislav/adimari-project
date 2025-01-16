@@ -71,7 +71,7 @@ function EditSelection({ id, parent, onSuccess }) {
         e.stopPropagation();
         const url = isEditing
             ? `${serverUrl}/api/selects/${id}`
-            : '${serverUrl}/api/selects';
+            : `${serverUrl}/api/selects`;
 
         const method = isEditing ? 'PUT' : 'POST';
 

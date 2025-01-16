@@ -59,7 +59,7 @@ function ProjectForm() {
     e.preventDefault();
     const url = isEditing
       ? `${serverUrl}/api/projects/${id}`
-      : '${serverUrl}/api/projects';
+      : `${serverUrl}/api/projects`;
 
     const method = isEditing ? 'PUT' : 'POST';
 

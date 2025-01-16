@@ -3,6 +3,7 @@ import axios from "axios";
 import { useParams } from "react-router-dom";
 import ListModel from "../components/ListModel";
 import "../CSS/ShowSelection.css";
+import { useActiveSelection } from "../components/selectionContext";
 
 const ShowSelection = () => {
 
@@ -12,6 +13,7 @@ const ShowSelection = () => {
     const [selection, setSelection] = useState(null);
     const [totalPrice, setTotalPrice] = useState(0);
     const [brandsUsed, setBrandsUsed] = useState([]);
+    const { serverUrl } = useActiveSelection();
 
 
     useEffect(() => {

@@ -28,9 +28,7 @@ mongoose
     console.error('Failed to connect to MongoDB:', err);
   });
 
-app.get('/', (req, res) => {
-  res.send('Welcome to Adimari API');
-});
+
 
 // Use the user routes
 app.use('/api/users', userRoutes); // Routes start with /users

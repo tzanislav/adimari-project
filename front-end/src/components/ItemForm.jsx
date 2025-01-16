@@ -82,7 +82,7 @@ function ItemForm() {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await axios.get('${serverUrl}/api/items');
+        const response = await axios.get(`${serverUrl}/api/items`);
         setItems(response.data);
       } catch (error) {
         console.error('Failed to fetch items:', error);
@@ -160,7 +160,7 @@ function ItemForm() {
     e.preventDefault();
     const url = isEditing
       ? `${serverUrl}/api/items/${id}`
-      : '${serverUrl}/api/items';
+      : `${serverUrl}/api/items`;
 
     const method = isEditing ? 'PUT' : 'POST';
 
@@ -174,11 +174,11 @@ function ItemForm() {
 
       setSuccessMessage(
         isEditing
-          ? `Item "${response.data.name}" updated successfully!`
-          : `Item "${response.data.name}" created successfully!`
+          ? `Item "${formData.name}" updated successfully!`
+          : `Item "${formData.name}" created successfully!`
       );
       setTimeout(() => {
-        window.location.href = '/api/items';
+        window.location.href = '/items';
       }, 500);
 
       if (!isEditing) {
@@ -225,7 +225,7 @@ function ItemForm() {
       tags: ["Analyzing..."],
     }));
     try {
-      const response = await axios.post('${serverUrl}/api/upload/analyze-image', {
+      const response = await axios.post(`${serverUrl}/api/upload/analyze-image`, {
         imageUrl,
       });
 
@@ -256,7 +256,7 @@ function ItemForm() {
       await axios.delete(`${serverUrl}/api/items/${id}`);
       setSuccessMessage('Item deleted successfully!');
       setTimeout(() => {
-        window.location.href = '/api/items';
+        window.location.href = '/items';
       }, 500);
     } catch (error) {
       setErrorMessage('Failed to delete item: ' + error.message);

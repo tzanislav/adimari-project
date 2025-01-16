@@ -17,6 +17,7 @@ function ProjectPage() {
     const [refreshKey, setRefreshKey] = useState(0); // Trigger re-fetches
     const { setActiveSelection, clearActiveSelection } = useActiveSelection();
     const [isDeleting, setIsDeleting] = useState(false);
+    const { serverUrl } = useActiveSelection();
 
     // Fetch project data
     useEffect(() => {

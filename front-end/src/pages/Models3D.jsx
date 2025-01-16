@@ -14,11 +14,12 @@ function Models() {
     const [filteredModels, setFilteredModels] = useState([]);
     const [activeSelectionObject, setActiveSelectionObject] = useState(null);
     const { activeSelection } = useActiveSelection();
+    const {serverUrl} = useActiveSelection();
 
     useEffect(() => {
         const fetchModels = async () => {
             try {
-                const response = await fetch('${serverUrl}/api/models3d');
+                const response = await fetch(`${serverUrl}/api/models3d`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch models');
                 }

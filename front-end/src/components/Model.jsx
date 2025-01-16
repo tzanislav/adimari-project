@@ -12,6 +12,7 @@ function Model({ modelId, handleAddModel, _selection }) {
     const [images, setImages] = useState([]);
     const [files, setFiles] = useState([]);
     const { activeSelection } = useActiveSelection();
+    const { serverUrl } = useActiveSelection();
 
     // Helper function to filter image files
     const filterImages = (files) => {
@@ -45,7 +46,7 @@ function Model({ modelId, handleAddModel, _selection }) {
 
     const handleCLick = () => {
         //Open model page
-        window.location.href = `/api/models3d/${modelId}`;
+        window.location.href = `/models3d/${modelId}`;
 
     }
 
@@ -145,7 +146,7 @@ function Model({ modelId, handleAddModel, _selection }) {
                         )}
                     </>
                 )}
-                <Link to={`/api/models3d/edit/${modelId}`} className="edit-link">Edit</Link>
+                <Link to={`/models3d/edit/${modelId}`} className="edit-link">Edit</Link>
 
 
             </div>
