@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import '../CSS/Uploader.css';
+import '../CSS/uploader.css';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 const FileUploader = ({ folderName, onUploadComplete, onRemove }) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
+  const {serverUrl} = useActiveSelection();
+
 
   const showOnlyName = (url) => {
     const newName = url.split('/').pop();
@@ -36,7 +40,7 @@ const FileUploader = ({ folderName, onUploadComplete, onRemove }) => {
 
     try {
       const response = await axios.post(
-        `http://adimari-tzani:5000/upload?folder=${encodeURIComponent(folderName)}`,
+        `${serverUrl}/api/upload?folder=${encodeURIComponent(folderName)}`,
         formData,
         {
           headers: {

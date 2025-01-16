@@ -24,7 +24,7 @@ function Model({ modelId, handleAddModel, _selection }) {
         // Fetch model data by ID
         const fetchModel = async () => {
             try {
-                const response = await fetch(`http://adimari-tzani:5000/models3d/${modelId}`); // Adjust API endpoint
+                const response = await fetch(`${serverUrl}/api/models3d/${modelId}`); // Adjust API endpoint
                 if (!response.ok) {
                     throw new Error('Failed to fetch model data');
                 }
@@ -45,7 +45,7 @@ function Model({ modelId, handleAddModel, _selection }) {
 
     const handleCLick = () => {
         //Open model page
-        window.location.href = `/models3d/${modelId}`;
+        window.location.href = `/api/models3d/${modelId}`;
 
     }
 
@@ -145,7 +145,7 @@ function Model({ modelId, handleAddModel, _selection }) {
                         )}
                     </>
                 )}
-                <Link to={`/models3d/edit/${modelId}`} className="edit-link">Edit</Link>
+                <Link to={`/api/models3d/edit/${modelId}`} className="edit-link">Edit</Link>
 
 
             </div>

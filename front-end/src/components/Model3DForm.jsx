@@ -5,6 +5,7 @@ import FileUploader from '../components/FileUploader'; // Ensure correct import 
 import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
 import DeleteBox from '../components/DeleteBox';
+import { useActiveSelection } from "../components/selectionContext";
 
 function Model3dForm() {
   const { id } = useParams(); // Get ID from URL
@@ -12,7 +13,7 @@ function Model3dForm() {
   const [isDeleting, setIsDeleting] = useState(false); // State for delete confirmation
   const [brands, setBrands] = useState([]); // State for brand data
   const [analysedImage, setAnalysedImage] = useState(false); // State for analyzed image data
-
+  const {serverUrl} = useActiveSelection();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -36,7 +37,7 @@ function Model3dForm() {
       const fetchModel3d = async () => {
         setLoading(true);
         try {
-          const response = await axios.get(`http://adimari-tzani:5000/models3d/${id}`);
+          const response = await axios.get(`${serverUrl}/api/models3d/${id}`);
           const data = response.data;
           setFormData({
             ...data,
@@ -59,7 +60,7 @@ function Model3dForm() {
   useEffect(() => {
     const fetchBrands = async () => {
       try {
-        const response = await axios.get('http://adimari-tzani:5000/brands');
+        const response = await axios.get('${serverUrl}/api/brands');
         setBrands(response.data);
       } catch (error) {
         console.error('Failed to fetch brands:', error);
@@ -91,7 +92,7 @@ function Model3dForm() {
       tags: ["Analyzing..."],
     }));
     try {
-      const response = await axios.post('http://adimari-tzani:5000/upload/analyze-image', {
+      const response = await axios.post('${serverUrl}/api/upload/analyze-image', {
         imageUrl,
       });
   
@@ -131,8 +132,8 @@ function Model3dForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = isEditing
-      ? `http://adimari-tzani:5000/models3d/${id}`
-      : 'http://adimari-tzani:5000/models3d';
+      ? `${serverUrl}/api/models3d/${id}`
+      : '${serverUrl}/api/models3d';
 
     const method = isEditing ? 'PUT' : 'POST';
 
@@ -150,7 +151,7 @@ function Model3dForm() {
           : `Model "${response.data.name}" created successfully!`
       );
       setTimeout(() => {
-        window.location.href = '/models3d';
+        window.location.href = '/api/models3d';
       }, 500);
 
       if (!isEditing) {
@@ -175,10 +176,10 @@ function Model3dForm() {
   // Delete model
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://adimari-tzani:5000/models3d/${id}`);
+      await axios.delete(`${serverUrl}/api/models3d/${id}`);
       setSuccessMessage('Model deleted successfully!');
       setTimeout(() => {
-        window.location.href = '/models3d';
+        window.location.href = '/api/models3d';
       }, 500);
     } catch (error) {
       setErrorMessage('Failed to delete model: ' + error.message);

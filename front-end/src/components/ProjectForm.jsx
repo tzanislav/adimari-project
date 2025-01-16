@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import DeleteBox from '../components/DeleteBox';
 import axios from 'axios';
 import '../CSS/EditBrand.css';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 function ProjectForm() {
   const { id } = useParams(); // Get ID from URL
@@ -17,6 +19,7 @@ function ProjectForm() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const {serverUrl} = useActiveSelection();
 
   // Fetch project data if editing
   useEffect(() => {
@@ -24,7 +27,7 @@ function ProjectForm() {
       const fetchProject = async () => {
         setLoading(true);
         try {
-          const response = await axios.get(`http://adimari-tzani:5000/projects/${id}`);
+          const response = await axios.get(`${serverUrl}/api/projects/${id}`);
           const data = response.data;
           setFormData({
             name: data.name || '',
@@ -55,8 +58,8 @@ function ProjectForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = isEditing
-      ? `http://adimari-tzani:5000/projects/${id}`
-      : 'http://adimari-tzani:5000/projects';
+      ? `${serverUrl}/api/projects/${id}`
+      : '${serverUrl}/api/projects';
 
     const method = isEditing ? 'PUT' : 'POST';
 
@@ -74,7 +77,7 @@ function ProjectForm() {
           : `Project "${response.data.name}" created successfully!`
       );
       setTimeout(() => {
-        window.location.href = '/projects';
+        window.location.href = '/api/projects';
       }, 500);
 
       if (!isEditing) {
@@ -93,10 +96,10 @@ function ProjectForm() {
   // Delete model
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://adimari-tzani:5000/projects/${id}`);
+      await axios.delete(`${serverUrl}/api/projects/${id}`);
       setSuccessMessage('Model deleted successfully!');
       setTimeout(() => {
-        window.location.href = '/projects';
+        window.location.href = '/api/projects';
       }, 500);
     } catch (error) {
       setErrorMessage('Failed to delete model: ' + error.message);

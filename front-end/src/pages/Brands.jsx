@@ -2,6 +2,8 @@ import React from 'react';
 import { useEffect, useState } from 'react';
 import Brand from '../components/Brand';
 import { Link } from 'react-router-dom';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 function Brands() {
     const [brands, setBrands] = useState([]);
@@ -9,6 +11,7 @@ function Brands() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filteredBrands, setFilteredBrands] = useState([]);
+    const {serverUrl} = useActiveSelection();
     
     
 
@@ -16,7 +19,7 @@ function Brands() {
     useEffect(() => {
         const fetchBrands = async () => {
             try {
-                const response = await fetch('http://adimari-tzani:5000/brands');
+                const response = await fetch(serverUrl +'/api/brands');
                 if (!response.ok) {
                     throw new Error('Failed to fetch brands');
                 }
@@ -89,7 +92,7 @@ function Brands() {
             <h1>Brands Page</h1>
             <input className='search-box' type="text" placeholder="Search Brands" value={search}  onChange={(e) => setSearch(e.target.value)} />
             {search != "" ? (<button className='search-button' onClick={() => setSearch('')}>Clear</button>) : null}
-            <Link className='link button' to="/brands/new">Add New Brand</Link>
+            <Link className='link button' to="/api/brands/new">Add New Brand</Link>
             {filteredBrands.length === 0 && <p>No brands found.</p>}
             {filteredBrands.map((brand) => (
                 <Brand key={brand._id} brandId={brand._id} handleClickItem={(property) => {

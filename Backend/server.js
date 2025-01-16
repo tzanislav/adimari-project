@@ -9,6 +9,7 @@ const selectRoutes = require('./routes/selectionRoute'); // Import select routes
 const itemRoutes = require('./routes/itemRoutes'); // Import item routes
 const cors = require('cors');
 require('dotenv').config();
+const path = require('path');
 
 
 const app = express();
@@ -32,16 +33,29 @@ app.get('/', (req, res) => {
 });
 
 // Use the user routes
-app.use('/users', userRoutes); // Routes start with /users
-app.use('/brands', brandRoutes); // Routes start with /brands
-app.use('/upload', uploadRoutes); // Routes start with /upload
-app.use('/models3d', modelRoutes); // Routes start with /models3d
-app.use('/projects', projectRoutes); // Routes start with /projects
-app.use('/selects', selectRoutes); // Routes start with /selects
-app.use('/items', itemRoutes); // Routes start with /items
+app.use('/api/users', userRoutes); // Routes start with /users
+app.use('/api/brands', brandRoutes); // Routes start with /brands
+app.use('/api/upload', uploadRoutes); // Routes start with /upload
+app.use('/api/models3d', modelRoutes); // Routes start with /models3d
+app.use('/api/projects', projectRoutes); // Routes start with /projects
+app.use('/api/selects', selectRoutes); // Routes start with /selects
+app.use('/api/items', itemRoutes); // Routes start with /items
+
+// Test route for API
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API is working!' });
+});
+
+// Serve static React files
+app.use(express.static(path.join(__dirname, '../front-end/dist')));
+
+// Catch-all route for React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../front-end/dist', 'index.html'));
+});
 
 // Start the server
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on http://adimari-tzani:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import '../CSS/EditBox.css';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 
 
@@ -17,6 +19,8 @@ function EditSelection({ id, parent, onSuccess }) {
     const [loading, setLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+    const {serverUrl} = useActiveSelection();
+
 
     // Fetch project data if editing
     useEffect(() => {
@@ -24,7 +28,7 @@ function EditSelection({ id, parent, onSuccess }) {
             const fetchProject = async () => {
                 setLoading(true);
                 try {
-                    const response = await axios.get(`http://adimari-tzani:5000/selects/${id}`);
+                    const response = await axios.get(`${serverUrl}/api/selects/${id}`);
                     const data = response.data;
                     setFormData({
                         name: data.name || '',
@@ -66,8 +70,8 @@ function EditSelection({ id, parent, onSuccess }) {
         e.preventDefault();
         e.stopPropagation();
         const url = isEditing
-            ? `http://adimari-tzani:5000/selects/${id}`
-            : 'http://adimari-tzani:5000/selects';
+            ? `${serverUrl}/api/selects/${id}`
+            : '${serverUrl}/api/selects';
 
         const method = isEditing ? 'PUT' : 'POST';
 
@@ -98,7 +102,7 @@ function EditSelection({ id, parent, onSuccess }) {
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
-            await axios.delete(`http://adimari-tzani:5000/selects/${id}`);
+            await axios.delete(`${serverUrl}/api/selects/${id}`);
             setSuccessMessage('Project deleted successfully.');
         } catch (error) {
             console.error('Failed to delete selection:', error);

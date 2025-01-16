@@ -102,20 +102,7 @@
 .item-details a:hover {
   text-decoration: underline;
 }
-.item-images
-{
-  width: 100%; /* or set a specific width */
-  overflow-x: scroll; /* enables horizontal scrolling */
-  white-space: nowrap; /* prevents wrapping of the contents */
 
-  
-}
-.item-images img {
-  display: inline-block; /* keeps the image in a single line */
-  height: 480px;
-  margin-right: 10px;
-  border-radius: 4px;
-}
 
 .search-box {
   width: 100%;

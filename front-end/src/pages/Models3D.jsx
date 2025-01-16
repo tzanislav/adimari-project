@@ -18,7 +18,7 @@ function Models() {
     useEffect(() => {
         const fetchModels = async () => {
             try {
-                const response = await fetch('http://adimari-tzani:5000/models3d');
+                const response = await fetch('${serverUrl}/api/models3d');
                 if (!response.ok) {
                     throw new Error('Failed to fetch models');
                 }
@@ -43,7 +43,7 @@ function Models() {
                 return;
             }
             try {
-                const response = await fetch(`http://adimari-tzani:5000/selects/${activeSelection[2]}`);
+                const response = await fetch(`${serverUrl}/api/selects/${activeSelection[2]}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch active project');
                 }
@@ -114,7 +114,7 @@ function Models() {
         // Update the backend
         const updateSelection = async () => {
             try {
-                const response = await fetch(`http://adimari-tzani:5000/selects/${activeSelectionObject._id}`, {
+                const response = await fetch(`${serverUrl}/api/selects/${activeSelectionObject._id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -157,7 +157,7 @@ function Models() {
                     onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-            <Link className='link button' to="/models3d/new">Add New Model</Link>
+            <Link className='link button' to="/api/models3d/new">Add New Model</Link>
             {filteredModels.map((model) => (
                 <Model key={model._id} modelId={model._id} handleAddModel={handleAddToSelection} _selection={activeSelectionObject} />
             ))}

@@ -17,7 +17,7 @@ function ListModel({ model }) {
     return (
         <div className="list-model-item">
             <div className="list-model-part">
-                <Link to={`/models3d/${model._id}`}>
+                <Link to={`/api/models3d/${model._id}`}>
                 <img src={model.images[0]} alt={model.name} />
                 </Link>
                 <div className="list-model-part-info">

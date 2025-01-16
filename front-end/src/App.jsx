@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
-import Brands from './pages/Brands';
+import Brands from './pages/brands';
 import Models3D from './pages/Models3D';
 import BrandForm from './components/BrandForm';
 import Model3DForm from './components/Model3DForm';
@@ -13,7 +13,7 @@ import ShowProject from './pages/ShowProject'; // Optional component to show a s
 import ShowSelection from './pages/ShowSelection';
 import Navbar from './components/Navbar'; // Optional navigation component
 import ItemForm from './components/ItemForm'
-import Items from './pages/Items';
+import Items from './pages/items';
 import { ActiveSelectionProvider } from "./components/selectionContext";
 import './App.css';
 

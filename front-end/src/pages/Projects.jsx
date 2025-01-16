@@ -2,7 +2,7 @@ import React, {useState, useEffect} from "react";
 import { Link } from "react-router-dom";
 import ListProject from "../components/ListProject";
 import DeleteBox from "../components/DeleteBox";
-import '../CSS/Projects.css';
+import '../CSS/projects.css';
 
 function Projects() {
     const [projects, setProjects] = useState([]);
@@ -11,7 +11,7 @@ function Projects() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        fetch('http://adimari-tzani:5000/projects')
+        fetch('${serverUrl}/api/projects')
             .then((response) => response.json())
             .then((data) => {
                 setProjects(data);
@@ -27,7 +27,7 @@ function Projects() {
 
     const handleDelete = async (id) => {
         try {
-            await fetch(`http://adimari-tzani:5000/projects/${id}`, {
+            await fetch(`${serverUrl}/api/projects/${id}`, {
                 method: 'DELETE',
             });
             setProjects((prev) => prev.filter((project) => project._id !== id));
@@ -48,7 +48,7 @@ function Projects() {
     return (
         <div className="projects-page"> 
             <h1>Projects</h1>
-            <Link to="/projects/new" className="link">Add a new project</Link>
+            <Link to="/api/projects/new" className="link">Add a new project</Link>
 
             {isDeleting && (
                 <DeleteBox itemName="project" deleteFunction={() => handleDelete(isDeleting)} closeFunction={() => setIsDeleting(false)}/>

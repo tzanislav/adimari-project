@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { showOnlyName } from '../utils/utils';
 import '../CSS/ItemCard.css';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 function Item({ itemId: itemId, handleClickItem }) {
     const [item, setItem] = useState(null);
@@ -15,6 +17,8 @@ function Item({ itemId: itemId, handleClickItem }) {
     const [models, setModels] = useState([]);
 
     const parentRef = useRef(null);
+    const {serverUrl} = useActiveSelection();
+
 
 
 
@@ -38,7 +42,7 @@ function Item({ itemId: itemId, handleClickItem }) {
         // Fetch item data by ID
         const fetchItems = async () => {
             try {
-                const response = await fetch(`http://adimari-tzani:5000/items/${itemId}`); // Adjust API endpoint
+                const response = await fetch(`${serverUrl}/api/items/${itemId}`); // Adjust API endpoint
                 if (!response.ok) {
                     throw new Error('Failed to fetch items data');
                 }
@@ -64,26 +68,8 @@ function Item({ itemId: itemId, handleClickItem }) {
             }
         }, 150); // 0.3 seconds delay
     };
-    /*
-        // Fetch models data for this item
-        useEffect(() => {
-            const fetchModels = async () => {
-                try {
-                    const response = await fetch(`http://adimari-tzani:5000/items/${itemId}/models`);
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch models');
-                    }
-                    const data = await response.json();
-                    setModels(data);
-                } catch (err) {
-                    setError(err.message);
-                }
-            };
+
     
-            fetchModels();
-        }, [itemId]);
-    
-    */
     if (loading) {
         return <p>Loading...</p>;
     }
@@ -143,13 +129,13 @@ function Item({ itemId: itemId, handleClickItem }) {
 
 
                 {showDetails && (
-                    <>
+                    <div className="item-below">
                         {images?.length > 0 && (
                             <div className="item-images">
                                 <h3>Images:</h3>
                                 {images.map((image, index) => (
-                                    <a href={image} target="_blank" rel="noreferrer">
-                                        <img key={index} src={image} alt={`${item.name} image ${index + 1}`} />
+                                    <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer">
+                                        <img src={image} alt={`${item.name} image ${index + 1}`} />
                                     </a>
                                 ))}
                             </div>
@@ -162,7 +148,7 @@ function Item({ itemId: itemId, handleClickItem }) {
                                         if (!images.includes(file)) {
                                             return (
                                                 <li key={index}>
-                                                    <a href={file} target="_blank" rel="noreferrer">{showOnlyName(file)}</a>
+                                                    <a href={file} target="_blank" rel="noreferrer">{showOnlyName(file, 50)}</a>
                                                 </li>
                                             );
                                         }
@@ -180,50 +166,56 @@ function Item({ itemId: itemId, handleClickItem }) {
                             <h4>Distributor:</h4>
                             <p className='item-property-button' onClick={() => handleClickProperty(item.distributor)}>{item.distributor || 'N/A'}</p>
                         </div>
+                        <div className="item-property">
+                            <div className='item-checkboxes'>
+                                <div className="item-checkbox">
+                                    <p>3D Models on Site</p>
+                                    <input
+                                        className="toggle-input"
+                                        id="has3dmodels"
+                                        type="checkbox"
+                                        checked={item.has3dmodels}
+                                        disabled
+                                    />
+                                    <label className="toggle-label" htmlFor="has3dmodels"></label>
+                                </div>
 
-                        <div className='item-checkboxes'>
-                            <div className="item-checkbox">
-                                <p>3D Models on Site</p>
-                                <input
-                                    className="toggle-input"
-                                    id="has3dmodels"
-                                    type="checkbox"
-                                    checked={item.has3dmodels}
-                                    disabled
-                                />
-                                <label className="toggle-label" htmlFor="has3dmodels"></label>
+                                <div className="item-checkbox">
+                                    <p>DWG Models on Site</p>
+                                    <input
+                                        className="toggle-input"
+                                        id="hasDWGmodels"
+                                        type="checkbox"
+                                        checked={item.hasDWGmodels}
+                                        disabled
+                                    />
+                                    <label className="toggle-label" htmlFor="hasDWGmodels"></label>
+                                </div>
                             </div>
+                        </div>
 
-                            <div className="item-checkbox">
-                                <p>DWG Models on Site</p>
-                                <input
-                                    className="toggle-input"
-                                    id="hasDWGmodels"
-                                    type="checkbox"
-                                    checked={item.hasDWGmodels}
-                                    disabled
-                                />
-                                <label className="toggle-label" htmlFor="hasDWGmodels"></label>
+                        <div className="item-property">
+                            <p><strong>Description:</strong></p>
+                            <p>{item.description || 'N/A'}</p>
+                        </div>
+
+                        <div className="item-property">
+                            <p><strong>Website:</strong></p>
+                            <p className='item-property-button' onClick={() => window.open(item.website, '_blank', 'noopener noreferrer')}>{item.website || 'N/A'}</p>
+                        </div>
+
+                        <div className="item-property">
+                            <p><strong>Tags:</strong></p>
+                            <div className='tags'>
+                                {item.tags?.map((tag, index) => (
+                                    <p className='item-property-button' key={`${tag}-${index}`} onClick={() => handleClickProperty(tag)}>{tag}</p>
+                                ))}
                             </div>
                         </div>
 
 
-                        <p><strong>Description:</strong></p>
-                        <p>{item.description || 'N/A'}</p>
-
-                        <p><strong>Website:</strong></p>
-                        <p className='item-property-button' onClick={() => window.open(item.website, '_blank', 'noopener noreferrer')}>{item.website || 'N/A'}</p>
-
-                        <p><strong>Tags:</strong></p>
-                        <div className='tags'>
-                            {item.tags?.map((tag, index) => (
-                                <p className='item-property-button' onClick={() => handleClickProperty(tag)}>{tag}</p>
-                            ))}
-                        </div>
-
-                            
                         <Link to={`/items/${itemId}`} className="edit-link item-button">Edit</Link>
-                    </>
+                    </div>
                 )}
             </div>
         </div >

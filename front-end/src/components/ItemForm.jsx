@@ -6,6 +6,8 @@ import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
 import DeleteBox from "../components/DeleteBox";
 import SuggestionsBox from '../components/SuggestionsBox';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 
 function ItemForm() {
@@ -14,6 +16,8 @@ function ItemForm() {
   const [isDeleting, setIsDeleting] = useState(false); // State for delete confirmation
   const [analysedImage, setAnalysedImage] = useState(false); // State for analyzed image data
   const [items, setItems] = useState([]);
+  const {serverUrl} = useActiveSelection();
+
   const [suggestions, setSuggestions] = useState({
     name: [],
     category: [],
@@ -54,7 +58,7 @@ function ItemForm() {
       const fetchItem = async () => {
         setLoading(true);
         try {
-          const response = await axios.get(`http://adimari-tzani:5000/items/${id}`);
+          const response = await axios.get(`${serverUrl}/api/items/${id}`);
           const data = response.data;
           setFormData({
             ...data,
@@ -78,7 +82,7 @@ function ItemForm() {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await axios.get('http://adimari-tzani:5000/items');
+        const response = await axios.get('${serverUrl}/api/items');
         setItems(response.data);
       } catch (error) {
         console.error('Failed to fetch items:', error);
@@ -92,31 +96,30 @@ function ItemForm() {
 
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    const inputValue = type === 'checkbox' ? checked : value;
+    
+    setFormData((prev) => ({ ...prev, [name]: inputValue }));
 
-    // Update the form data
-    setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Dynamically filter suggestions based on the input field
-    if (value) {
+    if (type !== 'checkbox' && value) {
       const filteredSuggestions = [...new Set(
         items
           .map((item) => item[name])
-          .filter((val) => val && val.toLowerCase().includes(value.toLowerCase()))
+          .filter((val) => typeof val === 'string' && val.toLowerCase().includes(value.toLowerCase()))
       )];
 
       setSuggestions((prev) => ({
         ...prev,
-        [name]: filteredSuggestions
+        [name]: filteredSuggestions,
       }));
     } else {
-      // Clear suggestions if input is empty
       setSuggestions((prev) => ({
         ...prev,
-        [name]: []
+        [name]: [],
       }));
     }
   };
+
 
   const handleBlur = (field) => {
     setTimeout(() => {
@@ -156,8 +159,8 @@ function ItemForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = isEditing
-      ? `http://adimari-tzani:5000/items/${id}`
-      : 'http://adimari-tzani:5000/items';
+      ? `${serverUrl}/api/items/${id}`
+      : '${serverUrl}/api/items';
 
     const method = isEditing ? 'PUT' : 'POST';
 
@@ -175,7 +178,7 @@ function ItemForm() {
           : `Item "${response.data.name}" created successfully!`
       );
       setTimeout(() => {
-        window.location.href = '/items';
+        window.location.href = '/api/items';
       }, 500);
 
       if (!isEditing) {
@@ -222,7 +225,7 @@ function ItemForm() {
       tags: ["Analyzing..."],
     }));
     try {
-      const response = await axios.post('http://adimari-tzani:5000/upload/analyze-image', {
+      const response = await axios.post('${serverUrl}/api/upload/analyze-image', {
         imageUrl,
       });
 
@@ -250,10 +253,10 @@ function ItemForm() {
   // Delete item
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://adimari-tzani:5000/items/${id}`);
+      await axios.delete(`${serverUrl}/api/items/${id}`);
       setSuccessMessage('Item deleted successfully!');
       setTimeout(() => {
-        window.location.href = '/items';
+        window.location.href = '/api/items';
       }, 500);
     } catch (error) {
       setErrorMessage('Failed to delete item: ' + error.message);

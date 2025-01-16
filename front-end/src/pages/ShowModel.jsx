@@ -18,7 +18,7 @@ function ShowModel() {
     useEffect(() => {
         const fetchModel = async () => {
             try {
-                const response = await fetch(`http://adimari-tzani:5000/models3d/${id}`);
+                const response = await fetch(`${serverUrl}/api/models3d/${id}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch model data');
                 }
@@ -93,7 +93,7 @@ function ShowModel() {
                     <p>Price: <br /><strong>{model.price}</strong></p>
                     <p>Path: <br /><strong>{model.path}</strong></p>
                     <button onClick={copyToClipboard}>{copyText}</button>                    
-                    <Link to={`/models3d/edit/${model._id}/`} className="edit-link">Edit</Link>
+                    <Link to={`/api/models3d/edit/${model._id}/`} className="edit-link">Edit</Link>
                 </div>
             </div>
         </div >

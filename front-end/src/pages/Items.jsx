@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import Item from '../components/Item';
 import { Link } from 'react-router-dom';
 import '../CSS/ListPage.css';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 function Items() {
     const [items, setItems] = useState([]);
@@ -10,14 +12,15 @@ function Items() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filteredItems, setFilteredItems] = useState([]);
-
+    const {serverUrl} = useActiveSelection();
 
 
 
     useEffect(() => {
         const fetchitems = async () => {
             try {
-                const response = await fetch('http://adimari-tzani:5000/items');
+                const response = await fetch(serverUrl +'/api/items');
+                console.log(serverUrl +'/api/items');
                 if (!response.ok) {
                     throw new Error('Failed to fetch items');
                 }

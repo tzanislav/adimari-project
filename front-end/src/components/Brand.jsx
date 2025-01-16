@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showOnlyName } from '../utils/utils';
+import { useActiveSelection } from "../components/selectionContext";
+
 
 
 function Brand({ brandId, handleClickItem }) {
@@ -8,11 +10,11 @@ function Brand({ brandId, handleClickItem }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
-
     const [images, setImages] = useState([]);
     const [files, setFiles] = useState([]);
-
     const [models, setModels] = useState([]);
+    const {serverUrl} = useActiveSelection();
+
 
 
 
@@ -36,7 +38,7 @@ function Brand({ brandId, handleClickItem }) {
         // Fetch brand data by ID
         const fetchBrand = async () => {
             try {
-                const response = await fetch(`http://adimari-tzani:5000/brands/${brandId}`); // Adjust API endpoint
+                const response = await fetch(`${serverUrl}/api/brands/${brandId}`); // Adjust API endpoint
                 if (!response.ok) {
                     throw new Error('Failed to fetch brand data');
                 }
@@ -58,7 +60,7 @@ function Brand({ brandId, handleClickItem }) {
     useEffect(() => {
         const fetchModels = async () => {
             try {
-                const response = await fetch(`http://adimari-tzani:5000/brands/${brandId}/models`);
+                const response = await fetch(`${serverUrl}/api/brands/${brandId}/models`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch models');
                 }
@@ -171,7 +173,7 @@ function Brand({ brandId, handleClickItem }) {
                             <div className='item-models-container'>
                                 {models.map((model) => (
                                     model.images.length > 0 ? (
-                                        <Link key={model._id} to={`/models3d/${model._id}`}><img src={`${model.images[0]}`} alt={`${model.name} image`} className='thumbnail' /></Link>
+                                        <Link key={model._id} to={`/api/models3d/${model._id}`}><img src={`${model.images[0]}`} alt={`${model.name} image`} className='thumbnail' /></Link>
                                     ) : (
                                         <Link key={model._id} to={`/modelsdwg/${model._id}`}>{model.name}</Link>
                                     )
@@ -211,7 +213,7 @@ function Brand({ brandId, handleClickItem }) {
 
 
 
-                        <Link to={`/brands/${brandId}`} className="edit-link item-button">Edit</Link>
+                        <Link to={`/api/brands/${brandId}`} className="edit-link item-button">Edit</Link>
                     </>
                 )}
             </div>

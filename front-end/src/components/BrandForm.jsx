@@ -39,7 +39,7 @@ function BrandForm() {
       const fetchBrand = async () => {
         setLoading(true);
         try {
-          const response = await axios.get(`http://adimari-tzani:5000/brands/${id}`);
+          const response = await axios.get(`${serverUrl}/api/brands/${id}`);
           const data = response.data;
           setFormData({
             ...data,
@@ -72,8 +72,8 @@ function BrandForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = isEditing
-      ? `http://adimari-tzani:5000/brands/${id}`
-      : 'http://adimari-tzani:5000/brands';
+      ? `${serverUrl}/api/brands/${id}`
+      : '${serverUrl}/api/brands';
 
     const method = isEditing ? 'PUT' : 'POST';
 
@@ -91,7 +91,7 @@ function BrandForm() {
           : `Brand "${response.data.name}" created successfully!`
       );
       setTimeout(() => {
-        window.location.href = '/brands';
+        window.location.href = '/api/brands';
       }, 500);
 
       if (!isEditing) {
@@ -123,10 +123,10 @@ function BrandForm() {
   // Delete brand
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://adimari-tzani:5000/brands/${id}`);
+      await axios.delete(`${serverUrl}/api/brands/${id}`);
       setSuccessMessage('Brand deleted successfully!');
       setTimeout(() => {
-        window.location.href = '/brands';
+        window.location.href = '/api/brands';
       }, 500);
     } catch (error) {
       setErrorMessage('Failed to delete brand: ' + error.message);

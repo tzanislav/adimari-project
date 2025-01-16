@@ -40,20 +40,29 @@
   object-fit: contain;
   margin-bottom: 10px;
   transition: all 0.3s;
+
+  border: #4b4b4b13 1px solid;
+  padding: 5px;
 }
 
 .thumbnail:hover {
   transform: scale(1.1);
 }
-
-.item-property {
+.item-property
+{
   display: flex;
   flex-direction: column;
   align-items: baseline;
   font-size: .5rem;
   text-transform: uppercase;
-  
+  width: 100%;
   letter-spacing: 2px;
+}
+.item-below .item-property {
+
+  border: #4b4b4b 1px solid;
+  margin: 10px 0;
+  padding: 10px;
 }
 
 .item-property h4
@@ -92,7 +101,11 @@
   /* enables horizontal scrolling */
   white-space: nowrap;
   /* prevents wrapping of the contents */
-
+  margin: 50px 0;
+  padding: 40px;
+  
+  border: #4b4b4b 1px solid;
+  
 
 }
 
@@ -115,7 +128,45 @@
   transition: all 0.3s;
 }
 
+.item-files
+{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: start;
+  margin: 10px 0;
+  border: #4b4b4b 1px solid;
+  width: 100%;
+}
 
+.item-files h3
+{
+  margin: 25px 45px;
+}
+
+.item-files li
+{
+  list-style-type: none;
+  margin: 25px;
+}
+
+.item-files li a
+{
+  text-decoration: none;
+  color: #4b4b4b;
+  margin: 10px;
+  padding: 10px 25px;
+  transition: all 0.3s;
+  height: 40px;
+  background-color: #c4c4c4;
+
+}
+
+.item-files li a:hover
+{
+  background-color: #4b4b4b;
+  color: #ffffff;
+}
 
 .item-property-button:hover {
   background-color: #c4c4c4;
