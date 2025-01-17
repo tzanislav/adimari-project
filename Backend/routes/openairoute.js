@@ -68,6 +68,9 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Bing search results did not load.' });
     }
 
+    //wait 1 second to let the page load
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // Extract content from the search results
     const organicResults = await page.evaluate(() => {
       const elements = Array.from(document.querySelectorAll('#b_results > li.b_algo'));
@@ -80,11 +83,23 @@ router.get('/', async (req, res) => {
 
     // Send the result to OpenAI API for price extraction
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: `You are a helpful assistant. Extract the price in any currency of the item in the following text and return a JSON formatted answer containing only the price in the format {"price" : "XXX.XX"} (no commas or anything except a valid float).`,
+          content: `You are a helpful assistant.
+          Extract the price in any currency of the item in the following 
+          text or estimate the price based on your opinion 
+          and return a JSON formatted answer containing only the price in the 
+          format{
+               "price": "XXX.XX",
+                "status": "found"
+                }
+          (no commas for the number or anything except a valid float) Where the status is wether the price is base on the text ("found") or based on an estimation ("estimate").
+          Even if you are not sure, please provide an estimate based on the information: ${query}
+          When estimatin, take into account the brand class and what similar items cost, also the text is context for the item. Work in euro please, even if you find the price in dollars or any other currency try to convert it.
+          Try to be as accurate as possible.
+          The answer shoud be exclusively valid JSON.`,
         },
         {
           role: 'user',
@@ -94,13 +109,14 @@ router.get('/', async (req, res) => {
     });
 
     const openAIResult = response.choices[0].message.content;
+    const cleanJSON = openAIResult.replace(/```json|```/g, '').trim();
 
     console.log('OpenAI Response:', openAIResult);
 
     // Parse and validate the JSON response
     let parsedResponse;
     try {
-      parsedResponse = JSON.parse(openAIResult);
+      parsedResponse = JSON.parse(cleanJSON);
       console.log('Parsed OpenAI Response:', parsedResponse);
     } catch (error) {
       console.error('Failed to parse OpenAI response as JSON:', error);
@@ -109,7 +125,7 @@ router.get('/', async (req, res) => {
 
     // Validate that the JSON contains a `price` field
     if (parsedResponse && typeof parsedResponse.price !== 'undefined') {
-      return res.json({ query, price: parsedResponse.price });
+      return res.json({ query, price: parsedResponse.price, status: parsedResponse.status });
     } else {
       console.error('OpenAI response does not contain a valid price:', parsedResponse);
       return res.status(500).json({ error: 'OpenAI response does not contain a valid price.' });

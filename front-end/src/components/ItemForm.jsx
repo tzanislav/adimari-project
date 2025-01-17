@@ -271,7 +271,7 @@ function ItemForm() {
   //Try to get the price
   const getPrice = async () => {
     // Combine formData fields to create the query string
-    var query = `${formData.name} ${formData.brand}`.trim();
+    var query = `${formData.brand}  ${formData.name}`.trim();
     //append the first tag
     if (formData.tags.length > 0) {
       query += ` ${formData.tags[0]}`;
@@ -301,7 +301,8 @@ function ItemForm() {
           ...prev,
           price: price,
         }));
-        setPriceMessage('');
+        console.log(response.data.status);
+        setPriceMessage(response.data.status);
       }
       console.log("Price:", price);
     } catch (error) {
@@ -311,7 +312,6 @@ function ItemForm() {
         price: 0,
       }));
 
-      setPriceMessage(price);
       console.error('Failed to get price:', error);
       // Optionally update the UI with an error message
       setErrorMessage('Failed to fetch the price. Please try again.');
