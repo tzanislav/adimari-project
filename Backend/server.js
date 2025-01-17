@@ -7,6 +7,7 @@ const modelRoutes = require('./routes/modelRoutes'); // Import model routes
 const projectRoutes = require('./routes/projectRoutes'); // Import project routes
 const selectRoutes = require('./routes/selectionRoute'); // Import select routes
 const itemRoutes = require('./routes/itemRoutes'); // Import item routes
+const openairoute = require('./routes/openairoute'); // Import openairoute routes
 const cors = require('cors');
 require('dotenv').config();
 const path = require('path');
@@ -38,6 +39,7 @@ app.use('/api/models3d', modelRoutes); // Routes start with /models3d
 app.use('/api/projects', projectRoutes); // Routes start with /projects
 app.use('/api/selections', selectRoutes); // Routes start with /selects
 app.use('/api/items', itemRoutes); // Routes start with /items
+app.use('/api/openai', openairoute); // Routes start with /openairoute
 
 // Test route for API
 app.get('/api/test', (req, res) => {

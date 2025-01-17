@@ -8,15 +8,15 @@ import DeleteBox from "../components/DeleteBox";
 import SuggestionsBox from '../components/SuggestionsBox';
 import { useActiveSelection } from "../components/selectionContext";
 
-
-
 function ItemForm() {
   const { id } = useParams(); // Get ID from URL
   const isEditing = Boolean(id); // Check if the page is for editing
   const [isDeleting, setIsDeleting] = useState(false); // State for delete confirmation
   const [analysedImage, setAnalysedImage] = useState(false); // State for analyzed image data
+  const [item, setItem] = useState(null);
   const [items, setItems] = useState([]);
   const { serverUrl } = useActiveSelection();
+  const [priceMessage, setPriceMessage] = useState('');
 
   const [suggestions, setSuggestions] = useState({
     name: [],
@@ -66,6 +66,7 @@ function ItemForm() {
             tags: data.tags || [],
             files: data.files || [],
           });
+          setItem(data);
         } catch (error) {
           console.error('Failed to fetch item:', error);
           setErrorMessage('Failed to fetch item data.');
@@ -267,6 +268,58 @@ function ItemForm() {
   };
 
 
+  //Try to get the price
+  const getPrice = async () => {
+    // Combine formData fields to create the query string
+    var query = `${formData.name} ${formData.brand}`.trim();
+    //append the first tag
+    if (formData.tags.length > 0) {
+      query += ` ${formData.tags[0]}`;
+    }
+
+
+    console.log('Query:', query);
+    setPriceMessage('Fetching price...');
+
+
+    try {
+      // Make a GET request to your backend API with the query parameter
+      const response = await axios.get(`${serverUrl}/api/openai`, {
+        params: { query }, // Pass query as a parameter
+      });
+
+      // Extract the price from the response
+      const price = response.data.price;
+      if (isNaN(price)) {
+        setPriceMessage(price);
+        setFormData((prev) => ({
+          ...prev,
+          price: 0,
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          price: price,
+        }));
+        setPriceMessage('');
+      }
+      console.log("Price:", price);
+    } catch (error) {
+      // Handle errors gracefully
+      setFormData((prev) => ({
+        ...prev,
+        price: 0,
+      }));
+
+      setPriceMessage(price);
+      console.error('Failed to get price:', error);
+      // Optionally update the UI with an error message
+      setErrorMessage('Failed to fetch the price. Please try again.');
+    }
+  };
+
+
+
   return (
     <div className="brand-form">
       <h2>{isEditing ? 'Edit Item' : 'Create New Item'}</h2>
@@ -464,12 +517,18 @@ function ItemForm() {
 
           <label>
             Price:
+            {priceMessage && <p>{priceMessage}</p>}
             <input
               type="number"
               name="price"
               value={formData.price || 0}
               onChange={handleChange}
             />
+            <button onClick={(e) => {
+              e.preventDefault();
+              getPrice();
+            }
+            }>Get Price</button>
           </label>
 
           <label>

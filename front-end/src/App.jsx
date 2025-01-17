@@ -13,7 +13,7 @@ import ShowProject from './pages/ShowProject'; // Optional component to show a s
 import ShowSelection from './pages/ShowSelection';
 import Navbar from './components/Navbar'; // Optional navigation component
 import ItemForm from './components/ItemForm'
-import Items from './pages/items';
+import Items from './pages/Items';
 import { ActiveSelectionProvider } from "./components/selectionContext";
 import './App.css';
 

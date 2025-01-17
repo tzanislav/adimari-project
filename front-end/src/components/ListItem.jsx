@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import "../CSS/ListModel.css";
 
-function ListItem({ item, handleRemove }) {
+function ListItem({ item, handleRemove, count, handleUpdateItem }) {
 
     const [copied, setCopied] = useState(false);
     const [images, setImages] = useState([]);
@@ -13,11 +13,16 @@ function ListItem({ item, handleRemove }) {
 
 
     const copyToClipboard = () => {
-        navigator.clipboard.writeText(item.path);
-        setCopied(true);
-        setTimeout(() => {
-            setCopied(false);
-        }, 2000);
+        console.log("Copying to clipboard:", item);
+        try {
+            navigator.clipboard.writeText(item.modelPath);
+            setCopied(true);
+            setTimeout(() => {
+                setCopied(false);
+            }, 2000);
+        } catch (error) {
+            console.error("Error copying to clipboard:", error);
+        }
     }
 
     const filterImages = (files) => {
@@ -37,7 +42,6 @@ function ListItem({ item, handleRemove }) {
                                 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/300px-No_image_available.svg.png" alt={item.name} />
                             )}
                         </Link>
-
                         <div className="list-item-edit-overlay">
                             <p>EDIT</p>
                         </div>
@@ -48,9 +52,13 @@ function ListItem({ item, handleRemove }) {
                     </div>
                 </div>
                 {item.modelPath && (
-                    <button onClick={copyToClipboard}>
-                        {copied ? "Copied!" : "Copy path"}
-                    </button>
+                    <div className='item-path'>
+                        <h4>Model path</h4>
+                        <h3>{item.modelPath}</h3>
+                        <button className='button-small' onClick={copyToClipboard}>
+                            {copied ? "Copied!" : "Copy path"}
+                        </button>
+                    </div>
                 )}
 
                 <div className="list-item-info">
@@ -70,10 +78,18 @@ function ListItem({ item, handleRemove }) {
                         <h4>Price</h4>
                         <h3>{item.price} EUR</h3>
                     </div>
+                    <div className="list-item-propery">
+                        <h4>Count</h4>
+                        <div className='count-buttons'>
+                            <button className='button-small' onClick={() => handleUpdateItem(item._id, count - 1)}>Remove</button>
+                            <h3>{count}</h3>
+                            <button className='button-small' onClick={() => handleUpdateItem(item._id, count + 1)}>Add</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <button onClick={() => handleRemove(item._id)}>Remove from selection</button>
+            <button className='button-small button-remove' onClick={() => handleRemove(item._id)}>Remove</button>
 
         </div>
     );

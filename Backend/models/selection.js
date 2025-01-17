@@ -14,9 +14,12 @@ const selectionSchema = new mongoose.Schema({
         ref: 'Project',
         required: true,
     },
-    items: {
-        type: [String], default: null 
-    },
+    items: [
+        {
+            _id: { type: String, required: true }, // Item ID
+            count: { type: Number, default: 1 }, // Count of the item
+        },
+    ],
     createdAt: {
         type: Date,
         default: Date.now,

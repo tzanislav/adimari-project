@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Route to fetch a single selection along with models in the models array
+// Route to fetch a single selection along with models in the items array
 router.get('/:id', async (req, res) => {
     try {
         // Fetch the selection by its ID
@@ -64,12 +64,13 @@ router.get('/:id', async (req, res) => {
             return res.status(404).send({ message: 'Selection not found' });
         }
 
-        // Fetch the models whose IDs are in the selection's models array
-        const itemsInSelection = await Item.find({
-            _id: { $in: selection.items }
-        });
+        // Extract the IDs from the items array
+        const itemIds = selection.items.map((item) => item._id);
 
-        // Combine selection with the models' detailed information
+        // Fetch the items whose IDs are in the selection's items array
+        const itemsInSelection = await Item.find({ _id: { $in: itemIds } });
+
+        // Combine selection with the items' detailed information
         const response = {
             ...selection.toObject(),
             itemDetails: itemsInSelection,

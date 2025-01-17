@@ -32,6 +32,7 @@ function Items() {
                         throw new Error('Failed to fetch active selection');
                     }
                     const selectionData = await response.json();
+                    console.log (selectionData);
                     setActiveSelection(selectionData._id);
                     return selectionData; // Return the fetched active selection
                 }
@@ -84,16 +85,22 @@ function Items() {
             console.error('No active selection to add to');
             return
         }
-        console.log(isAdding ? 'Adding model' : 'Deleting', item);
-        console.log('Active Selection:', selections);
         setIsWorking(true);
 
         // Create a new selection object
+        let updatedItems;
+
+        if (isAdding) {
+            // Add the item with count: 1 if not already present
+            updatedItems = [...(selections.items || []), { _id: item._id, count: 1 }];
+        } else {
+            // Remove the item entirely
+            updatedItems = (selections.items || []).filter((obj) => obj._id !== item._id);
+        }
+        
         const newSelection = {
             ...selections,
-            items: isAdding
-                ? [...(selections.items || []), item._id]
-                : (selections.items || []).filter((itemId) => itemId !== item._id),
+            items: updatedItems,
         };
 
         // Update the active selection
@@ -109,17 +116,16 @@ function Items() {
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify(newSelection),
+                        body: JSON.stringify(newSelection), // Sends the serialized items
                     }
                 );
-
+    
                 if (!response.ok) {
                     throw new Error('Failed to update selection');
                 }
-
+    
                 console.log('Selection updated successfully');
                 setIsWorking(false);
-
             } catch (err) {
                 setError(err.message);
             }

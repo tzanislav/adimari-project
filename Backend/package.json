@@ -10,6 +10,10 @@
     "express.js": "^1.0.0",
     "mongoose": "^8.9.3",
     "multer": "^1.4.5-lts.1",
-    "multer-s3": "^3.0.1"
+    "multer-s3": "^3.0.1",
+    "openai": "^4.78.1",
+    "puppeteer": "^24.1.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }

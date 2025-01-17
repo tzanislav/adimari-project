@@ -5,7 +5,7 @@ import '../CSS/ItemCard.css';
 import { useActiveSelection } from "../components/selectionContext";
 
 
-function Item({ item, handleClickItem, _handleAddRemoveModel, isWorking }) {
+function Item({item, handleClickItem, _handleAddRemoveModel, isWorking }) {
 
     const parentRef = useRef(null);
     const [loading, setLoading] = useState(true);
@@ -19,9 +19,11 @@ function Item({ item, handleClickItem, _handleAddRemoveModel, isWorking }) {
 
     useEffect(() => {
         if (activeSelection) {
-            setIsPresent(activeSelection.items?.includes(item._id));
+            setIsPresent(
+                activeSelection.items?.some((obj) => obj._id === item._id)
+            );
         }
-    }, [activeSelection]);
+    }, [activeSelection, item._id]);
 
 
 
@@ -49,8 +51,8 @@ function Item({ item, handleClickItem, _handleAddRemoveModel, isWorking }) {
         }, 150); // 0.3 seconds delay
     };
 
-    
-    const handleAddRemoveModel  = (isAdding, item) => {
+
+    const handleAddRemoveModel = (isAdding, item) => {
         console.log(isAdding ? 'Local Adding model' : 'Local Deleting', item);
         setIsPresent(isAdding);
         _handleAddRemoveModel(isAdding, item);
@@ -123,29 +125,39 @@ function Item({ item, handleClickItem, _handleAddRemoveModel, isWorking }) {
                                 )}
                             </>
                         }
-                        {images.length > 0 ? (
-                            <img
-                                src={images[0]}
-                                className='thumbnail'
-                                alt={`${item.name} image`}
-                                onClick={handleImageClick}
-                            />
-                        ) : (
-                            <img
-                                src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/300px-No_image_available.svg.png'
-                                className='thumbnail'
-                                alt='placeholder'
+                        <div className='item-thumbnail'>
+                            {item.modelPath &&
+                                <img src='https://mesharch.s3.eu-west-1.amazonaws.com/cube.png' className='item-model-icon' alt='3D Model' />
+                            }
+                            {images.length > 0 ? (
+                                <img
+                                    src={images[0]}
+                                    className='thumbnail'
+                                    alt={`${item.name} image`}
+                                    onClick={handleImageClick}
+                                />
+                            ) : (
+                                <img
+                                    src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/300px-No_image_available.svg.png'
+                                    className='thumbnail'
+                                    alt='placeholder'
 
-                                onClick={handleImageClick}
-                            />
-                        )}
+                                    onClick={handleImageClick}
+                                />
+                            )}
+                        </div>
                     </div>
                     <div className="item-properties-above-fold">
                         <div className="item-property">
                             <h4>Brand:</h4>
                             <p className='item-property-button' onClick={() => { handleClickProperty(item.brand) }}>{item.brand}</p>
                         </div>
+                        <div className="item-property item-property-right">
+                            <h4>Price:</h4>
+                            <h2 >{item.price} EUR</h2>
+                        </div>
                     </div>
+
                 </div>
 
 
@@ -178,6 +190,10 @@ function Item({ item, handleClickItem, _handleAddRemoveModel, isWorking }) {
                             </div>
                         )}
 
+                        <div className="item-property">
+                            <p><strong>Website:</strong></p>
+                            <p className='item-property-button' onClick={() => window.open(item.website, '_blank', 'noopener noreferrer')}>{item.website || 'N/A'}</p>
+                        </div>
                         <div className="item-property">
                             <h4>Class:</h4>
                             <p className='item-property-button' onClick={() => { handleClickProperty(item.class) }}>{item.class}</p>
@@ -219,10 +235,6 @@ function Item({ item, handleClickItem, _handleAddRemoveModel, isWorking }) {
                             <p>{item.description || 'N/A'}</p>
                         </div>
 
-                        <div className="item-property">
-                            <p><strong>Website:</strong></p>
-                            <p className='item-property-button' onClick={() => window.open(item.website, '_blank', 'noopener noreferrer')}>{item.website || 'N/A'}</p>
-                        </div>
 
                         <div className="item-property">
                             <p><strong>Tags:</strong></p>
@@ -232,8 +244,11 @@ function Item({ item, handleClickItem, _handleAddRemoveModel, isWorking }) {
                                 ))}
                             </div>
                         </div>
+                        <div className="item-property">
 
-                        <Link to={`/items/${item._id}`} className="edit-link item-button">Edit</Link>
+
+                            <Link to={`/items/${item._id}`} className="edit-link item-button">Edit</Link>
+                        </div>
                     </div>
                 )}
             </div>

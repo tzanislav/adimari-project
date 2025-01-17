@@ -1,5 +1,6 @@
 .list-item-container
 {
+    position: relative;
     width: 75%;
     margin: 10px auto;
     border-bottom: 1px solid #e0e0e0;
@@ -88,6 +89,7 @@
     align-items: center;
     opacity: 0;
     transition: opacity 0.5s;
+    pointer-events: none; /* Makes the overlay transparent to clicks */
 
 }
 
@@ -106,5 +108,44 @@
     position: relative;
     text-transform: capitalize;
     z-index: 1001;
+}
 
+.button-small
+{
+    padding: 5px 10px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 5px;
+    background-color: #f0f0f0;
+    color: #535353;
+    cursor: pointer;
+    transition: background-color 0.5s;
+}
+
+.count-buttons
+{
+    width: 150px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.button-remove
+{
+    position: absolute;
+    top: 60px;
+    left: 0;
+}
+
+.item-path
+{
+    width: 25%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 25px;
 }
