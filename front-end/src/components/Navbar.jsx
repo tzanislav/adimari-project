@@ -9,8 +9,8 @@ function Navbar() {
   const toggleMenu = () => {
     setIsOpen(!isOpen);
   };
-  const { activeSelection } = useActiveSelection();
-  const { clearActiveSelection } = useActiveSelection();
+  const { activeSelection , clearActiveSelection } = useActiveSelection();
+
 
 
 
@@ -35,11 +35,11 @@ function Navbar() {
       <div className='selection-bar' style={{ top: activeSelection ? '0px' : '-200px' }}>
         {!activeSelection ? <h3>No active selection</h3> :
           <>
-            <Link to={`/projects/${activeSelection[3]}`} className='active-selection-button-smaller'>{activeSelection[1]}</Link>
-            <Link to={`/selections/${activeSelection[2]}`} className='active-selection-button-bigger'>{activeSelection[0]}</Link>
+            <button onClick={() => clearActiveSelection()} className='active-selection-button'>Clear</button>
+            
+            <Link to={`/selections/${activeSelection._id}`} className='active-selection-button-bigger'>{activeSelection.name}</Link>
           </>
         }
-        <button onClick={() => clearActiveSelection()} className='active-selection-button'>Clear</button>
       </div>
     </nav>
   );

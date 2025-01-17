@@ -36,7 +36,7 @@ app.use('/api/brands', brandRoutes); // Routes start with /brands
 app.use('/api/upload', uploadRoutes); // Routes start with /upload
 app.use('/api/models3d', modelRoutes); // Routes start with /models3d
 app.use('/api/projects', projectRoutes); // Routes start with /projects
-app.use('/api/selects', selectRoutes); // Routes start with /selects
+app.use('/api/selections', selectRoutes); // Routes start with /selects
 app.use('/api/items', itemRoutes); // Routes start with /items
 
 // Test route for API

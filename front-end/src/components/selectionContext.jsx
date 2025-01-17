@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import axios from "axios";
 
 // Create Context
 const ActiveSelectionContext = createContext();
@@ -10,42 +11,61 @@ export const ActiveSelectionProvider = ({ children }) => {
   // Load server URL from environment variables
   const serverUrl = import.meta.env.VITE_SERVER_URL;
 
-  // Load initial value from cookies
+  // Load initial selection from the backend using the ID stored in the cookie
   useEffect(() => {
-    const savedSelection = document.cookie
+    const savedSelectionId = document.cookie
       .split("; ")
-      .find((row) => row.startsWith("activeSelection="))
+      .find((row) => row.startsWith("activeSelectionId="))
       ?.split("=")[1];
 
-    if (savedSelection) {
-      try {
-        setActiveSelection(JSON.parse(decodeURIComponent(savedSelection)));
-      } catch (error) {
-        console.error("Failed to parse activeSelection from cookie:", error);
-      }
+    if (savedSelectionId) {
+      axios.get(`${serverUrl}/api/selections/${savedSelectionId}`)
+        .then((response) => {
+          setActiveSelection(response.data);
+        })
+        .catch((error) => {
+          console.error("Error fetching active selection:", error);
+        });
     }
-  }, []);
+  }, [serverUrl]);
 
-  // Save to cookies on change
+  // Save only the ID to cookies on change
   useEffect(() => {
-    if (activeSelection) {
-      document.cookie = `activeSelection=${encodeURIComponent(
-        JSON.stringify(activeSelection)
+    if (activeSelection && activeSelection._id) {
+      document.cookie = `activeSelectionId=${encodeURIComponent(
+        activeSelection._id
       )}; path=/; max-age=31536000`;
     } else {
-      document.cookie = "activeSelection=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "activeSelectionId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     }
   }, [activeSelection]);
+
+  // Set active selection by ID and fetch data from the backend
+  const setActiveSelectionById = (id) => {
+    if (!id) {
+      clearActiveSelection();
+      return;
+    }
+    console.log("Setting active selection by ID:", id, " from ", `${serverUrl}/api/selections/${id}`);
+    axios.get(`${serverUrl}/api/selections/${id}`)
+      .then((response) => {
+        setActiveSelection(response.data);
+        console.log("Active selection set:", response.data);
+      })
+      .catch((error) => {
+        console.error("Error fetching active selection:", error);
+      });
+  };
 
   // Clear function
   const clearActiveSelection = () => {
     setActiveSelection(null);
-    document.cookie = "activeSelection=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    document.cookie = "activeSelectionId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
   };
 
   return (
     <ActiveSelectionContext.Provider
-      value={{ activeSelection, setActiveSelection, clearActiveSelection, serverUrl }}
+      value={{ activeSelection, setActiveSelection: setActiveSelectionById, clearActiveSelection, serverUrl }}
     >
       {children}
     </ActiveSelectionContext.Provider>

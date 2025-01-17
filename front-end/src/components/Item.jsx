@@ -5,16 +5,26 @@ import '../CSS/ItemCard.css';
 import { useActiveSelection } from "../components/selectionContext";
 
 
-function Item({ item, handleClickItem }) {
+function Item({ item, handleClickItem, _handleAddRemoveModel, isWorking }) {
 
+    const parentRef = useRef(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
     const [images, setImages] = useState([]);
     const [files, setFiles] = useState([]);
     const [models, setModels] = useState([]);
-    const parentRef = useRef(null);
-    const { activeSelection, setActiveSelection, serverUrl } = useActiveSelection();
+    const { activeSelection } = useActiveSelection();
+    const [isPresent, setIsPresent] = useState(false);
+
+    useEffect(() => {
+        if (activeSelection) {
+            setIsPresent(activeSelection.items?.includes(item._id));
+        }
+    }, [activeSelection]);
+
+
+
 
     // Helper function to filter image files
     const filterImages = (files) => {
@@ -39,54 +49,14 @@ function Item({ item, handleClickItem }) {
         }, 150); // 0.3 seconds delay
     };
 
-
-    const handleAddModel = (isAdding) => {
-        if (!activeSelection) {
-            console.error("activeSelection is not defined");
-            return;
-        }
-
-        console.log(
-            `${isAdding ? "Add" : "Remove"} model to selection ${activeSelection[2]} model: ${item._id}`
-        );
-
-        // Modify the models array based on `isAdding`
-        const updatedItems = isAdding
-            ? [...(activeSelection.items || []), item._id] // Add model
-            : (activeSelection.items || []).filter((id) => id !== item._id); // Remove model
-
-        const newSelection = {
-            ...activeSelection,
-            items: updatedItems,
-        };
-
-        // Update state
-        setActiveSelection(newSelection);
-        console.log('New selection: ', newSelection);
-
-        // Update the backend
-        const updateSelection = async () => {
-            try {
-                const response = await fetch(`${serverUrl}/api/selects/${activeSelection[2]}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(newSelection),
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to update selection');
-                }
-
-                console.log('Selection updated successfully');
-            } catch (err) {
-                setError(err.message);
-            }
-        };
-
-        updateSelection();
+    
+    const handleAddRemoveModel  = (isAdding, item) => {
+        console.log(isAdding ? 'Local Adding model' : 'Local Deleting', item);
+        setIsPresent(isAdding);
+        _handleAddRemoveModel(isAdding, item);
     };
+
+
 
 
     if (loading) {
@@ -112,10 +82,6 @@ function Item({ item, handleClickItem }) {
             style={showDetails ? { width: '100%' } : {}}
             ref={parentRef}
         >
-
-
-
-
             <div className='item-data'>
                 <div className="item-property">
                     <p className='item-property-button' onClick={() => { handleClickProperty(item.category) }}>{item.category}</p>
@@ -123,15 +89,18 @@ function Item({ item, handleClickItem }) {
                 <h1>{item.name}</h1>
                 <div className="item-above-fold" >
                     <div className='thumbnail-container'>
-                        {activeSelection &&
+                        {(activeSelection) &&
                             <>
-                                {activeSelection.items?.includes(item._id) ? (
+                                {isPresent ? (
                                     // Remove Button
                                     <button
                                         onClick={(e) => {
                                             e.preventDefault();
-                                            if (handleAddModel) {
-                                                handleAddModel(false); // Pass false for Remove
+                                            if (handleAddRemoveModel) {
+                                                handleAddRemoveModel(false, item); // Pass false for Remove
+                                            }
+                                            else {
+                                                console.log("No handleAddRemoveModel function provided");
                                             }
                                         }}
                                         className="remove-button"
@@ -143,8 +112,8 @@ function Item({ item, handleClickItem }) {
                                     <button
                                         onClick={(e) => {
                                             e.preventDefault();
-                                            if (handleAddModel) {
-                                                handleAddModel(true); // Pass true for Add
+                                            if (handleAddRemoveModel) {
+                                                handleAddRemoveModel(true, item); // Pass true for Add
                                             }
                                         }}
                                         className="add-button"

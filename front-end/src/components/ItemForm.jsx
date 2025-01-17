@@ -16,7 +16,7 @@ function ItemForm() {
   const [isDeleting, setIsDeleting] = useState(false); // State for delete confirmation
   const [analysedImage, setAnalysedImage] = useState(false); // State for analyzed image data
   const [items, setItems] = useState([]);
-  const {serverUrl} = useActiveSelection();
+  const { serverUrl } = useActiveSelection();
 
   const [suggestions, setSuggestions] = useState({
     name: [],
@@ -44,6 +44,7 @@ function ItemForm() {
     class: 'Low',
     price: 0,
     tags: [],
+    modelPath: '',
     has3dmodels: false,
     hasDWGmodels: false,
   });
@@ -98,7 +99,7 @@ function ItemForm() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     const inputValue = type === 'checkbox' ? checked : value;
-    
+
     setFormData((prev) => ({ ...prev, [name]: inputValue }));
 
     if (type !== 'checkbox' && value) {
@@ -178,7 +179,7 @@ function ItemForm() {
           : `Item "${formData.name}" created successfully!`
       );
       setTimeout(() => {
-        window.location.href = '/items';
+        window.history.back();
       }, 500);
 
       if (!isEditing) {
@@ -193,6 +194,7 @@ function ItemForm() {
           class: 'Low',
           price: 0,
           tags: [],
+          modelPath: '',
           has3dmodels: false,
           hasDWGmodels: false,
         });
@@ -256,7 +258,8 @@ function ItemForm() {
       await axios.delete(`${serverUrl}/api/items/${id}`);
       setSuccessMessage('Item deleted successfully!');
       setTimeout(() => {
-        window.location.href = '/items';
+        //Back
+        window.history.back();
       }, 500);
     } catch (error) {
       setErrorMessage('Failed to delete item: ' + error.message);
@@ -394,9 +397,16 @@ function ItemForm() {
           )}
 
           {formData.files.length > 0 && (
-            <ul>
+            <div className='uploaded-files'>
               {formData.files.map((file, index) => (
-                <li key={index}>
+                <div className='uploaded-file' key={index}>
+                  {file.match(/\.(jpeg|jpg|gif|png|webp)$/i)
+                    ?
+                    (<img className='uploaded-img' src={file} alt={showOnlyName(file)} />) :
+                    (<img className='uploaded-img' src="https://static.vecteezy.com/system/resources/previews/000/420/464/original/vector-document-in-folder-icon.jpg" alt={showOnlyName(file)} />)
+                  }
+
+
                   <p>{showOnlyName(file)}</p>
                   <button
                     onClick={(e) => {
@@ -409,9 +419,9 @@ function ItemForm() {
                   >
                     Remove
                   </button>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
 
           <label>
@@ -458,6 +468,16 @@ function ItemForm() {
               type="number"
               name="price"
               value={formData.price || 0}
+              onChange={handleChange}
+            />
+          </label>
+
+          <label>
+            Model Path:
+            <input
+              type="text"
+              name="modelPath"
+              value={formData.modelPath || ''}
               onChange={handleChange}
             />
           </label>

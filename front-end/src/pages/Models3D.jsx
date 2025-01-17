@@ -44,7 +44,7 @@ function Models() {
                 return;
             }
             try {
-                const response = await fetch(`${serverUrl}/api/selects/${activeSelection[2]}`);
+                const response = await fetch(`${serverUrl}/api/selections/${activeSelection[2]}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch active project');
                 }
@@ -115,7 +115,7 @@ function Models() {
         // Update the backend
         const updateSelection = async () => {
             try {
-                const response = await fetch(`${serverUrl}/api/selects/${activeSelectionObject._id}`, {
+                const response = await fetch(`${serverUrl}/api/selections/${activeSelectionObject._id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',

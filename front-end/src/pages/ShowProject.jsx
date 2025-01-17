@@ -88,7 +88,7 @@ function ProjectPage() {
             console.log("Deleting selection with ID:", editId);
 
             // Perform the deletion
-            await axios.delete(`${serverUrl}/api/selects/${editId}`);
+            await axios.delete(`${serverUrl}/api/selections/${editId}`);
 
             // Update the selections state directly
             setSelections((prevSelections) =>
