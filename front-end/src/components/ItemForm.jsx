@@ -43,6 +43,7 @@ function ItemForm() {
     category: '',
     class: 'Low',
     price: 0,
+    priceMethod: 'none',
     tags: [],
     modelPath: '',
     has3dmodels: false,
@@ -194,6 +195,7 @@ function ItemForm() {
           category: '',
           class: 'Low',
           price: 0,
+          priceMethod,
           tags: [],
           modelPath: '',
           has3dmodels: false,
@@ -297,13 +299,18 @@ function ItemForm() {
           price: 0,
         }));
       } else {
+
+        var method = response.data.status;
+        if (method != "estimate" && method != "found" ) {
+          method = "none";
+        }
         setFormData((prev) => ({
           ...prev,
           price: price,
+          priceMethod: method,
         }));
-        console.log(response.data.status);
-        setPriceMessage(response.data.status);
       }
+      setPriceMessage("");
       console.log("Price:", price);
     } catch (error) {
       // Handle errors gracefully
@@ -311,6 +318,7 @@ function ItemForm() {
         ...prev,
         price: 0,
       }));
+      setPriceMessage("Error");
 
       console.error('Failed to get price:', error);
       // Optionally update the UI with an error message
@@ -529,6 +537,22 @@ function ItemForm() {
               getPrice();
             }
             }>Get Price</button>
+          </label>
+
+
+          <label>
+            Price Method:
+            <select
+              name="priceMethod"
+              value={formData.priceMethod || ''}
+              onChange={handleChange}
+              required
+            >
+              <option value="none">None</option>
+              <option value="estimate">Estimation</option>
+              <option value="found">Found Online</option>
+              <option value="priceList">From Pricelist</option>
+            </select>
           </label>
 
           <label>

@@ -155,6 +155,7 @@ function Item({item, handleClickItem, _handleAddRemoveModel, isWorking }) {
                         <div className="item-property item-property-right">
                             <h4>Price:</h4>
                             <h2 >{item.price} EUR</h2>
+                            <p>{item.priceMethod}</p>
                         </div>
                     </div>
 

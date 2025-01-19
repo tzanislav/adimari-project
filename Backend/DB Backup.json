@@ -1,0 +1,2108 @@
+[
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "678517c5e8d3c3990fe18481",
+        "name": "Athus",
+        "brand": "Gallotti & Radice",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gallottiradice.it/it/prodotti/athus-console",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Athus/Athus%2520Console%280%29%5B1%5D.pdf",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Athus/Gallotti%20%26%20Radice%20%20Athus%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Athus/Gallotti%20%26%20Radice%20%20Athus%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Athus/Gallotti%20%26%20Radice%20%20Athus.jpg"
+        ],
+        "category": "Конзола",
+        "class": "Luxury",
+        "price": 0,
+        "tags": [
+            "Sphere",
+            "Lamp",
+            "Pottery"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-19T17:50:11.750Z"
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67851870e8d3c3990fe18498",
+        "name": "Tama",
+        "brand": "Gallotti & Radice",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gallottiradice.it/it/prodotti/tama-console",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tama/Gallotti%20%26%20Radice%20%20Tama%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tama/Gallotti%20%26%20Radice%20%20Tama.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tama/Gallotti%20%26%20Radice%20%20Tama%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tama/Tama%2520Console%280%29%5B1%5D.pdf"
+        ],
+        "category": "Конзола",
+        "class": "Luxury",
+        "price": 0,
+        "tags": [],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-19T17:50:11.750Z"
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67851949e8d3c3990fe184ab",
+        "name": "Sensei",
+        "brand": "Gallotti & Radice",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gallottiradice.it/it/prodotti/sensei-console",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Sensei/Gallotti%20%26%20Radice%20Sensei.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Sensei/Gallotti%20%26%20Radice%20Sensei%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Sensei/Gallotti%20%26%20Radice%20Sensei%202.jpg"
+        ],
+        "category": "Конзола",
+        "class": "Luxury",
+        "price": 0,
+        "tags": [],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-19T17:50:11.750Z"
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67851ad5e8d3c3990fe184f8",
+        "name": "Amiral",
+        "brand": "Giorgetti",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.giorgettimeda.com/ww/en/products/complements/amiral-leaning-mirror",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Amiral/Giorgetti%20Amiral%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Amiral/Giorgetti%20Amiral%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Amiral/Giorgetti%20Amiral.jpg"
+        ],
+        "category": "Закачалка за дрехи",
+        "class": "Luxury",
+        "price": 0,
+        "tags": [
+            "Огледало"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-14T13:06:46.709Z"
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67851d2de8d3c3990fe18522",
+        "name": "Frame ",
+        "brand": "Giorgetti",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.giorgettimeda.com/de/en/products/complements/frame-servomuto",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Frame%20/Giorgetti%20Frame.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Frame%20/424_Giorgetti_Amiral-mirror.pdf",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Frame%20/400_Giorgetti_Frame-valet-stand2024.pdf"
+        ],
+        "category": "Закачалка за дрехи",
+        "class": "Luxury",
+        "price": 0,
+        "tags": [
+            "Mirror",
+            "огледало"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-19T17:50:11.750Z"
+    },
+    {
+        "priceMethod": null,
+        "_id": "678520dbe8d3c3990fe185b5",
+        "name": "Joy too",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/joy-too",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joy%20too/bonaldo-sedia-joy-too-stilllife.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joy%20too/bonaldo-sedia-joy-too-gallery-01.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joy%20too/joy-too-H-67.webp"
+        ],
+        "category": "Бар стол",
+        "class": "Medium",
+        "price": 1230,
+        "tags": [],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T11:06:48.111Z",
+        "modelPath": "Z:\\Dropbox\\_3D models\\_3dSky\\5. Livingroom\\3. Chairs\\12. Woud nakki ottoman\\3D_Nakki ottoman"
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852136e8d3c3990fe185c6",
+        "name": "Noor too",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/noor-too",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Noor%20too/bonaldo-sedie-noor-too-stilllife.webp"
+        ],
+        "category": "Бар стол",
+        "class": "Medium",
+        "price": 1373,
+        "tags": [],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T14:19:54.809Z",
+        "modelPath": "Z:\\Dropbox\\Adimari\\1. Finance & Login\\Фактури 08_2018"
+    },
+    {
+        "priceMethod": null,
+        "_id": "678524bae8d3c3990fe186f4",
+        "name": "Agatha Footstool",
+        "brand": "Bontempi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bontempi.it/en/agatha-barstool-3496/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Agatha%20Footstool/AGATHA_SGABELLO_34.96_M328_TEBQ001-scaled.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Agatha%20Footstool/AGATHA-2_SGABELLO_34.96_M328_TEBQ001-scaled.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Agatha%20Footstool/Agatha-34.96%5B1%5D.pdf"
+        ],
+        "category": "Бар стол",
+        "class": "Medium",
+        "price": 600,
+        "tags": [
+            "Chair",
+            "Furniture",
+            "Indoors"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-16T13:54:30.981Z",
+        "modelPath": "Z:\\Dropbox\\Adimari\\1. Finance & Login\\Фактури 08_2018"
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852531e8d3c3990fe18709",
+        "name": "Clara Footstool",
+        "brand": "Bontempi",
+        "distributor": "",
+        "description": "",
+        "website": "",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Clara%20Footstool/CLARA_40-69M310_TN007T.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Clara%20Footstool/CLARA_40-69M312_PR04T_CLARA_40-59G093_TNS08_CLARA_40-60TVE03T_CLARA_40-11TL004T_CLARA_40-90M327_TL004T.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Clara%20Footstool/Clara-40.69-70%5B1%5D.pdf"
+        ],
+        "category": "Бар стол",
+        "class": "Medium",
+        "price": 450,
+        "tags": [
+            "Furniture",
+            "Chair"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T19:53:43.487Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852798e8d3c3990fe1875d",
+        "name": "Atena",
+        "brand": "Bontempi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bontempi.it/en/atena-1631/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Atena/ATENA_16-31_M028_ATENA_16-32_M028_C301_ATENA_16-35_M028_PAPILLON_56-55_M325_MATISSE_06-39_M328_L036_Q403_INES_34-55_M328_CUSCINO_TENO002_PUFFOSO_40-98_M028_TENO02.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Atena/ATENA_16-31_M028_ATENA_16-32_M028_C301_ATENA_16-35_M028_2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Atena/Bontempi%20Atena%205.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Atena/Bontempi%20Atena%204.jpg"
+        ],
+        "category": "Библиотека",
+        "class": "Medium",
+        "price": 3237,
+        "tags": [
+            "Bookcase",
+            "Indoors",
+            "Книги",
+            "секция"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T15:53:58.948Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "678528efe8d3c3990fe18776",
+        "name": "Box 12",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/box-12",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Box%2012/box-12-1.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Box%2012/box-12%5B1%5D.pdf"
+        ],
+        "category": "Библиотека",
+        "class": "Medium",
+        "price": 800,
+        "tags": [
+            "Bookshelf",
+            "Книги",
+            "Секция",
+            "Скрин"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T20:12:53.246Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852a8be8d3c3990fe187bf",
+        "name": "Butterfly",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/butterfly",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Butterfly/butterfly-original_webp.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Butterfly/butterfly-2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Butterfly/butterfly%5B1%5D.pdf"
+        ],
+        "category": "Библиотека",
+        "class": "Medium",
+        "price": 1500,
+        "tags": [
+            "Bookcase",
+            "Секция",
+            ""
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T19:55:13.563Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852b33e8d3c3990fe187dc",
+        "name": "Freebook",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "Каталог с детайли:\nhttps://api.novamobili.it/media/4178/details-collection.pdf",
+        "website": "https://www.novamobili.it/en/freebook",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Freebook/freebook-original_webp.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Freebook/freebook.jpg"
+        ],
+        "category": "Библиотека",
+        "class": "Medium",
+        "price": 470,
+        "tags": [
+            "Секция"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T14:26:14.697Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852ba9e8d3c3990fe18821",
+        "name": "Carraa Jewels Set",
+        "brand": "Il Paralume Marina",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.ilparalumemarina.com/list.aspx?bf=60&cat=8",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Marina/Il%20Paralume%20Marina%20Carrara%20Jewels%20Set%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Marina/Il%20Paralume%20Marina%20Carrara%20Jewels%20Set.jpg"
+        ],
+        "category": "Аксесоар за баня",
+        "class": "High",
+        "price": 2420,
+        "tags": [
+            "Mirror",
+            "огледало"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-16T13:42:44.283Z",
+        "modelPath": ""
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852c4ee8d3c3990fe18842",
+        "name": "Pontile",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Pontile/pontile-original_webp.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Pontile/pontile.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Pontile/pontile2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Pontile/pontile3.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Pontile/pontile%5B1%5D.pdf"
+        ],
+        "category": "Библиотека",
+        "class": "Medium",
+        "price": 2856.7,
+        "tags": [
+            "Furniture",
+            "Bookcase",
+            "Секция"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T19:59:41.745Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852cebe8d3c3990fe18865",
+        "name": "Wall 12",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/wall-12",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%2012/wall-12.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%2012/wall-12-original_webp.webp"
+        ],
+        "category": "Библиотека",
+        "class": "Medium",
+        "price": 1500,
+        "tags": [
+            "Bookcase",
+            "Секция"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T15:53:18.080Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852d18e8d3c3990fe1888a",
+        "name": "Bar cabinet",
+        "brand": "Nomon",
+        "distributor": "",
+        "description": "",
+        "website": "https://nomonhome.com/en/collections/bar-cabinet/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/Nomon%20Bar%20cabinet.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/Nomon%20Bar%20cabinet-1.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/Nomon%20Bar%20cabinet-3.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/Nomon%20Bar%20cabinet-4.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/Nomon%20Bar%20cabinet-5.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/Nomon%20Bar%20cabinet-6.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/Nomon%20Bar%20cabinet-7.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/Nomon-bar%20cabinet-2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bar%20cabinet/FT-BAR%5B1%5D.pdf"
+        ],
+        "category": "Бар",
+        "class": "High",
+        "price": 4102,
+        "tags": [
+            "Glass",
+            "Furniture",
+            "Table",
+            "Tabletop",
+            "Alcohol",
+            "Beverage",
+            "Liquor"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T14:07:32.781Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852d75e8d3c3990fe188b1",
+        "name": "Flatiron",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/flatiron",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Flatiron/Bonaldo%20Flatiron.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Flatiron/Bonaldo%20Flatiron%202.jpg"
+        ],
+        "category": "Бюро",
+        "class": "Medium",
+        "price": 2000,
+        "tags": [
+            "Desk",
+            "Table",
+            "Chair",
+            "Tabletop",
+            "Indoors"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T19:54:24.136Z",
+        "modelPath": null
+    },
+    {
+        "_id": "67852e0de8d3c3990fe188fc",
+        "name": "0419",
+        "brand": "Gallotti & Radice",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gallottiradice.it/en-us/products/0419",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/0419/Gallotti%20%26%20Radice%20%200419.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/0419/Gallotti%20%26%20Radice%20%200419-2.jpg"
+        ],
+        "category": "Бар стол",
+        "class": "Luxury",
+        "price": 750,
+        "tags": [
+            "Furniture",
+            "Chair",
+            "Bar Stool"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T14:39:55.213Z",
+        "modelPath": null,
+        "priceMethod": "estimate"
+    },
+    {
+        "priceMethod": null,
+        "_id": "67852ebde8d3c3990fe1894b",
+        "name": "Ode",
+        "brand": "Giorgetti",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.giorgettimeda.com/de/en/products/chairs-and-stools/ode",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Ode/Giorgetti%20Ode%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Ode/Giorgetti%20Ode.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Ode/151_Giorgetti_Ode.pdf"
+        ],
+        "category": "Бар стол",
+        "class": "Luxury",
+        "price": 2200,
+        "tags": [
+            "Furniture",
+            "Chair",
+            "Armchair"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T11:08:07.491Z",
+        "modelPath": "Z:\\Dropbox\\Projects\\87. House Simeonovo\\6. Sent\\2024.11.04 - LED Lenta Pred Kaca"
+    },
+    {
+        "priceMethod": null,
+        "_id": "678530fae8d3c3990fe18a16",
+        "name": "Habito",
+        "brand": "Gessi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gessi.com/en/kitchen/habito",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Habito/GESSI_Habito_2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Habito/GESSI_Habito_3.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Habito/GESSI_Habito_4.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Habito/GESSI_Habito_5.jpg"
+        ],
+        "category": "Батерия за кухненска мивка",
+        "class": "High",
+        "price": 789.6,
+        "tags": [
+            "Indoors",
+            "Interior Design",
+            "Sink",
+            "Sink Faucet"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T14:41:17.338Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "678531a6e8d3c3990fe18a45",
+        "name": "Inciso",
+        "brand": "Gessi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gessi.com/en/kitchen/inciso",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Inciso/GESSI_Inciso_2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Inciso/Gessi%20Inciso%203.jpg"
+        ],
+        "category": "Батерия за кухненска мивка",
+        "class": "High",
+        "price": 769,
+        "tags": [
+            "Sink",
+            "Sink Faucet"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T16:27:07.660Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "678533f0e8d3c3990fe18b1c",
+        "name": "Vita",
+        "brand": "Gessi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gessi.com/en/kitchen/vita",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita%205.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita%206.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita%207.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita%208.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vita/Gessi%20Vita%209.jpg"
+        ],
+        "category": "Батерия за кухненска мивка",
+        "class": "High",
+        "price": 1560,
+        "tags": [
+            "Sink Faucet"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T15:28:59.390Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67853645e8d3c3990fe18ecb",
+        "name": "Gauss",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/gauss",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gauss/Bonaldo%20Gauss.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gauss/bonaldo-homeoffice-gauss-gallery-02-2.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gauss/bonaldo-homeoffice-gauss-gallery.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gauss/gauss.pdf"
+        ],
+        "category": "Бюро",
+        "class": "Medium",
+        "price": 2500,
+        "tags": [
+            "Desk",
+            "Furniture",
+            "Table",
+            "Tabletop",
+            "Wood"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T20:07:50.266Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67853647e8d3c3990fe18f00",
+        "name": "Venti20",
+        "brand": "Gessi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gessi.com/en/kitchen/venti20",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Venti20/Gessi%20Venti20.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Venti20/GESSI_Venti20%20_2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Venti20/GESSI_Venti20%20_3.jpg"
+        ],
+        "category": "Батерия за кухненска мивка",
+        "class": "High",
+        "price": 2428,
+        "tags": [
+            "Sink Faucet"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T15:48:30.435Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "6785386ee8d3c3990fe18f6b",
+        "name": "Gessi316",
+        "brand": "Gessi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gessi.com/en/bath/gessi316",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gessi316/Gessi%20316.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gessi316/Gessi%20316_2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gessi316/Gessi%20316_3.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gessi316/Gessi%20316_4.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gessi316/Gessi%20316_5.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gessi316/Gessi%20316_6.jpg"
+        ],
+        "category": "Батерия за мивка в баня",
+        "class": "High",
+        "price": 1491.16,
+        "tags": [
+            "Sink Faucet",
+            "Indoors",
+            "Interior Design"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T15:48:57.345Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "678538a8e8d3c3990fe18fa4",
+        "name": "Scriba",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/scriba",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Scriba/scriba.pdf",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Scriba/%C3%91%C2%81%C3%91%C2%86%C3%91%C2%80%C3%90%C2%B8%C3%90%C2%B1%C3%90%C2%B0.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Scriba/bonaldo-homeoffice-scriba-gallery-03-1.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Scriba/bonaldo-homeoffice-scriba-gallery-01.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Scriba/Scriba.webp"
+        ],
+        "category": "Бюро",
+        "class": "Medium",
+        "price": 2000,
+        "tags": [
+            "Desk"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T20:02:05.639Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67853979e8d3c3990fe18fe2",
+        "name": "Desk",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/desk",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Desk/desk-2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Desk/desk-3.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Desk/desk%5B1%5D.pdf",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Desk/desk.jpg"
+        ],
+        "category": "Бюро",
+        "class": "Medium",
+        "price": 1200,
+        "tags": [
+            "Desk"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T20:09:18.420Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67853994e8d3c3990fe19021",
+        "name": "Venti20",
+        "brand": "Gessi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gessi.com/en/bath/venti20",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Venti20/Gessi%20Venti20.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Venti20/Gessi%20Venti20_2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Venti20/Gessi%20Venti20_3.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Venti20/Gessi%20Venti20_4.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Venti20/Gessi%20Venti20_5.jpg"
+        ],
+        "category": "Батерия за мивка в баня",
+        "class": "High",
+        "price": 974,
+        "tags": [
+            "Sink",
+            "Sink Faucet",
+            "Hot Tub",
+            "Tub"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T19:38:48.259Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "67853a32e8d3c3990fe190dc",
+        "name": "Isola",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/isola",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Isola/isola-original_webp.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Isola/isola.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Isola/isola%5B1%5D.pdf"
+        ],
+        "category": "Бюро",
+        "class": "Medium",
+        "price": 1500,
+        "tags": [
+            "Desk",
+            "Tabletop"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T20:10:20.454Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67853a67e8d3c3990fe191af",
+        "name": "Hi-Fi",
+        "brand": "Gessi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gessi.com/en/private-wellness/hifi",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Hi-Fi/Gessi%20Hi-fi%201.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Hi-Fi/Gessi%20Hi-fi%202.jpg"
+        ],
+        "category": "Душ",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Art",
+            "Collage",
+            "Indoors",
+            "Interior Design"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-19T17:50:11.751Z"
+    },
+    {
+        "priceMethod": null,
+        "_id": "67853ab3e8d3c3990fe19232",
+        "name": "Knot",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/knot-desk",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Knot/knot-original_webp.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Knot/knot.jpg"
+        ],
+        "category": "Бюро",
+        "class": "Medium",
+        "price": 1500,
+        "tags": [
+            "Desk",
+            ""
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-17T20:19:36.483Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67853bd8e8d3c3990fe192d1",
+        "name": "Alfa",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/alfa",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Alfa/alfa-original_webp.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Alfa/alfa.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Alfa/alfa.-2jpg.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Alfa/alfa.-3jpg.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Alfa/alfa%5B1%5D.pdf"
+        ],
+        "category": "Гардероб",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Indoors",
+            "Interior Design",
+            "Home Decor",
+            "Furniture"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-19T17:50:11.752Z"
+    },
+    {
+        "priceMethod": null,
+        "_id": "67853ce9e8d3c3990fe19318",
+        "name": "Spotwater Spotwater316",
+        "brand": "Gessi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gessi.com/en/private-wellness/spotwater",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spotwater%20Spotwater316/Gessi%20Spotwater%20%26%20Sporwater316_2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spotwater%20Spotwater316/Gessi%20Spotwater%20%26%20Sporwater316_3.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spotwater%20Spotwater316/Gessi%20Spotwater%20%26%20Sporwater316_4.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spotwater%20Spotwater316/Gessi%20Spotwater%20%26%20Sporwater316_5.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spotwater%20Spotwater316/Gessi%20Spotwater%20%26%20Sporwater316_6.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spotwater%20Spotwater316/Gessi%20Spotwater%20%26%20Sporwater316.jpg"
+        ],
+        "category": "Душ",
+        "class": "High",
+        "price": 745,
+        "tags": [
+            "Door",
+            "Handle",
+            "Indoors",
+            "Interior Design",
+            "Wood"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "__v": 0,
+        "createdAt": "2025-01-17T20:11:46.600Z",
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67853cf0e8d3c3990fe19361",
+        "name": "Crystal Sliding Door",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/crystal-sliding-door",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Crystal%20Sliding%20Door/crystal-scorrevole-original_webp.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Crystal%20Sliding%20Door/crystal-scorrevole.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Crystal%20Sliding%20Door/crystal%5B1%5D.pdf"
+        ],
+        "category": "Гардероб",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Bed",
+            "Bedroom",
+            "Room",
+            "Спалня"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-19T17:50:11.752Z"
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67853d42e8d3c3990fe193ac",
+        "name": "Gola Sliding Door",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/gola-sliding-door",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gola%20Sliding%20Door/Nova%20mobili%20Gola%20sliding%20door.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Gola%20Sliding%20Door/Nova%20mobili%20Gola%20sliding%20door.pdf"
+        ],
+        "category": "Гардероб",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Closet",
+            "Wardrobe",
+            "Indoors",
+            "Спалня"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "__v": 0,
+        "createdAt": "2025-01-19T17:50:11.753Z"
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786614409a1cdaceb913e15",
+        "name": "Luigio",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/luigio",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luigio/bonaldo-complementi-letti-luigio-main-slider-01.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luigio/luigio.pdf"
+        ],
+        "category": "Закачалка за дрехи",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Закачалка",
+            ""
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T13:06:12.121Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67866eaa09a1cdaceb9140d7",
+        "name": "Art Console",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/art-console",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Art%20Console/Bonaldo%20Art%20console.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Art%20Console/bonaldo-console-art-console-main-slider-01-5.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Art%20Console/bonaldo-console-art-console-main-slider.webp"
+        ],
+        "category": "Конзола",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Desk",
+            "Furniture",
+            "Table",
+            "Tabletop",
+            "Standing Desk"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T14:03:22.070Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786764009a1cdaceb9145e9",
+        "name": "Geometric Console",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/geometric-console",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Geometric%20Console/bonaldo-console-geometric-console-stilllife.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Geometric%20Console/bonaldo-console-geometric-console-gallery-01.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Geometric%20Console/bonaldo-console-geometric-console-gallery-02.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Geometric%20Console/bonaldo-console-geometric-console-gallery-03.webp"
+        ],
+        "category": "Конзола",
+        "class": "Medium",
+        "price": 0,
+        "tags": [],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T14:35:44.129Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786768e09a1cdaceb91463e",
+        "name": "Joni",
+        "brand": "Baxter",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.baxter.it/en/products/joni-accessories",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%207.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%208.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%205.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%206.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter_Joni_complemento_Indoor%5B1%5D.pdf"
+        ],
+        "category": "Библиотека",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Indoors",
+            "Interior Design",
+            "Bookcase"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T14:37:02.529Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "_id": "678676cc09a1cdaceb914695",
+        "name": "Jupiter",
+        "brand": "Novamobili",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.novamobili.it/en/jupiter-valestand",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Jupiter/jupiter-original_webp.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Jupiter/jupiter.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Jupiter/jupiter2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Jupiter/jupiter3.jpg"
+        ],
+        "category": "Закачалка за дрехи",
+        "class": "Medium",
+        "price": 600,
+        "tags": [
+            ""
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T14:38:04.481Z",
+        "__v": 0,
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786777409a1cdaceb91473c",
+        "name": "Bach Console",
+        "brand": "Bontempi",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bontempi.it/en/bach-console-0642/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bach%20Console/BACH_CONSOLLE_06-43_M028_CM012_LUXOR_09-39_C301_CM012_L036_LUXOR_09-40_C302_CM025.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bach%20Console/Screenshot%202025-01-14%20164031.jpg"
+        ],
+        "category": "Конзола",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Indoors",
+            "Interior Design",
+            "Furniture",
+            "Table",
+            "Coffee Table",
+            "Tabletop",
+            "коридор",
+            "мрамор"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T14:40:52.373Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "678677e609a1cdaceb914797",
+        "name": "Libelle",
+        "brand": "Baxter",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.baxter.it/en/products/libelle-accessories",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%207.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%209.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%2010.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%2012.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%2013.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%205.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%206.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%208.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter%20Libelle%2011.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Libelle/Baxter_Libelle_complemento_Indoor%5B1%5D.pdf"
+        ],
+        "category": "Библиотека",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Shelf",
+            "Furniture",
+            "Bookcase"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T14:42:46.534Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786780509a1cdaceb9147f2",
+        "name": "One Console",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/one-console",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/One%20Console/bonaldo-complementi-one-console-main-slider-01.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/One%20Console/bonaldo-complementi-one-console-main-slider-02.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/One%20Console/bonaldo-complementi-one-console-main-slider-03.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/One%20Console/one-console.pdf"
+        ],
+        "category": "Конзола",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Коридор"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T14:43:17.641Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "678678ad09a1cdaceb9148b0",
+        "name": "Doge",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/doge",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Doge/Bonaldo%20%20Doge%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Doge/Bonaldo%20Dege.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Doge/Bonaldo%20%20Doge%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Doge/Bonaldo%20%20Doge%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Doge/doge.pdf"
+        ],
+        "category": "Кресло",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Chair",
+            "Armchair"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T14:46:05.282Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "_id": "6786796509a1cdaceb914911",
+        "name": "Bodo",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/bodo",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bodo/bodo.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bodo/bonaldo-poltrone-bodo-main-slider-1.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bodo/bonaldo-poltrone-bodo-gallery-01-1.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bodo/bodo.pdf"
+        ],
+        "category": "Кресло",
+        "class": "Medium",
+        "price": 3168,
+        "tags": [
+            "Furniture",
+            "Chair",
+            "Armchair"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T14:49:09.191Z",
+        "__v": 0,
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67867a2909a1cdaceb914976",
+        "name": "Bruno",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/bruno",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bruno/Bruno.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bruno/bonaldo-poltrone-bruno-gallery-01.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bruno/bonaldo-poltrone-bruno-foto-1.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bruno/bonaldo-poltrone-bruno-gallery-03.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Bruno/bruno.pdf"
+        ],
+        "category": "Кресло",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Chair",
+            "Armchair"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T14:52:25.022Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "_id": "67867a5709a1cdaceb9149d9",
+        "name": "Syil",
+        "brand": "Gallotti & Radice",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gallottiradice.it/en-us/products/syil",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Syil/Gallotti%20%26%20Radice%20%20Syil.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Syil/Gallotti%20%26%20Radice%20%20Syil%206.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Syil/Gallotti%20%26%20Radice%20%20Syil%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Syil/Gallotti%20%26%20Radice%20%20Syil%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Syil/Gallotti%20%26%20Radice%20%20Syil%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Syil/Gallotti%20%26%20Radice%20%20Syil%205.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Syil/Syil%280%29%5B1%5D.pdf"
+        ],
+        "category": "Библиотека",
+        "class": "Luxury",
+        "price": 4000,
+        "tags": [
+            "Shelf",
+            "Furniture"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T14:53:11.869Z",
+        "__v": 0,
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67867ad209a1cdaceb914a42",
+        "name": "Lovy",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/lovy-armchair-low-lovy-armchair-bergere",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Lovy/Bonaldo%20Lovy%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Lovy/Bonaldo%20Lovy%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Lovy/Bonaldo%20Lovy%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Lovy/Bonaldo%20Lovy.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Lovy/lovy-armchair-low-lovy-armchair-bergere.pdf"
+        ],
+        "category": "Кресло",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Chair",
+            "Armchair"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T14:55:14.403Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "_id": "67867aed09a1cdaceb914aa9",
+        "name": "Tortona",
+        "brand": "Gallotti & Radice",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.gallottiradice.it/en-us/products/tortona",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tortona/Gallotti%20%26%20Radice%20%20Tortona%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tortona/Gallotti%20%26%20Radice%20%20Tortona.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tortona/Gallotti%20%26%20Radice%20%20Tortona%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tortona/Gallotti%20%26%20Radice%20%20Tortona%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tortona/Tortona%281%29%5B1%5D.pdf"
+        ],
+        "category": "Библиотека",
+        "class": "Luxury",
+        "price": 4000,
+        "tags": [
+            "Door",
+            "Sliding Door"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T14:55:41.307Z",
+        "__v": 0,
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67867c1d09a1cdaceb914b14",
+        "name": "Mimi",
+        "brand": "Lema",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.lemamobili.com/uk/mim%C3%AC-wall-panel-shelf-system",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Mimi/Lema-mimi_-orizzontale-mensole-pannelli-muro.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Mimi/Lema-mimi_-orizzontale-mensole-pannelli-muro.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Mimi/Lema-mimi_-_librerie_x3_sistema-mensole-pannelli-a-muro.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Mimi/Lema-mimi_3__libreire_x3_sistema-mensole-pannelli-a-muro.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Mimi/Lema-mimi_4__libreire_x3_sistema-mensole-pannelli-a-muro.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Mimi/479%5B1%5D"
+        ],
+        "category": "Библиотека",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Bookcase"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T15:00:45.073Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67867da809a1cdaceb914f41",
+        "name": "Saddle ",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/saddle-armchair",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Saddle%20/dasd.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Saddle%20/bonaldo-poltrone-saddle-armchair-main-slider.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Saddle%20/bonaldo-poltrone-saddle-armchair-foto.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Saddle%20/bonaldo-poltrone-saddle-armchair-gallery.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Saddle%20/saddle-armchair.pdf"
+        ],
+        "category": "Кресло",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Chair",
+            "Armchair"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T15:07:20.843Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67867dde09a1cdaceb914fae",
+        "name": "505",
+        "brand": "Molteni",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.molteni.it/en/product/505-up-system",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2030.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2010.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2011.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2012.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2013.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2014.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2015.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2016.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2021.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2026.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2024.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/505/Molteni%20505%20UP%20System%2028.jpg"
+        ],
+        "category": "Библиотека",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Shelf",
+            "Furniture"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T15:08:14.347Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67867e4409a1cdaceb915021",
+        "name": "Tirella",
+        "brand": "Bonaldo",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.bonaldo.com/en/product/tirella",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tirella/Screenshot%202025-01-14%20170830.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tirella/bonaldo-poltrone-tirella-gallery-02-2.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tirella/bonaldo-poltrone-tirella-main-slider-01-1.webp",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Tirella/tirella.pdf"
+        ],
+        "category": "Кресло",
+        "class": "Medium",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Chair",
+            "Cushion",
+            "Home Decor",
+            "Armchair"
+        ],
+        "has3dmodels": false,
+        "hasDWGmodels": false,
+        "createdAt": "2025-01-14T15:09:56.189Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67867f7409a1cdaceb91529c",
+        "name": "Unica",
+        "brand": "Nomon",
+        "distributor": "",
+        "description": "",
+        "website": "https://nomonhome.com/en/collections/shelving-system/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Shelving%20System/Nomon%20COLECCION_UNICA_C1_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Shelving%20System/Nomon%20ESTANTERIA_TECHO_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Shelving%20System/Nomon%20ESTANTER%C3%83%C2%8DA_%C3%83%C2%9ANICA_ESQUINA_TECHO_DETALLE_1_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Shelving%20System/Nomon%20ESTANTER%C3%83%C2%8DA_%C3%83%C2%9ANICA_ESQUINA_TECHO_DETALLE_3_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Shelving%20System/Nomon%20ESTANTER%C3%83%C2%8DA_%C3%83%C2%9ANICA_FRONTAL_SUELO_1_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Shelving%20System/Nomon%20ESTANTERIA-UNICA-PREMIO-DELTA-DE-BRONCE-2048x1891.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Shelving%20System/NomonESTANTER%C3%83%C2%8DA_%C3%83%C2%9ANICA_FRONTAL_SUELO_AMBIENTE_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Shelving%20System/FT-ESTANTER%C3%83%C2%8DA-%C3%83%C2%9ANICA%5B1%5D.pdf",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica/Nomon%20COLECCION_UNICA_C1_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica/Nomon%20ESTANTERIA_TECHO_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica/Nomon%20ESTANTER%C3%83%C2%8DA_%C3%83%C2%9ANICA_ESQUINA_TECHO_DETALLE_1_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica/Nomon%20ESTANTER%C3%83%C2%8DA_%C3%83%C2%9ANICA_ESQUINA_TECHO_DETALLE_3_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica/Nomon%20ESTANTER%C3%83%C2%8DA_%C3%83%C2%9ANICA_FRONTAL_SUELO_1_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica/Nomon%20ESTANTERIA-UNICA-PREMIO-DELTA-DE-BRONCE-2048x1891.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica/NomonESTANTER%C3%83%C2%8DA_%C3%83%C2%9ANICA_FRONTAL_SUELO_AMBIENTE_LOW_RES.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica/FT-ESTANTER%C3%83%C2%8DA-%C3%83%C2%9ANICA%5B1%5D.pdf"
+        ],
+        "category": "Библиотека",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Shelf",
+            "Furniture",
+            "Person"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T15:15:00.082Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786802509a1cdaceb915311",
+        "name": "Wall system",
+        "brand": "Poliform ",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.poliform.it/en/products/wall-system/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%20system/Poliform%20Wall%20system%205.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%20system/Poliform%20Wall%20system%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%20system/Poliform%20Wall%20system%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%20system/Poliform%20Wall%20system%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%20system/Poliform%20Wall%20system%206.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%20system/Poliform%20Wall%20system.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Wall%20system/Poliform%20Wall%20system%207.jpg"
+        ],
+        "category": "Библиотека",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Bookcase",
+            "Indoors",
+            "Interior Design",
+            "Architecture",
+            "Building",
+            "Living Room",
+            "Room"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T15:17:57.851Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67868ae909a1cdaceb91539a",
+        "name": "Joni ",
+        "brand": "Baxter",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.baxter.it/en/products/joni-stone-accessories",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%20stone.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%20stone%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%20wood%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter%20Joni%20wood.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Joni/Baxter_JoniStone_complemento_Indoor%5B1%5D.pdf"
+        ],
+        "category": "Бюро",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Table",
+            "Indoors",
+            "Interior Design",
+            "Chair",
+            "Desk"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:03:53.142Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "_id": "67868b5d09a1cdaceb915413",
+        "name": "Edward",
+        "brand": "Giorgetti",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.giorgettimeda.com/ww/en/products/chests-of-drawers-night-tables-and-vanity/edward",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Edward/Giorgetti%20Edward.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Edward/10673_Giorgetti_edward_2024.pdf"
+        ],
+        "category": "Бюро",
+        "class": "Luxury",
+        "price": 8000,
+        "tags": [
+            "Desk",
+            "Mailbox"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:05:49.977Z",
+        "__v": 0,
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67868c0209a1cdaceb91548e",
+        "name": "Victor",
+        "brand": "Lema",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.lemamobili.com/uk/victor-desk-solid-wood-frame",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Victor/Lema_victor_orizzontale.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Victor/Lema_victor-_3__scritto-consolle_x3_scrittoio-struttura-legno-massello.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Victor/Lema_victor-_2__scritto-consolle_x3_scrittoio-struttura-legno-massello.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Victor/Lema_victor_orizzontale__scrittoio-con-struttura-legno-massello.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Victor/68%5B1%5D"
+        ],
+        "category": "Бюро",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Table",
+            "Desk",
+            "Lamp",
+            "Home Decor",
+            "Chair",
+            "Dining Table"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:08:34.042Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67868cc709a1cdaceb91550b",
+        "name": "Note",
+        "brand": "Molteni",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.molteni.it/en/product/note",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Note/Molteni%20Note.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Note/Molteni%20Note_4.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Note/Molteni%20Note_2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Note/Molteni%20Note_3.jpg"
+        ],
+        "category": "Бюро",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Desk",
+            "Furniture",
+            "Table",
+            "Computer",
+            "Electronics"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:11:51.436Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67868f6109a1cdaceb915620",
+        "name": "Scriba 2",
+        "brand": "Molteni",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.molteni.it/en/product/scriba",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Scriba/Molteni%20Scriba.jpg"
+        ],
+        "category": "Бюро",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Table",
+            "Desk",
+            "Computer",
+            "Electronics",
+            "Reception"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:22:57.379Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786914f09a1cdaceb915721",
+        "name": "Unica desk",
+        "brand": "Nomon",
+        "distributor": "",
+        "description": "",
+        "website": "https://nomonhome.com/en/collections/desk/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica%20desk/Nomon%20Escritorio-nomon-home-unica-8.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica%20desk/Nomon%20Escritorio-nomon-home-unica-7.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica%20desk/Nomon%20Escritorio-nomon-home-unica-1.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica%20desk/Nomon%20Escritorio-nomon-home-unica-2-1024x688.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica%20desk/Nomon%20Escritorio-nomon-home-unica-3.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica%20desk/Nomon%20Escritorio-nomon-home-unica-4.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Unica%20desk/FT-ESCRITORIO%5B1%5D.pdf"
+        ],
+        "category": "Бюро",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Table",
+            "Desk",
+            "Lamp",
+            "Plant",
+            "Chair"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:31:11.973Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786938309a1cdaceb9157a4",
+        "name": "Touch Down Unit",
+        "brand": "Molteni",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.molteni.it/en/product/touch-down-unit",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit%209.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit%205.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit%206.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit%207.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit%208.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/Molteni%20Touch%20down%20unit%2010.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Touch%20Down%20Unit/touch-down-unit-product-sheet.pdf"
+        ],
+        "category": "Бюро",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Table",
+            "Chair",
+            "Desk",
+            "Plywood",
+            "Wood"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:40:35.292Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786944909a1cdaceb915829",
+        "name": "Concorde",
+        "brand": "Poliform ",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.poliform.it/en/products/scrittoio-concorde/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Concorde/Poliform%20CONCORDE.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Concorde/Poliform%20CONCORDE%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Concorde/Poliform%20CONCORDE%202.jpg"
+        ],
+        "category": "Бюро",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Furniture",
+            "Table",
+            "Desk",
+            "Chair",
+            "Lamp",
+            "Indoors",
+            "Interior Design"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:43:53.121Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "6786954c09a1cdaceb9158b0",
+        "name": "Modulor",
+        "brand": "Rimadesio",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.rimadesio.it/en/product/modulor-day/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-zona-giorno-agg-luglio-2024-1.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-zona-giorno-agg-luglio-2024-2-1920x1920.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-zona-notte-agg-luglio-2024-1-1920x1080.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-zona-notte-agg-luglio-2024-3-b.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-zona-notte-agg-luglio-2024-4.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-zona-giorno-agg-luglio-2024-4-1920x1080.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20interior-three-1.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-pagina-prodotto-1.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-pagina-prodotto-2.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-pagina-prodotto-7.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-parte-tecnica-agg-luglio-2024-1.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-zona-giorno-agg-luglio-2024-5.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-parte-tecnica-agg-luglio-2024-13.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-parte-tecnica-agg-luglio-2024-17.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Modulor/Rimadesio%20modulor-parte-tecnica-agg-luglio-2024-26.jpg"
+        ],
+        "category": "Ламперия",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Indoors",
+            "Interior Design",
+            "Wood Panels",
+            "Furniture",
+            "Chair",
+            "Architecture",
+            "Building",
+            "Living Room",
+            "Room"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T16:48:12.328Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67869b3409a1cdaceb915939",
+        "name": "Zen",
+        "brand": "Rimadesio",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.rimadesio.it/en/product/zen-zen-frame/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Zen/Rimadesio-Porta-Zen.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Zen/Rimadesio-Porta-Zen%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Zen/Rimadesio-Porta-Zen%203.jpg"
+        ],
+        "category": "Врата",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Indoors",
+            "Interior Design",
+            "Door",
+            "Home Decor",
+            "Rug",
+            "Lamp"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T17:13:24.367Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67869bbd09a1cdaceb915a4f",
+        "name": "Spin",
+        "brand": "Rimadesio",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.rimadesio.it/en/product/spin/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spin/Rimadesio-Porta-Spin.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spin/Rimadesio-Porta-Spin%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spin/Rimadesio-Porta-Spin%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Spin/Rimadesio-Porta-Spin%203.jpg"
+        ],
+        "category": "Врата",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Indoors",
+            "Interior Design",
+            "Desk",
+            "Furniture",
+            "Table"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T17:15:41.855Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67869c1009a1cdaceb915adc",
+        "name": "Sail",
+        "brand": "Rimadesio",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.rimadesio.it/en/product/sail-door/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Sail/Rimadesio-Porta-Sail.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Sail/Rimadesio-Porta-Sail%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Sail/Rimadesio-Porta-Sail%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Sail/Rimadesio-Porta-Sail%204.jpg"
+        ],
+        "category": "Врата",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Indoors",
+            "Interior Design",
+            "Door",
+            "Furniture"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T17:17:04.686Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67869c9f09a1cdaceb915b6b",
+        "name": "Moon",
+        "brand": "Rimadesio",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.rimadesio.it/en/product/moon/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Moon/Rimadesio-Porta-Moon%209.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Moon/Rimadesio-Porta-Moon%208.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Moon/Rimadesio-Porta-Moon%207.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Moon/Rimadesio-Porta-Moon%206.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Moon/Rimadesio-Porta-Moon%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Moon/Rimadesio-Porta-Moon%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Moon/Rimadesio-Porta-Moon.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Moon/Rimadesio-Porta-Moon%205.jpg"
+        ],
+        "category": "Врата",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Indoors",
+            "Interior Design",
+            "Wood Panels"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T17:19:27.514Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "_id": "67869d2709a1cdaceb915bfc",
+        "name": "Luxor",
+        "brand": "Rimadesio",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.rimadesio.it/en/product/luxor/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor%209.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor%203.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor%204.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor%205.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor%206.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor%207.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Luxor/Rimadesio-Porta-Luxor%208.jpg"
+        ],
+        "category": "Врата",
+        "class": "High",
+        "price": 4000,
+        "tags": [
+            "Door"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T17:21:43.058Z",
+        "__v": 0,
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "modelPath": null,
+        "_id": "67869d8509a1cdaceb915c8f",
+        "name": "Even",
+        "brand": "Rimadesio",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.rimadesio.it/en/product/even/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Even/Rimadesio-Porta-Even%202.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Even/Rimadesio-Porta-Even.jpg"
+        ],
+        "category": "Врата",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Door",
+            "Sliding Door",
+            "Window",
+            "Home Decor",
+            "Indoors",
+            "Interior Design"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T17:23:17.816Z",
+        "__v": 0
+    },
+    {
+        "priceMethod": null,
+        "_id": "67869e1d09a1cdaceb915d24",
+        "name": "Vela",
+        "brand": "Rimadesio",
+        "distributor": "",
+        "description": "",
+        "website": "https://www.rimadesio.it/en/product/vela/",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vela/pr33-2-1920x1920.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vela/pr32-virataCOLORE-1920x1920.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vela/Rimadesio-Collection-Book_2020_pag-197copia-1920x1920.jpg",
+            "https://mesharch.s3.eu-west-1.amazonaws.com/Vela/Lavoro_10373-ok-3-1920x1920.jpg"
+        ],
+        "category": "Врата на щок",
+        "class": "High",
+        "price": 0,
+        "tags": [
+            "Basin"
+        ],
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-14T17:25:49.965Z",
+        "__v": 0,
+        "modelPath": null
+    },
+    {
+        "priceMethod": null,
+        "_id": "678a6825a6a86c5605750b8c",
+        "name": "PI coffee table",
+        "brand": "Ethnicraft",
+        "distributor": "",
+        "description": "",
+        "website": "https://ethnicraft.com/bg/en/p/10135145/pi-coffee-table",
+        "files": [
+            "https://mesharch.s3.eu-west-1.amazonaws.com/PI%20coffee%20table/product_wf_35145_PI_coffee_table_varnished_mahogany_dark_brown_pebble_shape_front_web.jpg"
+        ],
+        "category": "Ниска маса",
+        "class": "Medium",
+        "price": 1789,
+        "tags": [
+            "Coffee Table",
+            "Furniture",
+            "Table"
+        ],
+        "modelPath": "",
+        "has3dmodels": true,
+        "hasDWGmodels": true,
+        "createdAt": "2025-01-17T14:24:37.053Z",
+        "__v": 0
+    }
+]
