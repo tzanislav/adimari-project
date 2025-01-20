@@ -23,13 +23,16 @@ router.get('/', async (req, res) => {
   }
 
   try {
+    const isDevelopment = process.env.DEV_MODE === 'development';
+
     const browser = await puppeteer.launch({
-      headless: true,
+      headless: true, // or false for debugging
+      executablePath: isDevelopment
+        ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' // Path for development (MacOS example)
+        : '/usr/bin/google-chrome', // Path for deployment (Ubuntu)
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process',
       ],
     });
     const page = await browser.newPage();
