@@ -1,6 +1,7 @@
 *node_modules/*
 /FrontEnd/node_modules*
 /BackEnd/node_modules*
+/Backend/auth/account.json
 
 .env.local
 .env
@@ -27,3 +28,7 @@ Thumbs.db
 
 # Vite-specific
 .vite/
+
+
+
+
