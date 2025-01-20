@@ -2,7 +2,7 @@ import React, {useState, useEffect} from "react";
 import { Link } from "react-router-dom";
 import ListProject from "../components/ListProject";
 import DeleteBox from "../components/DeleteBox";
-import '../CSS/projects.css';
+import '../CSS/Projects.css';
 import { useActiveSelection } from "../context/selectionContext";
 
 function Projects() {
