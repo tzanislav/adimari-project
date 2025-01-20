@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import '../CSS/uploader.css';
+import '../CSS/Uploader.css';
 import { useActiveSelection } from "../context/selectionContext";
 
 
