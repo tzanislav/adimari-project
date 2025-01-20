@@ -1,15 +1,25 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
+import { useAuth } from '../context/AuthContext';
 
 // Create Context
 const ActiveSelectionContext = createContext();
 
+
 // Provide Context to the App
 export const ActiveSelectionProvider = ({ children }) => {
+  const { user } = useAuth();
   const [activeSelection, setActiveSelection] = useState(null);
 
   // Load server URL from environment variables
   const serverUrl = import.meta.env.VITE_SERVER_URL;
+
+  // Clear active selection when user logs out
+  useEffect(() => {
+    if (!user) {
+      clearActiveSelection();
+    }
+  }, [user]); // Runs whenever `user` changes
 
   // Load initial selection from the backend using the ID stored in the cookie
   useEffect(() => {

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { showOnlyName } from '../utils/utils';
 import '../CSS/ItemCard.css';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
+import { useAuth } from '../context/AuthContext';
 
 
 function Item({item, handleClickItem, _handleAddRemoveModel, isWorking }) {
@@ -16,6 +17,7 @@ function Item({item, handleClickItem, _handleAddRemoveModel, isWorking }) {
     const [models, setModels] = useState([]);
     const { activeSelection } = useActiveSelection();
     const [isPresent, setIsPresent] = useState(false);
+    const { user } = useAuth();
 
     useEffect(() => {
         if (activeSelection) {
@@ -248,7 +250,7 @@ function Item({item, handleClickItem, _handleAddRemoveModel, isWorking }) {
                         <div className="item-property">
 
 
-                            <Link to={`/items/${item._id}`} className="edit-link item-button">Edit</Link>
+                           {user && <Link to={`/items/${item._id}`} className="edit-link item-button">Edit</Link>}
                         </div>
                     </div>
                 )}

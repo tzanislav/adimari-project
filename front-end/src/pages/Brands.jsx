@@ -2,7 +2,7 @@ import React from 'react';
 import { useEffect, useState } from 'react';
 import Brand from '../components/Brand';
 import { Link } from 'react-router-dom';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 
 function Brands() {

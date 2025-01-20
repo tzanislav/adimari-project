@@ -6,7 +6,9 @@ import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
 import DeleteBox from "../components/DeleteBox";
 import SuggestionsBox from '../components/SuggestionsBox';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
+import { useAuth } from '../context/AuthContext';
+
 
 function ItemForm() {
   const { id } = useParams(); // Get ID from URL
@@ -17,7 +19,7 @@ function ItemForm() {
   const [items, setItems] = useState([]);
   const { serverUrl } = useActiveSelection();
   const [priceMessage, setPriceMessage] = useState('');
-
+ 
   const [suggestions, setSuggestions] = useState({
     name: [],
     category: [],
@@ -48,11 +50,14 @@ function ItemForm() {
     modelPath: '',
     has3dmodels: false,
     hasDWGmodels: false,
+    createdBy: 'user',
   });
 
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const { user } = useAuth();
 
   // Fetch item data if editing
   useEffect(() => {
@@ -200,6 +205,7 @@ function ItemForm() {
           modelPath: '',
           has3dmodels: false,
           hasDWGmodels: false,
+          createdBy: user.email,
         });
       }
     } catch (error) {

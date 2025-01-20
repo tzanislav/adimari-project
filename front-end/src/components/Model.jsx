@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showOnlyName } from '../utils/utils';
 import '../CSS/Model.css';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 function Model({ modelId, handleAddModel, _selection }) {
     const [model, setModel] = useState(null);

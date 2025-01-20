@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 import EditSelection from "../components/EditSelection";
 import DeleteBox from "../components/DeleteBox";
 import axios from "axios";

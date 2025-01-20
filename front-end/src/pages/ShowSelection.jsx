@@ -3,7 +3,7 @@ import axios from "axios";
 import { Link, useParams } from "react-router-dom";
 import ListItem from "../components/ListItem";
 import "../CSS/ShowSelection.css";
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 
 const ShowSelection = () => {

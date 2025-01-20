@@ -14,35 +14,89 @@ import ShowSelection from './pages/ShowSelection';
 import Navbar from './components/Navbar'; // Optional navigation component
 import ItemForm from './components/ItemForm'
 import Items from './pages/Items';
-import { ActiveSelectionProvider } from "./components/selectionContext";
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import { ActiveSelectionProvider } from './context/selectionContext'; 
+import SignUp from './pages/SignUp';
 import './App.css';
 
 function App() {
   return (
     <div>
+      <AuthProvider>
       <ActiveSelectionProvider>
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/brands" element={<Brands />} />
-          <Route path="/brands/:id" element={<BrandForm />} />
-          <Route path="/brands/new" element={<BrandForm />} />
-          <Route path="/items/new" element={<ItemForm />} />
-          <Route path="/items/edit/:id" element={<ItemForm />} />
-          <Route path="/items/:id" element={<ItemForm />} />
+          <Route path="/signup" element={<SignUp />} />
           <Route path="/items" element={<Items />} />
-          <Route path="/models3d/" element={<Models3D />} />
-          <Route path="/models3d/:id" element={<ShowModel />} />
-          <Route path="/models3d/edit/:id" element={<Model3DForm />} />
-          <Route path="/models3d/new" element={<Model3DForm />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/projects/:id" element={<ShowProject />} />
-          <Route path="/projects/edit/:id" element={<ProjectForm />} />
-          <Route path="/projects/new" element={<ProjectForm />} />
-          <Route path="/selections/:id" element={<ShowSelection />} />
-          <Route path="/test" element={<ExampleForm />} />
+          <Route
+            path="/brands"
+            element={<ProtectedRoute element={<Brands />} />}
+          />
+          <Route
+            path="/brands/:id"
+            element={<ProtectedRoute element={<BrandForm />} />}
+          />
+          <Route
+            path="/brands/new"
+            element={<ProtectedRoute element={<BrandForm />} />}
+          />
+          <Route
+            path="/items/new"
+            element={<ProtectedRoute element={<ItemForm />} />}
+          />
+          <Route
+            path="/items/edit/:id"
+            element={<ProtectedRoute element={<ItemForm />} />}
+          />
+          <Route
+            path="/items/:id"
+            element={<ProtectedRoute element={<ItemForm />} />}
+          />
+          <Route
+            path="/models3d"
+            element={<ProtectedRoute element={<Models3D />} />}
+          />
+          <Route
+            path="/models3d/:id"
+            element={<ProtectedRoute element={<ShowModel />} />}
+          />
+          <Route
+            path="/models3d/edit/:id"
+            element={<ProtectedRoute element={<Model3DForm />} />}
+          />
+          <Route
+            path="/models3d/new"
+            element={<ProtectedRoute element={<Model3DForm />} />}
+          />
+          <Route
+            path="/projects"
+            element={<ProtectedRoute element={<Projects />} />}
+          />
+          <Route
+            path="/projects/:id"
+            element={<ProtectedRoute element={<ShowProject />} />}
+          />
+          <Route
+            path="/projects/edit/:id"
+            element={<ProtectedRoute element={<ProjectForm />} />}
+          />
+          <Route
+            path="/projects/new"
+            element={<ProtectedRoute element={<ProjectForm />} />}
+          />
+          <Route
+            path="/selections/:id"
+            element={<ProtectedRoute element={<ShowSelection />} />}
+          />
+          <Route
+            path="/test"
+            element={<ProtectedRoute element={<ExampleForm />} />}
+          />
         </Routes>
-      </ActiveSelectionProvider>
+        </ActiveSelectionProvider>
+      </AuthProvider>
     </div>
   );
 }

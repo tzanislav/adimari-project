@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import '../CSS/uploader.css';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 
 const FileUploader = ({ folderName, onUploadComplete, onRemove }) => {

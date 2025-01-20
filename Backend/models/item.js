@@ -16,7 +16,8 @@ const brandSchema = new mongoose.Schema({
   modelPath: { type: String, default: null }, // Assuming a single 3D mode
   has3dmodels: { type: Boolean, default: false }, // Added a boolean field
   hasDWGmodels: { type: Boolean, default: false }, // Added a boolean field
-  createdAt : { type: Date, default: Date.now }
+  createdAt : { type: Date, default: Date.now },
+  createdBy: { type: String, default: null },
 });
 
 // Export the model

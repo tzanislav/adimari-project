@@ -3,7 +3,7 @@ import Model from '../components/Model';
 import { Link } from 'react-router-dom';
 import '../CSS/Model.css';
 import '../CSS/ListPage.css';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 
 function Models() {

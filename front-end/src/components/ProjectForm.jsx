@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import DeleteBox from '../components/DeleteBox';
 import axios from 'axios';
 import '../CSS/EditBrand.css';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 
 function ProjectForm() {

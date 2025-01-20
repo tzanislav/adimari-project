@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Item from '../components/Item';
 import { data, Link } from 'react-router-dom';
 import '../CSS/ListPage.css';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 function Items() {
     const [items, setItems] = useState([]);
@@ -51,8 +51,12 @@ function Items() {
                     throw new Error('Failed to fetch items');
                 }
                 const data = await response.json();
-                // Sort by category
-                const sortedItems = data.sort((a, b) => a.category.localeCompare(b.category));
+                // Sort by createdAt date in descending order (null or undefined are last)
+                const sortedItems = data.sort((a, b) => {
+                    return new Date(b.createdAt) - new Date(a.createdAt);
+                });
+
+
                 setItems(sortedItems);
                 setFilteredItems(sortedItems);
     

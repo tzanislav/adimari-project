@@ -1,0 +1,11 @@
+.google-sign-in
+{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin-top: 40vh;
+    margin-bottom: 20px;
+    transform: translate(0, -50%);
+
+}

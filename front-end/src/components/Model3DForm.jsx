@@ -5,7 +5,7 @@ import FileUploader from '../components/FileUploader'; // Ensure correct import 
 import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
 import DeleteBox from '../components/DeleteBox';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 function Model3dForm() {
   const { id } = useParams(); // Get ID from URL

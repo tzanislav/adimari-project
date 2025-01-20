@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import ListProject from "../components/ListProject";
 import DeleteBox from "../components/DeleteBox";
 import '../CSS/projects.css';
-import { useActiveSelection } from "../components/selectionContext";
+import { useActiveSelection } from "../context/selectionContext";
 
 function Projects() {
     const [projects, setProjects] = useState([]);

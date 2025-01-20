@@ -1,45 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { useActiveSelection } from "../components/selectionContext";
-
+import React, { useState } from 'react';
+import { useActiveSelection } from '../context/selectionContext';
+import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import '../CSS/Navbar.css'; // Import CSS
+import '../CSS/Navbar.css';
 
 function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const toggleMenu = () => {
-    setIsOpen(!isOpen);
-  };
-  const { activeSelection , clearActiveSelection } = useActiveSelection();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { activeSelection, clearActiveSelection } = useActiveSelection();
+  const { user, logout } = useAuth();
 
-
-
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   return (
     <nav className="navbar">
-      <div className='navbar-top'>
+      <div className="navbar-top">
         <div className="navbar-container">
-          <Link to="/" className="navbar-logo">
-            Adimari
-          </Link>
-          <button className="navbar-toggle" onClick={toggleMenu}>
-            ☰
-          </button>
-          <ul className={`navbar-links ${isOpen ? 'active' : ''}`}>
+          <Link to="/" className="navbar-logo">Adimari</Link>
+          <button className="navbar-toggle" onClick={toggleMenu} aria-label="Toggle menu">☰</button>
+          <ul className={`navbar-links ${isMenuOpen ? 'open' : ''}`}>
             <li><Link to="/">Home</Link></li>
             <li><Link to="/items">Items</Link></li>
-            <li><Link to="/projects">Projects</Link></li>
+            {user && <li><Link to="/projects">Projects</Link></li>}
           </ul>
+          <div className="navbar-auth">
+            {user ? (
+              <>
+                <span className="user-email">{user.email}</span>
+                <button onClick={logout} className="logout-button">Sign out</button>
+              </>
+            ) : (
+              <Link to="/signup" className="auth-link">Sign In</Link>
+            )}
+          </div>
         </div>
       </div>
-      <div className='selection-bar' style={{ top: activeSelection ? '0px' : '-200px' }}>
-        {!activeSelection ? <h3>No active selection</h3> :
-          <>
-            <button onClick={() => clearActiveSelection()} className='active-selection-button'>Clear</button>
-            
-            <Link to={`/selections/${activeSelection._id}`} className='active-selection-button-bigger'>{activeSelection.name}</Link>
-          </>
-        }
-      </div>
+      {activeSelection && (
+        <div className="selection-bar">
+          <span>Active Selection:</span>
+          <Link to={`/selections/${activeSelection._id}`} className="selection-link">{activeSelection.name}</Link>
+          <button onClick={clearActiveSelection} className="selection-clear">Clear</button>
+        </div>
+      )}
     </nav>
   );
 }
