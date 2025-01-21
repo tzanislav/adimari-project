@@ -10,7 +10,7 @@ const SignUpWithGoogle = () => {
     const [userId, setUserId] = useState('');
     const [_role, setRole] = useState('regular'); // Default to 'regular'
     const [message, setMessage] = useState('');
-    const host =  import.meta.env.VITE_SERVER_URL|| '';
+    const host = import.meta.env.VITE_SERVER_URL || '';
 
 
     const handleGoogleSignIn = async () => {
@@ -26,7 +26,6 @@ const SignUpWithGoogle = () => {
 
             // Get the ID token
             const token = await user.getIdToken();
-            
             // Send the token to the backend for processing and role assignment
             const response = await fetch(host + '/auth/google-signin', {
                 method: 'POST',
@@ -37,6 +36,7 @@ const SignUpWithGoogle = () => {
             });
 
             const data = await response.json();
+            console.log('Sign in response:', data);
 
         } catch (error) {
             console.error('Error signing in with Google:', error);
@@ -47,16 +47,17 @@ const SignUpWithGoogle = () => {
         event.preventDefault();
 
         try {
-            const token = localStorage.getItem('token'); // Use token for authentication
-
+            const token = await user.getIdToken();
             const response = await fetch(host + '/auth/update-role', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ uid: userId, _role }),
+                body: JSON.stringify({ uid: userId, role: _role }),
             });
+            console.log(JSON.stringify({ uid: userId, role: _role }), token);
+
 
             const data = await response.json();
 
@@ -73,33 +74,28 @@ const SignUpWithGoogle = () => {
 
     // Refresh the token
     const auth = getAuth();
-    auth.currentUser?.getIdToken(true).then((token) => {
-        console.log('Token refreshed:');
-    });
-
-
-
+    auth.currentUser?.getIdToken(true).then((token) => {console.log('Token refreshed:', token)});
 
 
     return (
         <div className='google-sign-in'>
-            {user ? 
-            (
-                <>
-            <h1>Welcome, {user.email}</h1>
-            <p>{role}</p> 
+            {user ?
+                (
+                    <>
+                        <h1>Welcome, {user.email}</h1>
+                        <p>{role}</p>
 
-                </>
-            )
-            : (
-                <>
-                    <h1>Sign In or Sign Up with Google</h1>
-                    <GoogleButton
-                        onClick={handleGoogleSignIn}
-                        label="Sign In with Google"
-                    />
-                </>
-            )}
+                    </>
+                )
+                : (
+                    <>
+                        <h1>Sign In or Sign Up with Google</h1>
+                        <GoogleButton
+                            onClick={handleGoogleSignIn}
+                            label="Sign In with Google"
+                        />
+                    </>
+                )}
 
 
             {role === 'admin' && (
