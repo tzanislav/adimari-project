@@ -7,7 +7,7 @@ import '../CSS/Navbar.css';
 function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { activeSelection, clearActiveSelection } = useActiveSelection();
-  const { user, logout } = useAuth();
+  const { user, logout, role } = useAuth();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
@@ -25,7 +25,8 @@ function Navbar() {
           <div className="navbar-auth">
             {user ? (
               <>
-                <span className="user-email">{user.email}</span>
+                <Link to="/signup"  className="auth-link">{user.email}</Link>
+                <span className="user-email auth-link">{role}</span>
                 <button onClick={logout} className="logout-button">Sign out</button>
               </>
             ) : (

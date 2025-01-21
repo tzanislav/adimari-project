@@ -27,7 +27,7 @@ function App() {
         
           <Route
             path="/items/new"
-            element={<ProtectedRoute element={<ItemForm />} />}
+            element={<ProtectedRoute element={<ItemForm />}/>}
           />
           <Route
             path="/items/edit/:id"
