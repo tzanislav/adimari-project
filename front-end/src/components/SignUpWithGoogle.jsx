@@ -10,6 +10,8 @@ const SignUpWithGoogle = () => {
     const [userId, setUserId] = useState('');
     const [_role, setRole] = useState('regular'); // Default to 'regular'
     const [message, setMessage] = useState('');
+    const host =  import.meta.env.VITE_SERVER_URL|| '';
+
 
     const handleGoogleSignIn = async () => {
         const auth = getAuth();
@@ -24,9 +26,9 @@ const SignUpWithGoogle = () => {
 
             // Get the ID token
             const token = await user.getIdToken();
-
+            
             // Send the token to the backend for processing and role assignment
-            const response = await fetch('/auth/google-signin', {
+            const response = await fetch(host + '/auth/google-signin', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -47,7 +49,7 @@ const SignUpWithGoogle = () => {
         try {
             const token = localStorage.getItem('token'); // Use token for authentication
 
-            const response = await fetch('/api/auth/update-role', {
+            const response = await fetch(host + '/api/auth/update-role', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
