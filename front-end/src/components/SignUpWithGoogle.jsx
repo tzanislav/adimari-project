@@ -49,7 +49,7 @@ const SignUpWithGoogle = () => {
         try {
             const token = localStorage.getItem('token'); // Use token for authentication
 
-            const response = await fetch(host + '/api/auth/update-role', {
+            const response = await fetch(host + '/auth/update-role', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

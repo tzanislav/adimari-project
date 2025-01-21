@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
                 // Fetch role from backend
                 try {
                     const host =  import.meta.env.VITE_SERVER_URL|| '';
+                    console.log(host + `/auth/get-role`);
                     const response = await fetch(host + `/auth/get-role`, {
                         method: 'GET',
                         headers: {
