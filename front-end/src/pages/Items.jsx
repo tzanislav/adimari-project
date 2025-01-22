@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEffect, useState } from 'react';
 import Item from '../components/Item';
-import { data, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import '../CSS/ListPage.css';
 import { useActiveSelection } from "../context/selectionContext";
 
@@ -10,11 +10,14 @@ function Items() {
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [filteredItems, setFilteredItems] = useState([]);
-    const { activeSelection, setActiveSelection,clearActiveSelection, serverUrl } = useActiveSelection();
-
+    const [searchedItems, setSearchedItems] = useState([]);
+    const { activeSelection, setActiveSelection, clearActiveSelection, serverUrl } = useActiveSelection();
     const [isWorking, setIsWorking] = useState(false);
     const [selections, setSelections] = useState(null);
+    const [categoryFilter, setCategoryFilter] = useState('All');
+    const [classFilter, setClassFilter] = useState('All');
+
+
 
 
 
@@ -25,14 +28,14 @@ function Items() {
                     .split("; ")
                     .find((row) => row.startsWith("activeSelectionId="))
                     ?.split("=")[1];
-    
+
                 if (savedSelectionId) {
                     const response = await fetch(`${serverUrl}/api/selections/${savedSelectionId}`);
                     if (!response.ok) {
                         throw new Error('Failed to fetch active selection');
                     }
                     const selectionData = await response.json();
-                    console.log (selectionData);
+                    console.log(selectionData);
                     setActiveSelection(selectionData._id);
                     return selectionData; // Return the fetched active selection
                 }
@@ -43,7 +46,7 @@ function Items() {
                 return null;
             }
         };
-    
+
         const fetchItems = async (activeSelection) => {
             try {
                 const response = await fetch(serverUrl + '/api/items');
@@ -58,11 +61,11 @@ function Items() {
 
 
                 setItems(sortedItems);
-                setFilteredItems(sortedItems);
-    
+                setSearchedItems(sortedItems);
+
                 console.log('Active Selection:', activeSelection);
                 console.log('Selections:', selections);
-    
+
                 // Set selections if it’s null and active selection is available
                 if (selections === null && activeSelection) {
                     console.log('Setting active selection:', activeSelection);
@@ -72,14 +75,14 @@ function Items() {
                 setError(error.message);
             }
         };
-    
+
         const initializeData = async () => {
             setLoading(true);
             const activeSelectionData = await fetchActiveSelection(); // Wait for active selection
             await fetchItems(activeSelectionData); // Pass active selection to fetchItems
             setLoading(false); // Set loading to false after both operations complete
         };
-    
+
         initializeData();
     }, [selections]);
 
@@ -101,7 +104,7 @@ function Items() {
             // Remove the item entirely
             updatedItems = (selections.items || []).filter((obj) => obj._id !== item._id);
         }
-        
+
         const newSelection = {
             ...selections,
             items: updatedItems,
@@ -123,11 +126,11 @@ function Items() {
                         body: JSON.stringify(newSelection), // Sends the serialized items
                     }
                 );
-    
+
                 if (!response.ok) {
                     throw new Error('Failed to update selection');
                 }
-    
+
                 console.log('Selection updated successfully');
                 setIsWorking(false);
             } catch (err) {
@@ -140,12 +143,20 @@ function Items() {
 
     };
 
-
     useEffect(() => {
 
+        var filteredItems = [];
+
+        if (categoryFilter === 'All') {
+            filteredItems = items;
+        } else {
+            filteredItems = items.filter((item) => item.category === categoryFilter);
+        }
+
+        console.log('Filtered Items:', categoryFilter);
         if (search != '') {
-            setFilteredItems(
-                items.filter((item) => {
+            setSearchedItems(
+                filteredItems.filter((item) => {
                     const searchLower = search.toLowerCase();
 
                     // Define fields to search
@@ -179,10 +190,11 @@ function Items() {
             );
         }
         else {
-            setFilteredItems(items);
+            setSearchedItems(filteredItems);
         }
+        console.log('Searched Items:', search);
+    }, [categoryFilter, items, search]);
 
-    }, [search]);
 
 
     if (loading && items === null) {
@@ -200,10 +212,33 @@ function Items() {
                 <input className='search-box' type="text" placeholder="Search Items" value={search} onChange={(e) => setSearch(e.target.value)} />
                 {search != "" ? (<button className='search-button' onClick={() => setSearch('')}>Clear</button>) : null}
             </div>
+            <div className='filters'>
+                <div className='filter-container'>
+                    <label>Category:</label>
+
+                    <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                    >
+                        <option key='All' value='All'>
+                            All
+                        </option>
+                        {
+                            items.map((item) => item.category).filter((value, index, self) => self.indexOf(value) === index).map((category) => (
+                                <option key={category} value={category}>
+                                    {category}
+                                </option>
+                            ))
+                        }
+
+                    </select>
+                    { categoryFilter != 'All' && <button onClick={() => setCategoryFilter('All')}>Clear</button> }
+                </div>
+            </div>
             <Link className='link button' to="/items/new">Add New item</Link>
             <div className='items-container-list'>
-                {filteredItems.length === 0 && <p>No items found.</p>}
-                {filteredItems.map((item) => (
+                {searchedItems.length === 0 && <p>No items found.</p>}
+                {searchedItems.map((item) => (
                     <Item key={item._id} item={item} handleClickItem={(property) => {
                         setSearch(property);
                     }}
