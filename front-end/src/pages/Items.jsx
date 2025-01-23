@@ -16,6 +16,7 @@ function Items() {
     const [selections, setSelections] = useState(null);
     const [categoryFilter, setCategoryFilter] = useState('All');
     const [classFilter, setClassFilter] = useState('All');
+    const [modelFilter, setModelFilter] = useState('All');
 
 
 
@@ -155,6 +156,16 @@ function Items() {
             filteredItems = filteredItems.filter((item) => item.class === classFilter);
         }
 
+        if (modelFilter !== 'All') {
+            if (modelFilter === 'Yes') {
+                filteredItems = filteredItems.filter((item) => item.modelPath?.length > 5);
+            }
+            else if (modelFilter === 'No') {
+                //Check if modelPath is an empty string or null
+                filteredItems = filteredItems.filter((item) => !item.hasOwnProperty('modelPath') || item.modelPath == null || item.modelPath.length < 5); 
+            }
+        }
+
 
         console.log('Filtered Items:', categoryFilter);
         if (search != '') {
@@ -196,7 +207,7 @@ function Items() {
             setSearchedItems(filteredItems);
         }
         console.log('Searched Items:', search);
-    }, [categoryFilter, items, search, classFilter]);
+    }, [categoryFilter, items, search, classFilter , modelFilter]);
 
 
 
@@ -254,6 +265,25 @@ function Items() {
                         }
                     </select>
                     {classFilter != 'All' && <button onClick={() => setClassFilter('All')}>X</button>}
+                </div>
+                <div className='filter-container'>
+                    <label>3D Model:</label>
+                    <select
+                        value={modelFilter}
+                        onChange={(e) => setModelFilter(e.target.value)}
+                    >
+                        <option key='All' value='All'>
+                            All
+                        </option>
+                        <option key='Yes' value='Yes'>
+                            Yes
+                        </option>
+                        <option key='No' value='No'>
+                            No
+                        </option>
+
+                    </select>
+                    {modelFilter != 'All' && <button onClick={() => setModelFilter('All')}>X</button>}
                 </div>
             </div>
             <Link className='link button' to="/items/new">Add New item</Link>
