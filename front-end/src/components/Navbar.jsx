@@ -20,8 +20,8 @@ function Navbar() {
           <ul  onClick={toggleMenu} className={`navbar-links ${isMenuOpen ? 'open' : ''}` }>
             <li><Link to="/">Home</Link></li>
             <li><Link to="/items">Items</Link></li>
-            {user && <li><Link to="/projects">Projects</Link></li>}
-            {(user && isMenuOpen) ? (
+            {user  && <li><Link to="/projects">Projects</Link></li>}
+            {user ? (
               <div className="navbar-auth-mobile">
                 <Link to="/signup" className="auth-link">{user.email}</Link>
                 <span className="user-email auth-link">{role}</span>
