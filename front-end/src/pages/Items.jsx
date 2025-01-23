@@ -145,13 +145,16 @@ function Items() {
 
     useEffect(() => {
 
-        var filteredItems = [];
+        var filteredItems = items;
 
-        if (categoryFilter === 'All') {
-            filteredItems = items;
-        } else {
+        if (categoryFilter !== 'All') {
             filteredItems = items.filter((item) => item.category === categoryFilter);
         }
+
+        if (classFilter !== 'All') {
+            filteredItems = filteredItems.filter((item) => item.class === classFilter);
+        }
+
 
         console.log('Filtered Items:', categoryFilter);
         if (search != '') {
@@ -193,7 +196,7 @@ function Items() {
             setSearchedItems(filteredItems);
         }
         console.log('Searched Items:', search);
-    }, [categoryFilter, items, search]);
+    }, [categoryFilter, items, search, classFilter]);
 
 
 
@@ -215,7 +218,6 @@ function Items() {
             <div className='filters'>
                 <div className='filter-container'>
                     <label>Category:</label>
-
                     <select
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
@@ -230,9 +232,28 @@ function Items() {
                                 </option>
                             ))
                         }
-
                     </select>
-                    { categoryFilter != 'All' && <button onClick={() => setCategoryFilter('All')}>Clear</button> }
+                    {categoryFilter != 'All' && <button onClick={() => setCategoryFilter('All')}>X</button>}
+
+                </div>
+                <div className='filter-container'>
+                    <label>Class:</label>
+                    <select
+                        value={classFilter}
+                        onChange={(e) => setClassFilter(e.target.value)}
+                    >
+                        <option key='All' value='All'>
+                            All
+                        </option>
+                        {
+                            items.map((item) => item.class).filter((value, index, self) => self.indexOf(value) === index).map((classType) => (
+                                <option key={classType} value={classType}>
+                                    {classType}
+                                </option>
+                            ))
+                        }
+                    </select>
+                    {classFilter != 'All' && <button onClick={() => setClassFilter('All')}>X</button>}
                 </div>
             </div>
             <Link className='link button' to="/items/new">Add New item</Link>
