@@ -4,6 +4,8 @@ import Item from '../components/Item';
 import { Link } from 'react-router-dom';
 import '../CSS/ListPage.css';
 import { useActiveSelection } from "../context/selectionContext";
+import ItemDetails from '../components/ItemDetails';
+import { useAuth } from '../context/AuthContext';
 
 function Items() {
     const [items, setItems] = useState([]);
@@ -17,6 +19,8 @@ function Items() {
     const [categoryFilter, setCategoryFilter] = useState('All');
     const [classFilter, setClassFilter] = useState('All');
     const [modelFilter, setModelFilter] = useState('All');
+    const [selecteditem, setSelectedItem] = useState(null);
+    const { user } = useAuth();
 
 
 
@@ -210,6 +214,15 @@ function Items() {
     }, [categoryFilter, items, search, classFilter , modelFilter]);
 
 
+    const handleShowDetails = (item) => {
+        setSelectedItem(item);
+        console.log('Show details for:', item);
+    };
+
+    const onClose = () => {
+        setSelectedItem(null);
+    };
+
 
     if (loading && items === null) {
         return <p>Loading...</p>;
@@ -221,6 +234,8 @@ function Items() {
 
     return (
         <div className="items-container">
+            {selecteditem && <ItemDetails item={selecteditem} handleClickItem={(property) => setSearch(property)} user={user} onClose={onClose}/>}
+
             <h1>Items</h1>
             <div className="search-container">
                 <input className='search-box' type="text" placeholder="Search Items" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -295,6 +310,7 @@ function Items() {
                     }}
                         _handleAddRemoveModel={handleAddRemoveFromSelection}
                         isWorking={isWorking}
+                        handleShowDetails={handleShowDetails}
                     />
                 ))}
             </div>
