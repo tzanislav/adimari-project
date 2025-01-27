@@ -19,7 +19,7 @@ function ItemForm() {
   const [items, setItems] = useState([]);
   const { serverUrl } = useActiveSelection();
   const [priceMessage, setPriceMessage] = useState('');
- 
+
   const [suggestions, setSuggestions] = useState({
     name: [],
     category: [],
@@ -100,6 +100,8 @@ function ItemForm() {
     fetchItems();
 
   }, []);
+
+
 
 
 
@@ -307,7 +309,7 @@ function ItemForm() {
       } else {
 
         var method = response.data.status;
-        if (method != "estimate" && method != "found" ) {
+        if (method != "estimate" && method != "found") {
           method = "none";
         }
         setFormData((prev) => ({
@@ -330,6 +332,13 @@ function ItemForm() {
       // Optionally update the UI with an error message
       setErrorMessage('Failed to fetch the price. Please try again.');
     }
+  };
+
+  const setFirstImage = (image) => {
+    setFormData((prev) => ({
+      ...prev,
+      files: [image, ...prev.files.filter((file) => file !== image)],
+    }));
   };
 
 
@@ -469,7 +478,15 @@ function ItemForm() {
                 <div className='uploaded-file' key={index}>
                   {file.match(/\.(jpeg|jpg|gif|png|webp)$/i)
                     ?
-                    (<img className='uploaded-img' src={file} alt={showOnlyName(file)} />) :
+                    (
+                      <div style={{ position: "relative" }}>
+                        <img className='uploaded-img' src={file} alt={showOnlyName(file)}  />
+                        <button className='button-small' style={{ position: "absolute", left: "0", top: '10px' }} onClick={(e) => {
+                          setFirstImage(file);
+                          e.preventDefault();
+                          }}>Set Thumb</button>
+                      </div>
+                    ) :
                     (<img className='uploaded-img' src="https://static.vecteezy.com/system/resources/previews/000/420/464/original/vector-document-in-folder-icon.jpg" alt={showOnlyName(file)} />)
                   }
 
