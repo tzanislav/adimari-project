@@ -12,6 +12,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ActiveSelectionProvider } from './context/selectionContext'; 
 import SignUp from './pages/SignUp';
+import Footer from './components/Footer';
 import './App.css';
 
 function App() {
@@ -58,6 +59,7 @@ function App() {
             element={<ProtectedRoute element={<ShowSelection />} />}
           />
         </Routes>
+        <Footer />
         </ActiveSelectionProvider>
       </AuthProvider>
     </div>
