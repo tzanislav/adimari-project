@@ -63,7 +63,7 @@ function ListItem({ item, handleRemove, count, handleUpdateItem }) {
 
                 <div className="list-item-info">
                     <div className="list-item-propery">
-                        <h4>Brnad</h4>
+                        <h4>Brand</h4>
                         <h3>{item.brand}</h3>
                     </div>
                     <div className="list-item-propery">
