@@ -13,6 +13,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { ActiveSelectionProvider } from './context/selectionContext'; 
 import SignUp from './pages/SignUp';
 import Footer from './components/Footer';
+import Team from './pages/Team';
 import './App.css';
 
 function App() {
@@ -57,6 +58,10 @@ function App() {
           <Route
             path="/selections/:id"
             element={<ProtectedRoute element={<ShowSelection />} />}
+          />
+          <Route
+            path="/team"
+            element={<Team />}
           />
         </Routes>
         <Footer />

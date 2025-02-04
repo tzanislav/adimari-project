@@ -1,0 +1,82 @@
+.team-member
+{
+    width: 80%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px auto;
+    padding: 10px;
+    border: 1px solid black;
+    border-radius: 10px;
+    background-color: #f0f0f0;
+
+}
+
+.team-member-prop
+{
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
+    margin: 25px;
+}
+
+.no-task {
+    background-color: rgb(226, 134, 134);
+}
+
+.profile-picture
+{
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    margin-right: 10px;
+    
+    text-align: center;
+}
+
+.profile-picture-container
+{
+    width: 64px;
+    height: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #e2cfb1;
+    border-radius: 50%;
+}
+
+.no-picture
+{
+    font-size: 20px;
+    color: #333;
+    
+}
+
+.team-log
+{
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 350px;
+    text-align: center;
+    background-color: #ffffff;
+    padding: 50px 50px;
+    overflow: auto;
+    max-height: 80%;
+    filter: drop-shadow(0px 0px 10px rgba(0, 0, 0, 0.5));
+
+}
+
+.log-entry
+{
+    margin: 4px auto;
+    display: flex;
+    padding: 0 25px;
+    flex-direction: row;
+    justify-content: space-between;
+    background-color: rgb(236, 236, 236);
+
+}

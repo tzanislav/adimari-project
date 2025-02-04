@@ -21,6 +21,7 @@ function Navbar() {
             <li><Link to="/">Home</Link></li>
             <li><Link to="/items">Items</Link></li>
             {user  && <li><Link to="/projects">Projects</Link></li>}
+            <li><Link to="/team">Team</Link></li>
             {user ? (
               <div className="navbar-auth-mobile">
                 <Link to="/signup" className="auth-link">{user.email}</Link>
