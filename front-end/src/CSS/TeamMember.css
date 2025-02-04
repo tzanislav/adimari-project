@@ -1,16 +1,13 @@
-.team-container
-{
+.team-container {
     width: 100%;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 10px;
 }
 
-.team-member-container
-{
+.team-member-container {
     position: relative;
     width: 80%;
     margin: 0 auto;
@@ -80,8 +77,7 @@
 
 }
 
-.log-container
-{
+.log-container {
     width: min(60%, 500px);
     margin: auto;
     text-align: center;
@@ -90,7 +86,7 @@
     overflow: auto;
     max-height: 70%;
     position: relative;
-    top : 5%;
+    top: 5%;
     filter: drop-shadow(0px 0px 10px rgba(0, 0, 0, 0.5));
 
 }
@@ -100,20 +96,28 @@
     display: flex;
     padding: 0 25px;
     flex-direction: row;
-    justify-content: space-between;
+    justify-content: space-around;
     background-color: rgb(236, 236, 236);
 
 }
 
-.team-member-admin
-{
+.log-prop {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
+    min-height: 0;
+
+
+}
+
+.team-member-admin {
     display: block;
     position: relative;
     padding: 0;
     margin: 0;
 }
-.team-member-admin button
-{
+
+.team-member-admin button {
     padding: 10px;
     margin: 0;
     background: none;
@@ -136,24 +140,42 @@
         min-height: 0;
         margin: 25px;
 
-        
+
     }
-    .team-member-prop h3, .team-member-prop p,  .team-member-prop h5{
+
+    .team-member-prop h3,
+    .team-member-prop p,
+    .team-member-prop h5 {
         margin: 0;
         padding: 0;
         font-size: 1em;
     }
 
-    .team-member-prop h5
-    {
-        display: none   ;
-    }
-
-
-    .team-member-pic
-    {
+    .team-member-prop h5,
+    .log-movement {
         display: none;
     }
-  
 
+
+    .team-member-pic {
+        display: none;
+    }
+
+    .log-entry {
+        padding: 0;
+        width: 100%;
+        margin: 5px auto;
+        align-items: center;
+        justify-items: space-between;
+        line-height: 0.7em;
+    }
+
+    .log-container {
+        padding: 0;
+        width: 95%;
+    }
+
+    .log-entry p {
+        font-size: 1em;
+    }
 }
