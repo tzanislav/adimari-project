@@ -1,17 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-function TeamLog({ member, handleClose }) {
-    const [memberLog, setMemberLog] = useState([]);
-
-    useEffect(() => {
-        fetch("http://54.76.118.84:5000/logs/" + member.username)
-            .then((res) => res.json())
-            .then((data) => {
-                const sortedData = data.sort((a, b) => b.timestamp - a.timestamp);
-                setMemberLog(sortedData);
-            })
-            .catch((error) => console.error('Error fetching data:', error));
-    }, [member.username]);
+function TeamLog({ memberLog, member, handleClose }) {
 
     const formatDuration = (ms) => {
         const totalSeconds = Math.floor(ms / 1000);
@@ -32,32 +21,41 @@ function TeamLog({ member, handleClose }) {
         return date.toLocaleDateString('en-GB') + ' ' + date.toLocaleTimeString();
     };
 
+    if (!memberLog) {
+        return <div>Loading...</div>;
+    }
+
     return (
         <div className="team-log">
-            <div className="log-header">
-                <h1>{member.username}</h1>
-            </div>
-            <button onClick={handleClose}>Close</button>
-            {memberLog.map((log, index) => {
-                let timeSinceLast = null;
-                if (index < memberLog.length - 1) {
-                    timeSinceLast = log.timestamp - memberLog[index + 1].timestamp;
-                }
-                const formattedTime = timeSinceLast !== null
-                    ? formatDuration(timeSinceLast)
-                    : '--';
+            <div className="log-container">
+                <div className="log-header">
+                    <h1>{member.username}</h1>
+                </div>
+                <button onClick={handleClose}>Close</button>
+                {memberLog.map((log, index) => {
+                    let timeSinceLast = null;
+                    if (index < memberLog.length - 1) {
+                        timeSinceLast = log.timestamp - memberLog[index + 1].timestamp;
+                    }
+                    if (index === 0) {
+                        timeSinceLast = Date.now() - log.timestamp;
+                    }
+                    const formattedTime = timeSinceLast !== null
+                        ? formatDuration(timeSinceLast)
+                        : '--';
 
-                return (
-                    <div className="log-entries">
-                        <div key={log.timestamp} className="log-entry">
-                            <p>{log.movement}</p>
-                            <p>{formatDate(log.timestamp)}</p>
-                            <p>{formattedTime}</p>
+                    return (
+                        <div className="log-entries">
+                            <div key={log.timestamp} className="log-entry">
+                                <p>{log.movement}</p>
+                                <p>{formatDate(log.timestamp)}</p>
+                                <p>{formattedTime}</p>
+                            </div>
                         </div>
-                    </div>
 
-                );
-            })}
+                    );
+                })}
+            </div>
         </div>
     );
 }
