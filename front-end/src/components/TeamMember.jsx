@@ -30,7 +30,6 @@ function TeamMember({ member }) {
                 <h5>Time Since Last Change</h5>
                 <h3>{member.timeSinceLastChange}</h3>
             </div>
-            {role}
             {role === "admin" && user && (
                 <>
                     {showLog ? (
