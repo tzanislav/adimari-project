@@ -33,7 +33,7 @@ function TeamMember({ member, handleShowLog }) {
                     <h3>{member.timeSinceLastChange}</h3>
                 </div>
             </div>
-            {role === "admin" && user && (
+            {role === "admin" || user && (
                 <div className="team-member-admin">
                     <button className="btn btn-primary" onClick={() => handleShowLog(member)}>View Log</button>
                 </div>

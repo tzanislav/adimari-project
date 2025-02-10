@@ -26,8 +26,10 @@ function TeamLog({ memberLog, member, handleClose }) {
     }
 
     return (
-        <div className="team-log">
-            <div className="log-container">
+        <div className="team-log"  onClick = {(e) => {
+            e.stopPropagation();
+            handleClose()}}>
+            <div className="log-container"onClick = {(e) => {e.stopPropagation();}}>
                 <div className="log-header">
                     <h1>{member.username}</h1>
                 </div>

@@ -41,7 +41,7 @@ function Team() {
     useEffect(() => {
         const interval = setInterval(() => {
             setNumber(number + 1);
-        }, 10000);
+        }, 30000);
         return () => clearInterval(interval);
     }, [number]);
 
