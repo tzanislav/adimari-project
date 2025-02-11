@@ -14,6 +14,7 @@ import { ActiveSelectionProvider } from './context/selectionContext';
 import SignUp from './pages/SignUp';
 import Footer from './components/Footer';
 import Team from './pages/Team';
+import TeamStatus from './pages/TeamStatus';
 import './App.css';
 
 function App() {
@@ -62,6 +63,10 @@ function App() {
           <Route
             path="/team"
             element={<Team />}
+          />
+          <Route
+            path="/team-status"
+            element={<ProtectedRoute element={<TeamStatus />} />}
           />
         </Routes>
         <Footer />

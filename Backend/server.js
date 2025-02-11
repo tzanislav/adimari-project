@@ -9,9 +9,12 @@ const selectRoutes = require('./routes/selectionRoute'); // Import select routes
 const itemRoutes = require('./routes/itemRoutes'); // Import item routes
 const openairoute = require('./routes/openairoute'); // Import openairoute routes
 const authRoutes = require('./routes/authRoutes'); // Import auth routes
+const clickUpRoutes = require('./routes/clickupRoutes'); // Import clickup routes
 const cors = require('cors');
 const path = require('path');
 const app = express();
+const { authenticate, authorizeRole } = require('./auth/authMiddleware');
+
 
 require('dotenv').config();
 
@@ -34,16 +37,15 @@ mongoose
   });
 
 
-
-// Use the user routes
-app.use('/api/users', userRoutes); // Routes start with /users
-app.use('/api/brands', brandRoutes); // Routes start with /brands
-app.use('/api/upload', uploadRoutes); // Routes start with /upload
-app.use('/api/models3d', modelRoutes); // Routes start with /models3d
-app.use('/api/projects', projectRoutes); // Routes start with /projects
-app.use('/api/selections', selectRoutes); // Routes start with /selects
-app.use('/api/items', itemRoutes); // Routes start with /items
-app.use('/api/openai', openairoute); // Routes start with /openairoute
+app.use('/api/users', userRoutes); 
+app.use('/api/brands', brandRoutes); 
+app.use('/api/upload', uploadRoutes); 
+app.use('/api/models3d', modelRoutes); 
+app.use('/api/projects', projectRoutes); 
+app.use('/api/selections', selectRoutes); 
+app.use('/api/items', itemRoutes); 
+app.use('/api/openai', openairoute); 
+app.use('/clickup', clickUpRoutes);
 app.use('/auth', authRoutes);
 
 // Test route for API

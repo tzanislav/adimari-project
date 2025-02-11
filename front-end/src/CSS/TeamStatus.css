@@ -1,0 +1,136 @@
+.member {
+    background-color: rgb(255, 255, 255);
+    border: 1px solid black;
+    border-radius: 5px;
+    margin: 10px;
+}
+
+.member-info {
+    display: flex;
+    flex-direction: row;
+    justify-content: start;
+    align-items: center;
+    padding: 10px;
+    transition: all 0.3s;
+}
+
+.member-info:hover {
+    background-color: rgb(189, 189, 189);
+}
+
+.member-pic {
+    width: 200px;
+    margin: 0 10px;
+    text-align: center;
+}
+
+.member-pic img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+}
+
+.no-task {
+    background-color: rgb(245, 153, 153);
+}
+
+.member .task {
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin: 10px;
+}
+
+.member-log {
+    display: flex;
+    flex-direction: column;
+    width: 80%;
+    margin: 10px auto;
+}
+
+.member .entry {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin: 5px 0;
+    width: 100%;
+}
+
+.entry-details {
+    display: flex;
+    flex-direction: row;
+    padding: 0 10px;
+
+    align-items: center;
+    width: 550px;
+}
+
+.entry-details h3 {
+    margin: 0 5px;
+    width: 100px;
+}
+
+.gap {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    background-color: rgb(241, 241, 241);
+}
+
+.entry .manual {
+    background-color: rgb(212, 212, 212);
+}
+
+.entry-time {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+
+
+@media (max-width: 768px) {
+    .member .entry {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        margin: 10px;
+        border: 1px solid black;
+    }
+
+    .entry-details {
+        width: auto;
+        flex-direction: column;
+    }
+
+    .gap {
+
+        background-color: rgb(241, 241, 241);
+    }
+
+    .entry-details h3 {
+        width: auto;
+    }
+
+
+
+    .member-pic {
+
+        justify-content: start;
+        align-items: start;
+        text-align: start;
+        width: 100px;
+
+    }
+
+
+    .member-pic h3
+
+    {
+        width: 50px;
+    }
+
+
+}
