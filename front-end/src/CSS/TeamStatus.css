@@ -71,6 +71,14 @@
     width: 100px;
 }
 
+.log-btn
+{
+    background: none;
+    text-transform: capitalize;
+    font-size: 1em;
+    text-decoration: underline;
+
+}
 .gap {
     display: flex;
     flex-direction: row;
@@ -91,13 +99,36 @@
 
 
 @media (max-width: 768px) {
+
+    .member-log {
+
+        width: 90%;
+        margin: 25px auto;
+        padding: 0;
+
+    }
+
+    .time-entries
+    {
+        padding: 0;
+        margin: 0;
+    }
+
+    .member
+    {
+        margin: 10 auto;
+        padding: 0;
+    }
+
     .member .entry {
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        margin: 10px;
+        margin: 10px 0;
+        padding: 0;
         border: 1px solid black;
+        border-radius: 15px;
     }
 
     .entry-details {

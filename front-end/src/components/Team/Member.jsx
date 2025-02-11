@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-function Member({ member }) {
+function Member({ member, handleShowLog }) {
 
     const [showDetails, setShowDetails] = useState(false);
     const [currentTask, setCurrentTask] = useState(null);
@@ -62,7 +62,7 @@ function Member({ member }) {
         if (minutes > 0)
             output += `${minutes}m `;
 
-        if(ms < 60000) {
+        if (ms < 60000) {
             output = '<1 m';
         }
         return output;
@@ -95,10 +95,11 @@ function Member({ member }) {
                             'No Task'}
                     </div>
                 </div>
+                <button className="log-btn" onClick={(e) => {e.stopPropagation(); handleShowLog(member);}}>View Log</button>
             </div>
             {showDetails && (
                 <div className="member-log">
-                    <ul>
+                    
                         {showDetails && (
                             <div className="member-details">
                                 <h4>Task Entries</h4>
@@ -107,7 +108,7 @@ function Member({ member }) {
                                         const currentDate = new Date(Number(entry.start)).toLocaleDateString();
                                         const prevDate =
                                             index > 0 ? new Date(Number(timeEntries[index - 1].start)).toLocaleDateString() : null;
-
+                                        const today = new Date().toLocaleDateString();
                                         const nextStart = index > 0 ? Number(timeEntries[index - 1].start) : null;
 
                                         return (
@@ -116,6 +117,12 @@ function Member({ member }) {
                                                     <div className="date-separator">
                                                         <hr />
                                                         <h3>{currentDate}</h3>
+                                                    </div>
+                                                ) : null}
+
+                                                {currentDate == today && index === 0 ? (
+                                                    <div className="date-separator">
+                                                        <h3>Today</h3>
                                                     </div>
                                                 ) : null}
 
@@ -157,10 +164,14 @@ function Member({ member }) {
                                 </div>
                             </div>
                         )}
-                    </ul>
+                    
 
                 </div>
             )}
+
+
+
+
         </div>
     );
 }

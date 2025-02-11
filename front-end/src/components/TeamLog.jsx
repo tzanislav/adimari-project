@@ -48,7 +48,7 @@ function TeamLog({ memberLog, member, handleClose }) {
 
                     return (
                         <div className="log-entries">
-                            <div key={log.timestamp} className="log-entry">
+                            <div key={log.timestamp + index} className="log-entry">
                                 <p className="log-movement log-prop">{log.movement}</p>
                                 <p className="log-prop">{formatDate(log.timestamp).split(' ')[0]}</p>
                                 <p className="log-prop">{formatDate(log.timestamp).split(' ')[1]}</p>

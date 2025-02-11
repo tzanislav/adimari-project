@@ -62,10 +62,6 @@ function App() {
           />
           <Route
             path="/team"
-            element={<Team />}
-          />
-          <Route
-            path="/team-status"
             element={<ProtectedRoute element={<TeamStatus />} />}
           />
         </Routes>
