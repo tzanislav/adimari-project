@@ -5,6 +5,7 @@ function Member({ member, handleShowLog }) {
     const [showDetails, setShowDetails] = useState(false);
     const [currentTask, setCurrentTask] = useState(null);
     const [timeEntries, setTimeEntries] = useState(null);
+
     const serverUrl = import.meta.env.VITE_SERVER_URL;
 
     useEffect(() => {
@@ -49,7 +50,7 @@ function Member({ member, handleShowLog }) {
         return date.toLocaleString(); // Format in local time zone
     }
 
-    const formatDuration = (ms) => {
+    const formatDuration = (ms, showDaysOnly = false) => {
         var output = '';
         const seconds = Math.floor(ms / 1000);
         const days = Math.floor(seconds / 86400);
@@ -57,9 +58,9 @@ function Member({ member, handleShowLog }) {
         const minutes = Math.floor((seconds % 3600) / 60);
         if (days > 0)
             output += `${days}d `;
-        if (hours > 0)
+        if (hours > 0 && !showDaysOnly)
             output += `${hours}h `;
-        if (minutes > 0)
+        if (minutes > 0 && !showDaysOnly)
             output += `${minutes}m `;
 
         if (ms < 60000) {
@@ -72,6 +73,22 @@ function Member({ member, handleShowLog }) {
         const duration = end - start;
         return formatDuration(duration);
     }
+
+    const calculateDailyTotal = (entries) => {
+
+        return entries.reduce((acc, entry) => {
+
+            const dateKey = new Date(Number(entry.start)).toLocaleDateString();
+
+            acc[dateKey] = (acc[dateKey] || 0) + (entry.end - entry.start);
+
+            return acc;
+
+        }, {});
+
+    };
+
+    const dailyTotals = calculateDailyTotal(timeEntries);
 
 
     return (
@@ -95,76 +112,78 @@ function Member({ member, handleShowLog }) {
                             'No Task'}
                     </div>
                 </div>
-                <button className="log-btn" onClick={(e) => {e.stopPropagation(); handleShowLog(member);}}>View Log</button>
+                <button className="log-btn" onClick={(e) => { e.stopPropagation(); handleShowLog(member); }}>View Log</button>
             </div>
             {showDetails && (
                 <div className="member-log">
-                    
-                        {showDetails && (
-                            <div className="member-details">
-                                <h4>Task Entries</h4>
-                                <div className="time-entries">
-                                    {timeEntries.map((entry, index) => {
-                                        const currentDate = new Date(Number(entry.start)).toLocaleDateString();
-                                        const prevDate =
-                                            index > 0 ? new Date(Number(timeEntries[index - 1].start)).toLocaleDateString() : null;
-                                        const today = new Date().toLocaleDateString();
-                                        const nextStart = index > 0 ? Number(timeEntries[index - 1].start) : null;
 
-                                        return (
-                                            <React.Fragment key={entry.id}>
+                    {showDetails && (
+                        <div className="member-details">
+                            <h4>Task Entries</h4>
+                            <div className="time-entries">
+                                {timeEntries.map((entry, index) => {
+                                    const currentDate = new Date(Number(entry.start)).toLocaleDateString();
+                                    const prevDate =
+                                        index > 0 ? new Date(Number(timeEntries[index - 1].start)).toLocaleDateString() : null;
+                                    const today = new Date().toLocaleDateString();
+                                    const nextStart = index > 0 ? Number(timeEntries[index - 1].start) : null;
+
+                                    return (
+                                        <React.Fragment key={entry.id}  >
+                                            <div className={`entry-day ${currentDate.split('/')[1] % 2 == 0 ? "isOdd" : "isEven"}`}>
+
                                                 {index === 0 || currentDate !== prevDate ? (
                                                     <div className="date-separator">
                                                         <hr />
-                                                        <h3>{currentDate}</h3>
+                                                        <h3>{currentDate} - Total: {formatDuration(dailyTotals[currentDate])}</h3>
+                                                        {currentDate == today && index === 0 ? (<p className="entry-today">Today</p>) :
+                                                            (<p> {formatDuration(Date.now() - new Date(currentDate).getTime(), true)} ago </p>)}
                                                     </div>
                                                 ) : null}
 
-                                                {currentDate == today && index === 0 ? (
-                                                    <div className="date-separator">
-                                                        <h3>Today</h3>
-                                                    </div>
-                                                ) : null}
+                                                <div className="entry-container">
+                                                    {index > 0 && (nextStart - entry.end) > 900000 && currentDate == prevDate ? (
+                                                        <div className="gap entry-day">
+                                                            <h3>No Task</h3>
+                                                            <div className="entry-details">
+                                                                <div className="entry-time">
+                                                                    <p>from</p>
+                                                                    <h3>{convertTimestampToLocal(entry.end, true)}</h3>
+                                                                    <p>to</p>
+                                                                    <h3>{convertTimestampToLocal(nextStart, true)}</h3>
+                                                                    <p>Duration:</p>
+                                                                    <h3>{formatDuration(nextStart - entry.end)}</h3>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
 
-                                                {index > 0 && (nextStart - entry.end) > 900000 && currentDate == prevDate ? (
-                                                    <div className="gap entry">
-                                                        <h3>No Task</h3>
-                                                        <div className="entry-details">
+
+                                                    <div className="entry">
+                                                        <a href={entry.task_url} target="_blank" rel="noopener noreferrer" className="task-name"><p>{entry.task.name}</p></a>
+                                                        <div className={`entry-details  ${(entry.end - entry.start) % 10000 === 0 ? 'manual' : 'automatic'}`}>
                                                             <div className="entry-time">
                                                                 <p>from</p>
-                                                                <h3>{convertTimestampToLocal(entry.end, true)}</h3>
+                                                                <h3>{convertTimestampToLocal(entry.start, true)}</h3>
                                                                 <p>to</p>
-                                                                <h3>{convertTimestampToLocal(nextStart, true)}</h3>
+                                                                <h3>{convertTimestampToLocal(entry.end, true)}</h3>
+                                                            </div>
+                                                            <div className="entry-time">
                                                                 <p>Duration:</p>
-                                                                <h3>{formatDuration(nextStart - entry.end)}</h3>
+                                                                <h3>{getDuration(entry.start, entry.end)}</h3>
+                                                                {(entry.end - entry.start) % 10000 === 0 ? 'Manual' : ''}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                ) : null}
-
-
-                                                <div className="entry">
-                                                    <a href={entry.task_url} target="_blank" rel="noopener noreferrer"><p>{entry.task.name}</p></a>
-                                                    <div className={`entry-details  ${(entry.end - entry.start) % 10000 === 0 ? 'manual' : 'automatic'}`}>
-                                                        <div className="entry-time">
-                                                            <p>from</p>
-                                                            <h3>{convertTimestampToLocal(entry.start, true)}</h3>
-                                                            <p>to</p>
-                                                            <h3>{convertTimestampToLocal(entry.end, true)}</h3>
-                                                        </div>
-                                                        <div className="entry-time">
-                                                            <p>Duration:</p>
-                                                            <h3>{getDuration(entry.start, entry.end)}</h3>
-                                                        </div>
-                                                    </div>
                                                 </div>
-                                            </React.Fragment>
-                                        );
-                                    })}
-                                </div>
+                                            </div>
+                                        </React.Fragment>
+                                    );
+                                })}
                             </div>
-                        )}
-                    
+                        </div>
+                    )}
+
 
                 </div>
             )}

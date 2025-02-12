@@ -49,12 +49,12 @@
     margin: 10px auto;
 }
 
-.member .entry {
+.entry {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    margin: 5px 0;
     width: 100%;
+
 }
 
 .entry-details {
@@ -83,11 +83,15 @@
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    background-color: rgb(241, 241, 241);
+    color: rgb(141, 46, 46);
+    border: 1px solid rgb(141, 46, 46);
+    margin: 10px 0; 
+    padding: 0 10px;
+    
 }
 
 .entry .manual {
-    background-color: rgb(212, 212, 212);
+    background-color: rgb(218, 193, 170);
 }
 
 .entry-time {
@@ -95,6 +99,59 @@
     flex-direction: row;
     justify-content: center;
     align-items: center;
+}
+
+.isOdd
+{
+    background-color: rgb(230, 230, 230);
+}
+
+.isEven
+{
+    background-color: rgb(255, 255, 255);
+}
+
+.entry-day
+{
+    padding: 10px;
+}
+.entry-day hr
+{
+    background-color: rgb(255, 255, 255);
+    height: 2px;
+}
+
+.date-separator
+{
+    margin-top : 0px;
+}
+
+.entry-container
+{
+    padding: 0 40px;
+}
+.entry-today
+{
+    display: inline;
+    text-transform: uppercase;
+    font-weight: bold;
+    font-size: 2em;
+}
+
+.task-name
+{
+    background-color: rgb(63, 63, 63);
+    padding:  0 20px;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    margin: 10px;
+}
+
+.task-name:hover
+{
+    background-color: rgb(141, 46, 46);
 }
 
 
@@ -125,10 +182,8 @@
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        margin: 10px 0;
+        margin: 0px 0;
         padding: 0;
-        border: 1px solid black;
-        border-radius: 15px;
     }
 
     .entry-details {
@@ -136,10 +191,7 @@
         flex-direction: column;
     }
 
-    .gap {
 
-        background-color: rgb(241, 241, 241);
-    }
 
     .entry-details h3 {
         width: auto;
