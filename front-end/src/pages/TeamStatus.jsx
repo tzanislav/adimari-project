@@ -13,7 +13,7 @@ function TeamStatus() {
     const { user, logout, role } = useAuth();
     const [shownLog, setShownLog] = useState(null);
     const [logData, setLogData] = useState(null);
-
+    
     useEffect(() => {
         fetch(serverUrl + '/clickup/members')
             .then(res => res.json())
@@ -42,6 +42,8 @@ function TeamStatus() {
         setShownLog(member);
     }
 
+
+
     if (!user || (role !== 'admin' && role !== 'moderator')) {
         return <div>Not authorized</div>
     }
@@ -59,7 +61,7 @@ function TeamStatus() {
                     <Member key={member.id} member={member} handleShowLog={handleShowLog}/>
                 ))}
             </div>
-            {shownLog && <TeamLog memberLog={logData} member={shownLog} handleClose={() => {setShownLog(null)}}/>}
+            {shownLog && logData && <TeamLog memberLog={logData} member={shownLog} handleClose={() => {setShownLog(null)}}/>}
         </div>
     );
 }

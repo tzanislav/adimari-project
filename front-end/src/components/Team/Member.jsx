@@ -5,6 +5,8 @@ function Member({ member, handleShowLog }) {
     const [showDetails, setShowDetails] = useState(false);
     const [currentTask, setCurrentTask] = useState(null);
     const [timeEntries, setTimeEntries] = useState(null);
+    const [number, setNumber] = useState(0);
+
 
     const serverUrl = import.meta.env.VITE_SERVER_URL;
 
@@ -18,21 +20,28 @@ function Member({ member, handleShowLog }) {
         } catch (error) {
             console.error('Error fetching data:', error);
         }
-    }, [member.id]);
+    }, [member.id, number]);
 
     useEffect(() => {
         try {
             fetch(serverUrl + `/clickup/time-entries/${member.id}`)
                 .then(res => res.json())
-                .then(data => {
-                    const sortedData = data.data.sort((a, b) => b.start - a.start);
+                .then(data => {                 
+                    const sortedData = data?.data.sort((a, b) => b.start - a.start);                 
                     setTimeEntries(data.data);
-                    console.log(data.data);
                 });
         } catch (error) {
             console.error('Error fetching data:', error);
         }
-    }, [member.id]);
+    }, [member.id, number]);
+
+        // Update number to trigger useEffect every 1 minute
+        useEffect(() => {
+            const interval = setInterval(() => {
+                setNumber(number + 1);
+            }, 60000);
+            return () => clearInterval(interval);
+        }, [number]);
 
 
     if (!currentTask || !timeEntries) {
