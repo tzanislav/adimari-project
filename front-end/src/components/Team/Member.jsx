@@ -143,7 +143,7 @@ function Member({ member, handleShowLog }) {
 
                                                 <div className="entry-container">
                                                     {index > 0 && (nextStart - entry.end) > 900000 && currentDate == prevDate ? (
-                                                        <div className="gap entry-day">
+                                                        <div className="gap">
                                                             <h3>No Task</h3>
                                                             <div className="entry-details">
                                                                 <div className="entry-time">

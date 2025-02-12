@@ -83,8 +83,9 @@
     display: flex;
     flex-direction: row;
     justify-content: space-between;
+    flex-wrap: wrap;
     color: rgb(141, 46, 46);
-    border: 1px solid rgb(141, 46, 46);
+
     margin: 10px 0; 
     padding: 0 10px;
     
@@ -99,6 +100,7 @@
     flex-direction: row;
     justify-content: center;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .isOdd
@@ -215,5 +217,8 @@
         width: 50px;
     }
 
+    .gap{
+        border: 1px solid rgb(141, 46, 46);
+    }
 
 }
