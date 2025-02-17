@@ -173,6 +173,7 @@ function ItemForm() {
       : `${serverUrl}/api/items`;
 
     const method = isEditing ? 'PUT' : 'POST';
+    const token = await user.getIdToken();
 
     try {
       const response = await axios({

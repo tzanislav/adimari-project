@@ -10,6 +10,7 @@ const itemRoutes = require('./routes/itemRoutes'); // Import item routes
 const openairoute = require('./routes/openairoute'); // Import openairoute routes
 const authRoutes = require('./routes/authRoutes'); // Import auth routes
 const clickUpRoutes = require('./routes/clickupRoutes'); // Import clickup routes
+const licenseEntryRoutes = require('./routes/licenseEntryRoutes'); // Import license routes
 const cors = require('cors');
 const path = require('path');
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api/items', itemRoutes);
 app.use('/api/openai', openairoute); 
 app.use('/clickup', clickUpRoutes);
 app.use('/auth', authRoutes);
+app.use('/api/licenses', authenticate, licenseEntryRoutes);
 
 // Test route for API
 app.get('/api/test', (req, res) => {

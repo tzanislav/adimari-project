@@ -1,0 +1,152 @@
+.license-header
+{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    margin: 40px 0;
+}
+.license-container ,.form-container
+{
+    width: 80%;
+    margin: 0 auto;
+}
+
+.buttons-container
+{
+    display: flex;
+    justify-content: space-between;
+    margin: 40px 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: separate; 
+    border-spacing: 0;
+    margin: 1em 0;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    background: #fff;
+    overflow: hidden;
+    border-radius: 0.5em;
+  }
+
+table h5
+{
+    display: none;
+}
+
+  .form-container
+  {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+  }
+
+  .platform-header
+  {
+    text-align: center;
+    font-size: 1.5em;
+    font-weight: 600;
+    background-color: #e4e4e4;
+  }
+  
+  thead {
+    background-color: #ececec;
+  }
+  
+  thead th {
+    padding: 0.75em 1em;
+    font-weight: 600;
+    color: #333;
+    text-align: left;
+  }
+  
+  tbody tr {
+    border-top: 1px solid #ddd; 
+  }
+  
+  tbody tr:hover {
+    background-color: #f9f9f9; /* Row highlight on hover */
+  }
+  
+  tbody td {
+    padding: 0.75em 1em;
+    border-bottom: 1px solid #ddd; /* Subtle bottom border */
+  }
+  
+  tbody tr:last-child td {
+    border-bottom: none; /* Remove border for final row */
+  }
+
+  .password
+  {
+ color: white;
+  }
+
+  .password:hover
+  {
+    color: black;
+  }
+
+  .expired
+  {
+    color: red;
+    background-color: #ffcaca;
+  }
+
+  .expired.password
+  {color: #ffcaca;}
+
+
+  @media screen and (max-width: 600px) {
+    table {
+      border: 0;
+
+    }
+    table caption {
+      font-size: 1.3em;
+    }
+    table thead {
+      border: none;
+      clip: rect(0 0 0 0);
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      padding: 0;
+      position: absolute;
+      width: 1px;
+    }
+    table tr {
+      border-bottom: 3px solid #ddd;
+      display: block;
+      text-align: center;
+      margin-bottom: 0.625em;
+    }
+    table td {
+      border-bottom: 1px solid #ddd;
+      display: block;
+      text-align: center;
+      border: none;
+    }
+    table .btn-simple
+    {
+      display: block;
+      margin: 0 auto;
+    }
+
+    table h5
+{
+    display: inline;
+}
+
+.password
+{
+    color: #333;
+}
+
+
+    
+  }
+  
