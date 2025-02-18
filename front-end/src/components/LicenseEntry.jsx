@@ -5,7 +5,6 @@ function LicenseEntry({ entry , handleEdit }) {
 
     const formatDate = (date) => {
         if (!date) return '';
-      
         const dateObj = new Date(date);
         const timeLeft = Date.now() - dateObj.getTime();
         const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
@@ -27,8 +26,8 @@ function LicenseEntry({ entry , handleEdit }) {
 
 
     return (
-        <tr className={entry.expiresAt && isExpired(entry.expiresAt) ? 'expired' : ''}>
-            <td>{entry.user}</td>
+        <tr className={entry.expiresAt && isExpired(entry.expiresAt) ? 'expired' : '' + entry.clearances === 'admin' ? 'entry-admin' : ''}>
+            <td>{entry.user} </td>
             <td className = "password"> <h5>Password:</h5> {entry.password}</td>
             <td>{entry.usedBy}</td>
             <td> {entry.price && "EUR"} {entry.price}</td>

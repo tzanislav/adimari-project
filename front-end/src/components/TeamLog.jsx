@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import "../CSS/Team-Log.css";
 
 function TeamLog({ memberLog, member, handleClose }) {
 
@@ -18,7 +19,8 @@ function TeamLog({ memberLog, member, handleClose }) {
 
     const formatDate = (timestamp) => {
         const date = new Date(timestamp);
-        return date.toLocaleDateString('en-GB') + ' ' + date.toLocaleTimeString();
+        const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+        return date.toLocaleDateString('en-GB') + ' ' + date.toLocaleTimeString('en-GB', options);
     };
 
     if (!memberLog) {

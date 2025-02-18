@@ -10,7 +10,7 @@ const licenseEntrySchema = new mongoose.Schema({
     price : { type: Number, default: null },
     imageUrl : { type: String, default: null },
     expiresAt: { type: Date, default: null },
-    clearances: { type: [String], default: null },
+    clearances: { type: String, default: null },
     createdAt: { type: Date, default: Date.now },
     createdBy: { type: String, default: null },
 });

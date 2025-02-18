@@ -30,8 +30,14 @@ function Licenses() {
                 const data = await response.json();
                 //Sort by platform
                 data.sort((a, b) => a.platform.localeCompare(b.platform));
-                setLicenses(data);
-                setFilteredLicenses(data);
+                if (role === 'admin') {
+                    setLicenses(data);
+                    setFilteredLicenses(data);
+                }
+                else {
+                    setLicenses(data.filter(license => license.clearances !== 'admin'));
+                    setFilteredLicenses(data.filter(license => license.clearances !== 'admin'));
+                }
             } catch (error) {
                 console.error('Error fetching data:', error);
             }
@@ -66,7 +72,7 @@ function Licenses() {
     return (
         <div className="licenses">
             <div className="license-header">
-                <h1>Licenses</h1>
+                <h1>Usernames and Passwords</h1>
                 <button onClick={() => handleEdit(false)}>Add New Entry</button>
             </div>
 
@@ -74,7 +80,7 @@ function Licenses() {
                 <div className="search-container">
                     <input type="text" className="search-box" placeholder="Search by username, used by, platform or comment" onChange={(e) => {
                         const search = e.target.value.toLowerCase();
-                        setFilteredLicenses(licenses.filter(license => 
+                        setFilteredLicenses(licenses.filter(license =>
                             license.user.toLowerCase().includes(search) ||
                             license.usedBy.toLowerCase().includes(search) ||
                             license.platform.toLowerCase().includes(search) ||
@@ -96,16 +102,23 @@ function Licenses() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredLicenses.map((license, index) => (
-                            <React.Fragment key={license._id}>
-                                {index === 0 || filteredLicenses[index - 1].platform !== license.platform ? (
-                                    <tr>
-                                        <td colSpan="8" className="platform-header">{license.platform}</td>
-                                    </tr>
-                                ) : null}
-                                <LicenseEntry entry={license} handleEdit={handleEdit} />
-                            </React.Fragment>
-                        ))}
+                        {filteredLicenses.map((license, index) => {
+
+
+                            return (
+
+                                <React.Fragment key={license._id}>
+                                    {index === 0 || filteredLicenses[index - 1].platform !== license.platform ? (
+                                        <tr>
+                                            <td colSpan="8" className="platform-header">{license.platform}</td>
+                                        </tr>
+                                    ) : null}
+                                    <LicenseEntry entry={license} handleEdit={handleEdit} />
+
+                                </React.Fragment>
+                            );
+                        })}
+
                     </tbody>
                 </table>
             </div>

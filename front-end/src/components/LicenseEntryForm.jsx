@@ -5,12 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import { useActiveSelection } from '../context/selectionContext';
 import SuggestionsBox from '../components/SuggestionsBox';
 
-function LicenseForm({handleRefresh, id, handleClose}) {
+function LicenseForm({ handleRefresh, id, handleClose }) {
   const isEditing = Boolean(id);
 
   // From your contexts/hooks
-  const { user } = useAuth();
-  const { serverUrl } = useActiveSelection(); 
+  const { user, role } = useAuth();
+  const { serverUrl } = useActiveSelection();
 
   const [isDeleting, setIsDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,7 @@ function LicenseForm({handleRefresh, id, handleClose}) {
     price: '',
     imageUrl: '',
     expiresAt: '',
-    clearances: [],
+    clearances: 'moderator',
     createdBy: '',
   });
 
@@ -90,9 +90,7 @@ function LicenseForm({handleRefresh, id, handleClose}) {
         setFormData({
           ...existingLicense,
           expiresAt: dateString,
-          clearances: Array.isArray(existingLicense.clearances)
-            ? existingLicense.clearances
-            : [],
+          clearances: existingLicense.clearances || 'moderator',
         });
       } catch (error) {
         console.error('Failed to fetch license:', error);
@@ -143,17 +141,10 @@ function LicenseForm({handleRefresh, id, handleClose}) {
     }
   };
 
-  // Clearances as comma-separated
-  const handleClearancesChange = (e) => {
-    const arr = e.target.value
-      .split(',')
-      .map((i) => i.trim())
-      .filter((i) => i !== '');
-    setFormData((prev) => ({ ...prev, clearances: arr }));
-  };
 
   // Create or update license
   const handleSubmit = async (e) => {
+    console.log('Submitting form:', formData);
     e.preventDefault();
     if (!user) {
       setErrorMessage('You must be logged in');
@@ -204,7 +195,7 @@ function LicenseForm({handleRefresh, id, handleClose}) {
     }
   };
 
-  if(loading) {
+  if (loading) {
     return null;
   }
 
@@ -279,7 +270,6 @@ function LicenseForm({handleRefresh, id, handleClose}) {
             />
           </label>
 
-
           {/* USED BY field with suggestions */}
           <label>
             Used By:
@@ -322,7 +312,6 @@ function LicenseForm({handleRefresh, id, handleClose}) {
             />
           </label>
 
-
           <label>
             Expires At:
             <input
@@ -333,7 +322,26 @@ function LicenseForm({handleRefresh, id, handleClose}) {
             />
           </label>
 
-
+          {role === 'admin' ? (
+            <label>
+              Visible to:
+              <select
+                name="clearances"
+                type="text"
+                value={formData.clearances || 'moderator'}
+                onChange={handleChange}
+              >
+                <option value="moderator">All</option>
+                <option value="admin">Admin Only</option>
+              </select>
+            </label>
+          ) : (
+            <input
+              type="hidden"
+              name="clearances"
+              value="moderator"
+            />
+          )}
 
           <div className='buttons-container' style={{ marginTop: '1rem' }}>
             <button type="submit">

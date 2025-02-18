@@ -80,10 +80,6 @@ table h5
     border-bottom: none; /* Remove border for final row */
   }
 
-  .password
-  {
- color: white;
-  }
 
   .password:hover
   {
@@ -98,6 +94,11 @@ table h5
 
   .expired.password
   {color: #ffcaca;}
+
+  .entry-admin
+  {
+    background-color: rgb(218, 213, 204);
+  }
 
 
   @media screen and (max-width: 600px) {
