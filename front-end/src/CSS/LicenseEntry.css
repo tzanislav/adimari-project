@@ -56,11 +56,12 @@ table h5
     background-color: #ececec;
   }
   
-  thead th {
+  th {
     padding: 0.75em 1em;
-    font-weight: 600;
+    font-weight: bold;
     color: #333;
     text-align: left;
+    font-size: .85em;
   }
   
   tbody tr {
@@ -135,6 +136,11 @@ table h5
     {
       display: block;
       margin: 0 auto;
+    }
+
+    th
+    {
+      display: none;
     }
 
     table h5

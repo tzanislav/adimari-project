@@ -90,17 +90,6 @@ function Licenses() {
                     } />
                 </div>
                 <table>
-                    <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>Password</th>
-                            <th>Used By</th>
-                            <th>Price</th>
-                            <th>Comment</th>
-                            <th>Expires At</th>
-                            <th>Edit</th>
-                        </tr>
-                    </thead>
                     <tbody>
                         {filteredLicenses.map((license, index) => {
 
@@ -109,9 +98,22 @@ function Licenses() {
 
                                 <React.Fragment key={license._id}>
                                     {index === 0 || filteredLicenses[index - 1].platform !== license.platform ? (
-                                        <tr>
-                                            <td colSpan="8" className="platform-header">{license.platform}</td>
-                                        </tr>
+                                        <>
+                                            <tr>
+                                                <td colSpan="8" className="platform-header">{license.platform}</td>
+                                            </tr>
+
+                                            <tr>
+                                                <th>Username</th>
+                                                <th>Password</th>
+                                                <th>Used By</th>
+                                                <th>Price</th>
+                                                <th>Comment</th>
+                                                <th>Expires At</th>
+                                                <th>Edit</th>
+                                            </tr>
+
+                                        </>
                                     ) : null}
                                     <LicenseEntry entry={license} handleEdit={handleEdit} />
 
