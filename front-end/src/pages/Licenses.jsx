@@ -30,13 +30,13 @@ function Licenses() {
                 const data = await response.json();
                 //Sort by platform
                 data.sort((a, b) => a.platform.localeCompare(b.platform));
-                if (role === 'admin') {
+                if (role == 'admin') {
                     setLicenses(data);
                     setFilteredLicenses(data);
                 }
                 else {
-                    setLicenses(data.filter(license => license.clearances !== 'admin'));
-                    setFilteredLicenses(data.filter(license => license.clearances !== 'admin'));
+                    setLicenses(data.filter(license => license.clearances != 'admin'));
+                    setFilteredLicenses(data.filter(license => license.clearances != 'admin'));
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -64,7 +64,7 @@ function Licenses() {
         setNumber(number + 1);
     };
 
-    if (!licenses) {
+    if (!licenses || !role) {
         return <div>Loading...</div>
     }
 
