@@ -36,7 +36,6 @@ const SignUpWithGoogle = () => {
             });
 
             const data = await response.json();
-            console.log('Sign in response:', data);
 
         } catch (error) {
             console.error('Error signing in with Google:', error);
@@ -56,8 +55,6 @@ const SignUpWithGoogle = () => {
                 },
                 body: JSON.stringify({ uid: userId, role: _role }),
             });
-            console.log(JSON.stringify({ uid: userId, role: _role }), token);
-
 
             const data = await response.json();
 
@@ -74,7 +71,7 @@ const SignUpWithGoogle = () => {
 
     // Refresh the token
     const auth = getAuth();
-    auth.currentUser?.getIdToken(true).then((token) => {console.log('Token refreshed:', token)});
+    auth.currentUser?.getIdToken(true).then((token) => {console.log('Token refreshed:')});
 
 
     return (

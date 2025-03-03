@@ -6,7 +6,6 @@ const router = express.Router();
 
 // Route to add a selection
 router.post('/', async (req, res) => {
-    console.log(req.body);
     try {
         try {
             const parentProject = await Project.findById(req.body.project);
@@ -20,10 +19,8 @@ router.post('/', async (req, res) => {
 
         const newSelection = new Selection(req.body);
         const result = await newSelection.save();
-        console.log("Created:  " + result);
         res.status(201).send({ message: 'Selection added successfully!', selection: result });
     } catch (err) {
-        console.log(err);
         res.status(500).send({ error: 'Failed to add selection', details: err });
     }
 });
@@ -36,7 +33,6 @@ router.put('/:id', async (req, res) => {
         if (!selection) {
             res.status(404).send({ message: 'Selection not found' });
         } else {
-            console.log("Selection updated", selection);
             res.status(200).send({ message: 'Selection updated successfully!', selection });
         }
     } catch (err) {

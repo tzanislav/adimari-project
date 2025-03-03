@@ -17,7 +17,6 @@ const openai = new OpenAI({
 router.get('/', async (req, res) => {
   const { query } = req.query;
   const newQuery = query + ' price'; // Append 'price' to the query to help OpenAI extract prices
-  console.log('Query:', newQuery);
   if (!query) {
     return res.status(400).json({ error: 'Please provide a query parameter.' });
   }
@@ -82,7 +81,6 @@ router.get('/', async (req, res) => {
 
     await browser.close(); // Close the browser
 
-    console.log('Extracted Results:', organicResults);
 
     // Send the result to OpenAI API for price extraction
     const response = await openai.chat.completions.create({
@@ -114,13 +112,11 @@ router.get('/', async (req, res) => {
     const openAIResult = response.choices[0].message.content;
     const cleanJSON = openAIResult.replace(/```json|```/g, '').trim();
 
-    console.log('OpenAI Response:', openAIResult);
 
     // Parse and validate the JSON response
     let parsedResponse;
     try {
       parsedResponse = JSON.parse(cleanJSON);
-      console.log('Parsed OpenAI Response:', parsedResponse);
     } catch (error) {
       console.error('Failed to parse OpenAI response as JSON:', error);
       return res.status(500).json({ error: 'Invalid JSON response from OpenAI.' });

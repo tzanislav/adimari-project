@@ -17,8 +17,6 @@ router.post('/', async (req, res) => {
 // Route to update a project
 router.put('/:id', async (req, res) => {
     try {
-        console.log("Updating project with data:", req.body);
-
         // Build the update object dynamically from the request body
         const updateFields = {};
 
@@ -39,8 +37,6 @@ router.put('/:id', async (req, res) => {
         if (!project) {
             return res.status(404).send({ message: 'Project not found' });
         }
-
-        console.log("Project updated successfully:", project);
         res.status(200).send({ message: 'Project updated successfully!', project });
     } catch (err) {
         console.error("Error updating project:", err);

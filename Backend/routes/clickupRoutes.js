@@ -14,7 +14,7 @@ router.get('/time-entries',  async (req, res) => {
             }
         });
         data = await response.json();
-        console.log(data);
+
     } catch (error) {
         console.error('Error fetching data:', error);
     }
@@ -33,7 +33,7 @@ router.get('/time-entries/:user_id',  async (req, res) => {
         });
         data = await response.json();
 
-        console.log(data);
+
     } catch (error) {
         console.error('Error fetching data:', error);
     }
@@ -52,7 +52,6 @@ router.get('/current-task/:user_id',  async (req, res) => {
             }
         });
         data = await response.json();
-        console.log(data);
     } catch (error) {
         console.error('Error fetching data:', error);
     }
