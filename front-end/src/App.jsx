@@ -15,6 +15,7 @@ import SignUp from './pages/SignUp';
 import Footer from './components/Footer';
 import TeamStatus from './pages/TeamStatus';
 import Licenses from './pages/Licenses';
+import Turntable from './components/Other/Turntable';
 import './App.css';
 
 function App() {
@@ -67,6 +68,10 @@ function App() {
           <Route
             path="/licenses"
             element={<ProtectedRoute element={<Licenses />} />}
+          />
+          <Route
+            path="/turntable"
+            element={<Turntable/>}
           />
         </Routes>
         <Footer />

@@ -1,0 +1,16 @@
+.turntable {
+
+    height: 80vh;
+    width: 80vh;
+    margin: auto;
+    background: rgb(177, 177, 177);
+    background: radial-gradient(circle, rgb(70, 84, 114,0.5) 0%, rgb(70, 84, 114,.5) 45%, rgba(255, 255, 255, 0) 46%);
+}
+
+@media screen and (max-width: 768px) {
+    .turntable {
+        height: auto;
+        width: 100%;
+    }
+    
+}
