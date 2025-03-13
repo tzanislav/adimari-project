@@ -122,16 +122,12 @@ function ItemForm() {
         ...prev,
         [name]: filteredSuggestions,
       }));
-    } else {
-      setSuggestions((prev) => ({
-        ...prev,
-        [name]: [],
-      }));
-    }
+    } 
   };
 
 
   const handleBlur = (field) => {
+    setFormData((prev) => ({ ...prev, [field]: prev[field].trim() }));
     setTimeout(() => {
       setSuggestions((prev) => ({
         ...prev,
@@ -141,18 +137,15 @@ function ItemForm() {
   };
 
   const handleFocus = (field) => {
-    if (formData[field]) {
-      const filteredSuggestions = [...new Set(
-        items
-          .map((item) => item[field])
-          .filter((val) => val && val.toLowerCase().includes(formData[field].toLowerCase()))
-      )];
+    const filteredSuggestions = [...new Set(
+      items
+        .map((item) => item[field])
+    )];
 
-      setSuggestions((prev) => ({
-        ...prev,
-        [field]: filteredSuggestions,
-      }));
-    }
+    setSuggestions((prev) => ({
+      ...prev,
+      [field]: filteredSuggestions,
+    }));
   };
 
 
@@ -219,6 +212,7 @@ function ItemForm() {
 
   // Analyze image with Rekognition
   const analyzeImage = async (imageUrl) => {
+    /*
     if (formData.tags.length > 0) {
       return;
     }
@@ -262,6 +256,7 @@ function ItemForm() {
       }));
       setErrorMessage('Failed to analyze image.');
     }
+      */
   };
 
   // Delete item
@@ -540,6 +535,9 @@ function ItemForm() {
               onChange={handleChange}
               required
             >
+              <option value="None">None</option>
+              <option value="Undefined">Undefined</option>
+              <option value="Budget">Budget</option>
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
