@@ -6,6 +6,9 @@ const SuggestionsBox = ({ suggestions, onSuggestionClick, onClose }) => {
   const boxRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
 
+  // Sort suggestions alphabetically
+  const sortedSuggestions = suggestions.sort((a, b) => a.localeCompare(b));
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (boxRef.current && !boxRef.current.contains(event.target)) {
@@ -28,7 +31,7 @@ const SuggestionsBox = ({ suggestions, onSuggestionClick, onClose }) => {
   return (
     <div className="suggestions-box" ref={boxRef}>
       <h3 className="suggestions-box-title">Suggestions:</h3>
-      {suggestions.map((suggestion, index) => (
+      {sortedSuggestions.map((suggestion, index) => (
         <div
           key={index}
           className="suggestion-item"
