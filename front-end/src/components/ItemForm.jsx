@@ -276,6 +276,9 @@ function ItemForm() {
 
   //Try to get the price
   const getPrice = async () => {
+    console.log("Price Get is Disabled");
+    return;
+
     // Combine formData fields to create the query string
     var query = `${formData.brand}  ${formData.name}`.trim();
     //append the first tag
@@ -554,11 +557,6 @@ function ItemForm() {
               value={formData.price || 0}
               onChange={handleChange}
             />
-            <button onClick={(e) => {
-              e.preventDefault();
-              getPrice();
-            }
-            }>Get Price</button>
           </label>
 
 
