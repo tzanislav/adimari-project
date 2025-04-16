@@ -8,7 +8,7 @@
     padding: 20px;
     background-color: #cecece;
     border-radius: 8px;
-    position: absolute;
+    position: fixed;
     top: 5vh;
     left: 50%;
     transform: translateX(-50%);
