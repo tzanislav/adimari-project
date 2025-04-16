@@ -99,7 +99,7 @@ function MemberLog({ memberId, incrementMs = 3600000 }) {
 
                             return (
                                 <React.Fragment key={bar.index}>
-                                    <VerticalBar fill={bar.total / maxTotal} text={showHour ? timeStr : ""} />
+                                    <VerticalBar fill={bar.total / maxTotal} text={showHour ? timeStr : ""} details = {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} />
                                 </React.Fragment>
                             );
                         })}

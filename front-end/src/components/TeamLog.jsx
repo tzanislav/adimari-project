@@ -10,11 +10,13 @@ function TeamLog({member, handleClose }) {
     return (
         <div className="member-log-wrapper" onClick={(e) => {
             e.stopPropagation();
-            handleClose()
+            
         }}>
+            <button className="close-button" onClick={handleClose}>Close</button>
             <p>Log for {member.username}</p>
             <MemberLog memberId={member.id} incrementMs={600000} />
         </div>
+
     );
 }
 
