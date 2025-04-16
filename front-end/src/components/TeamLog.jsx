@@ -8,7 +8,7 @@ function TeamLog({member, handleClose }) {
     }
 
     return (
-        <div className="team-log member-log-wrapper" onClick={(e) => {
+        <div className="member-log-wrapper" onClick={(e) => {
             e.stopPropagation();
             handleClose()
         }}>

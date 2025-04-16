@@ -91,7 +91,6 @@ router.post('/google-signin', async (req, res) => {
 });
 
 router.get('/get-role', authenticate, async (req, res) => {
-    console.log('User:', req.user);
     const { role = 'regular' } = req.user; // Default to 'regular' if no role is set
     res.send({ role });
 });

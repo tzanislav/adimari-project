@@ -61,7 +61,6 @@ router.get('/time-entries/:id', async (req, res) => {
 
 router.post('/time-entries', async (req, res) => {
     if(!teamMembers) {
-        console.log('Team members not fetched yet.');
         return res.status(500).json({ message: 'Team members not fetched yet.' });
     }
 
@@ -84,7 +83,6 @@ router.post('/time-entries', async (req, res) => {
         console.error('Error saving activity log:', error);
         res.status(500).json({ message: 'Failed to log activity', error });
     }
-    console.log('Received request:', member.username, "Movement:", req.body.movement);
 });
 
 

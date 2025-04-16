@@ -76,7 +76,6 @@ router.post('/', upload.array('files', 10), (req, res) => {
 
 // Analyze image with Rekognition
 router.post("/analyze-image", async (req, res) => {
-  console.log(req.body);
   try {
     const { imageUrl } = req.body;
 
