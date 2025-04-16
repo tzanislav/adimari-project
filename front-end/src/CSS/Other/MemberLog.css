@@ -4,15 +4,16 @@
     width: min(85%,1200px);
     height: 75vh;
     overflow: auto;
-    margin: 10vh auto;
+    margin: 0 auto;
     padding: 20px;
     background-color: #cecece;
     border-radius: 8px;
     position: fixed;
-    top: 5vh;
+    top: 12vh;
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
+    z-index: 1000;
 }
 
 .member-log-container
