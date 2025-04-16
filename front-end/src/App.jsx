@@ -15,7 +15,8 @@ import SignUp from './pages/SignUp';
 import Footer from './components/Footer';
 import TeamStatus from './pages/TeamStatus';
 import Licenses from './pages/Licenses';
-import Turntable from './components/Other/Turntable';
+import LogTest from './pages/Other/LogTest';
+
 import './App.css';
 
 function App() {
@@ -70,8 +71,8 @@ function App() {
             element={<ProtectedRoute element={<Licenses />} />}
           />
           <Route
-            path="/turntable"
-            element={<Turntable/>}
+            path="/logtest"
+            element={<ProtectedRoute element={<LogTest />} />}
           />
         </Routes>
         <Footer />

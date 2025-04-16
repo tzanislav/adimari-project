@@ -1,0 +1,28 @@
+.bar-container {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .bar-outer {
+    width: 8px;
+    height: 64px;
+    display: flex;
+    flex-direction: column-reverse;
+    overflow: hidden;
+    background-color: rgb(226, 226, 226);
+  }
+  
+  .bar-inner {
+    width: 100%;
+    background-color: rgb(110, 109, 107);
+    transition: height 0.3s ease;
+  }
+  
+  .bar-text {
+    width: 8px;
+    margin-top: 8px;
+    font-size: 14px;    
+    text-wrap: nowrap;
+  }
+  
