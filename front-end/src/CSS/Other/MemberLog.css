@@ -1,7 +1,7 @@
 .member-log-wrapper
 {
 
-    width: min(85%,1200px);
+    width: min(85%,900px);
     height: 75vh;
     overflow: auto;
     margin: 0 auto;

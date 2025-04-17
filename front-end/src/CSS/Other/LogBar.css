@@ -1,3 +1,6 @@
+:root {
+  --bar-width: 6px;
+}
 
 .bar-container {
   display: inline-flex;
@@ -10,7 +13,7 @@
 }
 
 .bar-outer {
-  width: 8px;
+  width: var(--bar-width);
   height: 64px;
   display: flex;
   flex-direction: column-reverse;
@@ -33,13 +36,23 @@
 }
 
 .bar-text {
-  width: 8px;
+  width: var(--bar-width);
   margin-top: 8px;
   font-size: 8px;
   text-wrap: nowrap;
+  position: relative;
+  left: 6px;
 }
 
 .bar-details {
   position: absolute;
   z-index: 1001;
+}
+
+
+@media screen and (max-width: 768px) {
+  :root {
+    --bar-width: 3px;
+  }
+  
 }
