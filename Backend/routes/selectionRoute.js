@@ -2,10 +2,12 @@ const express = require('express');
 const Selection = require('../models/selection');
 const Item = require('../models/item');
 const Project = require('../models/project');
+const { authenticate, authorizeRole } = require('../auth/authMiddleware');
 const router = express.Router();
+const requireEditor = [authenticate, authorizeRole(['admin', 'moderator'])];
 
 // Route to add a selection
-router.post('/', async (req, res) => {
+router.post('/', ...requireEditor, async (req, res) => {
     try {
         try {
             const parentProject = await Project.findById(req.body.project);
@@ -26,7 +28,7 @@ router.post('/', async (req, res) => {
 });
 
 // Route to update a selection
-router.put('/:id', async (req, res) => {
+router.put('/:id', ...requireEditor, async (req, res) => {
     try {
         const selection = await Selection.findByIdAndUpdate
         (req.params.id, req.body, { new: true });
@@ -80,7 +82,7 @@ router.get('/:id', async (req, res) => {
 
 
 // Route to delete a selection
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', ...requireEditor, async (req, res) => {
     try {
         const selection = await Selection.findByIdAndDelete(req.params.id);
         if (!selection) {

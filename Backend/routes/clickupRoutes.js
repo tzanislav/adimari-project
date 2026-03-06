@@ -3,6 +3,8 @@ const fetch = require('node-fetch');
 require('dotenv').config();
 const router = express.Router();
 
+const isValidUserId = (value) => /^\d+$/.test(String(value || ''));
+
 router.get('/time-entries',  async (req, res) => {
     //get request from clickup
     var data = null;
@@ -17,6 +19,7 @@ router.get('/time-entries',  async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching data:', error);
+        return res.status(502).send({ error: 'Failed to fetch ClickUp time entries.' });
     }
     res.send(data);
 });
@@ -24,8 +27,12 @@ router.get('/time-entries',  async (req, res) => {
 router.get('/time-entries/:user_id',  async (req, res) => {
     //get request from clickup
     var data = null;
+    if (!isValidUserId(req.params.user_id)) {
+        return res.status(400).send({ error: 'Invalid user id.' });
+    }
+
     try {
-        const response = await fetch(`https://api.clickup.com/api/v2/team/37458550/time_entries?assignee=${req.params.user_id}`, {
+        const response = await fetch(`https://api.clickup.com/api/v2/team/37458550/time_entries?assignee=${encodeURIComponent(req.params.user_id)}`, {
             method: 'GET',
             headers: {
                 'Authorization': process.env.CLICKUP_API_KEY
@@ -36,6 +43,7 @@ router.get('/time-entries/:user_id',  async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching data:', error);
+        return res.status(502).send({ error: 'Failed to fetch ClickUp time entries.' });
     }
     res.send(data);
 });
@@ -44,8 +52,12 @@ router.get('/time-entries/:user_id',  async (req, res) => {
 router.get('/current-task/:user_id',  async (req, res) => {
     //get request from clickup
     var data = null;
+    if (!isValidUserId(req.params.user_id)) {
+        return res.status(400).send({ error: 'Invalid user id.' });
+    }
+
     try {
-        const response = await fetch(`https://api.clickup.com/api/v2/team/37458550/time_entries/current?assignee=${req.params.user_id}`, {
+        const response = await fetch(`https://api.clickup.com/api/v2/team/37458550/time_entries/current?assignee=${encodeURIComponent(req.params.user_id)}`, {
             method: 'GET',
             headers: {
                 'Authorization': process.env.CLICKUP_API_KEY
@@ -54,6 +66,7 @@ router.get('/current-task/:user_id',  async (req, res) => {
         data = await response.json();
     } catch (error) {
         console.error('Error fetching data:', error);
+        return res.status(502).send({ error: 'Failed to fetch ClickUp current task.' });
     }
     res.send(data);
 });
@@ -74,6 +87,7 @@ router.get('/members', async (req, res) => {
         data = await response.json();
     } catch (error) {
         console.error('Error fetching data:', error);
+        return res.status(502).send({ error: 'Failed to fetch ClickUp members.' });
     }
     res.send(data);
 });

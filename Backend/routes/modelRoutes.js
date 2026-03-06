@@ -1,10 +1,12 @@
 const express = require('express');
 const Model3d = require('../models/model3d');
+const { authenticate, authorizeRole } = require('../auth/authMiddleware');
 
 const router = express.Router();
+const requireEditor = [authenticate, authorizeRole(['admin', 'moderator'])];
 
 // Route to add a model
-router.post('/', async (req, res) => {
+router.post('/', ...requireEditor, async (req, res) => {
     try {
         const newModel = new Model3d(req.body);
         const result = await newModel.save();
@@ -15,7 +17,7 @@ router.post('/', async (req, res) => {
 });
 
 // Route to update a model
-router.put('/:id', async (req, res) => {
+router.put('/:id', ...requireEditor, async (req, res) => {
     try {
         const model = await Model3d.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!model) {
@@ -53,7 +55,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Route to delete a model
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', ...requireEditor, async (req, res) => {
     try {
         const model = await Model3d.findByIdAndDelete(req.params.id);
         if (!model) {

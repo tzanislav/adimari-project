@@ -8,6 +8,7 @@ import DeleteBox from "../components/DeleteBox";
 import SuggestionsBox from '../components/SuggestionsBox';
 import { useActiveSelection } from "../context/selectionContext";
 import { useAuth } from '../context/AuthContext';
+import { getAuthHeaders } from '../utils/authHeaders';
 
 
 function ItemForm() {
@@ -166,13 +167,13 @@ function ItemForm() {
       : `${serverUrl}/api/items`;
 
     const method = isEditing ? 'PUT' : 'POST';
-    const token = await user.getIdToken();
 
     try {
+      const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
       const response = await axios({
         url,
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         data: formData,
       });
 
@@ -233,8 +234,18 @@ function ItemForm() {
       tags: ["Analyzing..."],
     }));
     try {
+      if (!user) {
+        setErrorMessage('You must be signed in to analyze images.');
+        return;
+      }
+
+      const token = await user.getIdToken();
       const response = await axios.post(`${serverUrl}/api/upload/analyze-image`, {
         imageUrl,
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       // Extract top-level names
@@ -262,7 +273,9 @@ function ItemForm() {
   // Delete item
   const handleDelete = async () => {
     try {
-      await axios.delete(`${serverUrl}/api/items/${id}`);
+      await axios.delete(`${serverUrl}/api/items/${id}`, {
+        headers: await getAuthHeaders(),
+      });
       setSuccessMessage('Item deleted successfully!');
       setTimeout(() => {
         //Back
@@ -292,9 +305,18 @@ function ItemForm() {
 
 
     try {
+      if (!user) {
+        setPriceMessage('Sign in required');
+        return;
+      }
+
+      const token = await user.getIdToken();
       // Make a GET request to your backend API with the query parameter
       const response = await axios.get(`${serverUrl}/api/openai`, {
         params: { query }, // Pass query as a parameter
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       // Extract the price from the response

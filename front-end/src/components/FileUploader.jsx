@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import '../CSS/Uploader.css';
 import { useActiveSelection } from "../context/selectionContext";
+import { useAuth } from '../context/AuthContext';
 
 
 const FileUploader = ({ folderName, onUploadComplete, onRemove }) => {
@@ -10,6 +11,7 @@ const FileUploader = ({ folderName, onUploadComplete, onRemove }) => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const {serverUrl} = useActiveSelection();
+  const { user } = useAuth();
 
 
   const showOnlyName = (url) => {
@@ -33,17 +35,25 @@ const FileUploader = ({ folderName, onUploadComplete, onRemove }) => {
     setUploading(true);
     setError('');
 
+    if (!user) {
+      setError('You must be signed in to upload files.');
+      setUploading(false);
+      return;
+    }
+
     const formData = new FormData();
     Array.from(files).forEach((file) => {
       formData.append('files', file);
     });
 
     try {
+      const token = await user.getIdToken();
       const response = await axios.post(
         `${serverUrl}/api/upload?folder=${encodeURIComponent(folderName)}`,
         formData,
         {
           headers: {
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
           },
         }

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import '../CSS/Model.css';
 import '../CSS/ListPage.css';
 import { useActiveSelection } from "../context/selectionContext";
+import { getAuthHeaders } from '../utils/authHeaders';
 
 
 function Models() {
@@ -115,11 +116,10 @@ function Models() {
         // Update the backend
         const updateSelection = async () => {
             try {
+                const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
                 const response = await fetch(`${serverUrl}/api/selections/${activeSelectionObject._id}`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers,
                     body: JSON.stringify(newSelection),
                 });
 

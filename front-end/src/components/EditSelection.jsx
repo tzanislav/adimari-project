@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import '../CSS/EditBox.css';
 import { useActiveSelection } from "../context/selectionContext";
+import { getAuthHeaders } from '../utils/authHeaders';
 
 
 
@@ -77,9 +78,11 @@ function EditSelection({ id, parent, onSuccess }) {
 
         setLoading(true);
         try {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
             const response = await axios({
                 method,
                 url,
+                headers,
                 data: formData,
             });
             console.log('Server response:', response);
@@ -102,7 +105,9 @@ function EditSelection({ id, parent, onSuccess }) {
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
-            await axios.delete(`${serverUrl}/api/selections/${id}`);
+            await axios.delete(`${serverUrl}/api/selections/${id}`, {
+                headers: await getAuthHeaders(),
+            });
             setSuccessMessage('Project deleted successfully.');
         } catch (error) {
             console.error('Failed to delete selection:', error);

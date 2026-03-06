@@ -1,11 +1,13 @@
 const express = require('express');
 const Brand = require('../models/brand');
 const Model3d = require('../models/model3d');
+const { authenticate, authorizeRole } = require('../auth/authMiddleware');
 
 const router = express.Router();
+const requireEditor = [authenticate, authorizeRole(['admin', 'moderator'])];
 
 // Route to add a brand
-router.post('/', async (req, res) => {
+router.post('/', ...requireEditor, async (req, res) => {
     try {
         //Check if brand already exists by name
         const existingBrand = await
@@ -23,7 +25,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', ...requireEditor, async (req, res) => {
     try {
         const brand = await Brand.findByIdAndUpdate
             (req.params.id, req.body, { new: true });
@@ -63,7 +65,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Route to delete a brand
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', ...requireEditor, async (req, res) => {
     try {
         const brand = await Brand.findByIdAndDelete(req.params.id);
         if (!brand) {

@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import ListItem from "../components/ListItem";
 import "../CSS/ShowSelection.css";
 import { useActiveSelection } from "../context/selectionContext";
+import { getAuthHeaders } from '../utils/authHeaders';
 
 
 const ShowSelection = () => {
@@ -77,13 +78,12 @@ const ShowSelection = () => {
         const updateSelection = async () => {
             try {
                 console.log(`${serverUrl}/api/selections/${selection._id}`);
+                const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
                 const response = await fetch(
                     `${serverUrl}/api/selections/${selection._id}`,
                     {
                         method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers,
                         body: JSON.stringify(newSelection), // Send updated selection
                     }
                 );
@@ -122,13 +122,12 @@ const ShowSelection = () => {
         // Update the backend
 
         try {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
             const response = await fetch(
                 `${serverUrl}/api/selections/${selection._id}`,
                 {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers,
                     body: JSON.stringify(newSelection), // Send updated selection
                 }
             );

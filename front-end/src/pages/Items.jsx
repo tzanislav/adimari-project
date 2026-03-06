@@ -6,6 +6,7 @@ import '../CSS/ListPage.css';
 import { useActiveSelection } from "../context/selectionContext";
 import ItemDetails from '../components/ItemDetails';
 import { useAuth } from '../context/AuthContext';
+import { getAuthHeaders } from '../utils/authHeaders';
 
 function Items() {
     const [items, setItems] = useState([]);
@@ -121,13 +122,12 @@ function Items() {
         // Update the backend
         const updateSelection = async () => {
             try {
+                const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
                 const response = await fetch(
                     `${serverUrl}/api/selections/${selections._id}`,
                     {
                         method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers,
                         body: JSON.stringify(newSelection), // Sends the serialized items
                     }
                 );

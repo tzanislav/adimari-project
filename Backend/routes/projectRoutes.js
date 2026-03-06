@@ -1,10 +1,12 @@
 const express = require('express');
 const Project = require('../models/project');
 const Selection = require('../models/selection');
+const { authenticate, authorizeRole } = require('../auth/authMiddleware');
 const router = express.Router();
+const requireEditor = [authenticate, authorizeRole(['admin', 'moderator'])];
 
 // Route to add a project
-router.post('/', async (req, res) => {
+router.post('/', ...requireEditor, async (req, res) => {
     try {
         const newProject = new Project(req.body);
         const result = await newProject.save();
@@ -15,7 +17,7 @@ router.post('/', async (req, res) => {
 });
 
 // Route to update a project
-router.put('/:id', async (req, res) => {
+router.put('/:id', ...requireEditor, async (req, res) => {
     try {
         // Build the update object dynamically from the request body
         const updateFields = {};
@@ -70,7 +72,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Route to delete a project
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', ...requireEditor, async (req, res) => {
     try {
         const project = await Project.findByIdAndDelete(req.params.id);
         if (!project) {

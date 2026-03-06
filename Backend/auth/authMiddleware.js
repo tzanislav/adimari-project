@@ -20,7 +20,9 @@ const authenticate = async (req, res, next) => {
 
 // Middleware to check roles
 const authorizeRole = (requiredRole) => (req, res, next) => {
-    if (req.user.role !== requiredRole) {
+    const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+
+    if (!req.user?.role || !allowedRoles.includes(req.user.role)) {
         return res.status(403).send({ message: 'Access denied. Insufficient permissions.' });
     }
     next();

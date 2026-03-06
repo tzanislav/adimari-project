@@ -4,12 +4,19 @@ const admin = require('../auth/firebase-admin');
 const router = express.Router();
 const { authenticate, authorizeRole } = require('../auth/authMiddleware');
 
+const allowedRoles = new Set(['regular', 'moderator', 'admin']);
+
+const isValidEmail = (email) => typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 // User signup route
 router.post('/signup', async (req, res) => {
     const { email, password } = req.body; // Default role is 'regular'
 
     const role = 'regular';
-    console.log('Sign up email:', email);
+    if (!isValidEmail(email) || typeof password !== 'string' || password.length < 8) {
+        return res.status(400).send({ error: 'A valid email and a password with at least 8 characters are required.' });
+    }
+
     try {
         const user = await admin.auth().createUser({
             email,
@@ -28,25 +35,9 @@ router.post('/signup', async (req, res) => {
 
 // User sign-in route
 router.post('/signin', async (req, res) => {
-    const { email, password } = req.body;
-    console.log('Sign in email:', email);
-    try {
-        // Find user by email
-        const userRecord = await admin.auth().getUserByEmail(email);
-
-        // Generate custom token
-        const token = await admin.auth().createCustomToken(userRecord.uid);
-
-        // Fetch custom claims (including role)
-        const user = await admin.auth().getUser(userRecord.uid);
-        const role = user.customClaims?.role || 'regular'; // Default to 'regular' if no role is set
-
-        // Send token and role to the frontend
-        res.status(200).send({ token, role });
-    } catch (error) {
-        console.error('Error signing in user:', error);
-        res.status(400).send({ error: error.message });
-    }
+    return res.status(410).send({
+        error: 'Custom email sign-in is disabled. Use Firebase client authentication to obtain an ID token.',
+    });
 });
 
 
@@ -54,6 +45,11 @@ router.post('/signin', async (req, res) => {
 // Update a user's role
 router.post('/update-role', authenticate, authorizeRole('admin'), async (req, res) => {
     const { uid, role } = req.body;
+
+    if (typeof uid !== 'string' || !allowedRoles.has(role)) {
+        return res.status(400).send({ error: 'Invalid uid or role.' });
+    }
+
     try {
         await admin.auth().setCustomUserClaims(uid, { role });
         res.send({ message: `Role updated to ${role} for user ${uid}` });

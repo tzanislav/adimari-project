@@ -16,15 +16,18 @@ const openai = new OpenAI({
 // Route to get content from Bing and extract price
 router.get('/', async (req, res) => {
   const { query } = req.query;
-  const newQuery = query + ' price'; // Append 'price' to the query to help OpenAI extract prices
-  if (!query) {
+  if (typeof query !== 'string' || query.trim().length === 0 || query.length > 120) {
     return res.status(400).json({ error: 'Please provide a query parameter.' });
   }
 
+  const normalizedQuery = query.trim();
+  const newQuery = normalizedQuery + ' price'; // Append 'price' to the query to help OpenAI extract prices
+
   try {
     const isDevelopment = process.env.DEV_MODE === 'development';
+    let browser;
 
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
       headless: true, // or false for debugging
       executablePath: isDevelopment
         ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' // Path for development (MacOS example)
@@ -96,8 +99,8 @@ router.get('/', async (req, res) => {
                "price": "XXX.XX",
                 "status": "found"
                 }
-          (no commas for the number or anything except a valid float) Where the status is wether the price is base on the text ("found") or based on an estimation ("estimate").
-          Even if you are not sure, please provide an estimate based on the information: ${query}
+              (no commas for the number or anything except a valid float) Where the status is wether the price is base on the text ("found") or based on an estimation ("estimate").
+              Even if you are not sure, please provide an estimate based on the information: ${normalizedQuery}
           When estimatin, take into account the brand class and what similar items cost, also the text is context for the item. Work in euro please, even if you find the price in dollars or any other currency try to convert it.
           Try to be as accurate as possible.
           The answer shoud be exclusively valid JSON.`,
@@ -124,7 +127,7 @@ router.get('/', async (req, res) => {
 
     // Validate that the JSON contains a `price` field
     if (parsedResponse && typeof parsedResponse.price !== 'undefined') {
-      return res.json({ query, price: parsedResponse.price, status: parsedResponse.status });
+      return res.json({ query: normalizedQuery, price: parsedResponse.price, status: parsedResponse.status });
     } else {
       console.error('OpenAI response does not contain a valid price:', parsedResponse);
       return res.status(500).json({ error: 'OpenAI response does not contain a valid price.' });
@@ -132,7 +135,7 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Error extracting price:', error);
-    return res.status(500).json({ error: 'Failed to extract price.', details: error });
+    return res.status(500).json({ error: 'Failed to extract price.' });
   }
 });
 

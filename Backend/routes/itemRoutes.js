@@ -1,10 +1,12 @@
 const express = require('express');
 const Item = require('../models/item');
+const { authenticate, authorizeRole } = require('../auth/authMiddleware');
 
 const router = express.Router();
+const requireEditor = [authenticate, authorizeRole(['admin', 'moderator'])];
 
 // Route to add an item
-router.post('/', async (req, res) => {
+router.post('/', ...requireEditor, async (req, res) => {
     try {
         // Check if item already exists by name
         const existingItem = await Item.findOne({ name: req.body.name });
@@ -21,7 +23,7 @@ router.post('/', async (req, res) => {
 });
 
 // Route to update an item
-router.put('/:id', async (req, res) => {
+router.put('/:id', ...requireEditor, async (req, res) => {
     try {
         const item = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!item) {
@@ -59,7 +61,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Route to delete an item
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', ...requireEditor, async (req, res) => {
     try {
         const item = await Item.findByIdAndDelete(req.params.id);
         if (!item) {

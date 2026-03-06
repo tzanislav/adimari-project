@@ -14,14 +14,30 @@ function TeamStatus() {
     const [shownLog, setShownLog] = useState(null);
 
     useEffect(() => {
-        fetch(serverUrl + '/clickup/members')
-            .then(res => res.json())
-            .then(data => {
+        const loadMembers = async () => {
+            if (!user) {
+                return;
+            }
+
+            try {
+                const token = await user.getIdToken();
+                const response = await fetch(serverUrl + '/clickup/members', {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                const data = await response.json();
                 data.members.sort((a, b) => a.username.localeCompare(b.username));
                 setTeamMembers(data);
-            });
+            } catch (error) {
+                console.error('Error fetching members:', error);
+            }
+        };
+
+        loadMembers();
     }
-        , []);
+        , [serverUrl, user]);
 
 
 

@@ -5,6 +5,8 @@ import FileUploader from '../components/FileUploader'; // Ensure correct import 
 import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
 import DeleteBox from "../components/DeleteBox";
+import { useActiveSelection } from '../context/selectionContext';
+import { getAuthHeaders } from '../utils/authHeaders';
 
 function BrandForm() {
   const { id } = useParams(); // Get ID from URL
@@ -32,6 +34,7 @@ function BrandForm() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const { serverUrl } = useActiveSelection();
 
   // Fetch brand data if editing
   useEffect(() => {
@@ -78,10 +81,11 @@ function BrandForm() {
     const method = isEditing ? 'PUT' : 'POST';
 
     try {
+      const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
       const response = await axios({
         url,
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         data: formData,
       });
 
@@ -123,7 +127,9 @@ function BrandForm() {
   // Delete brand
   const handleDelete = async () => {
     try {
-      await axios.delete(`${serverUrl}/api/brands/${id}`);
+      await axios.delete(`${serverUrl}/api/brands/${id}`, {
+        headers: await getAuthHeaders(),
+      });
       setSuccessMessage('Brand deleted successfully!');
       setTimeout(() => {
         window.location.href = '/api/brands';

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useAuth } from '../../context/AuthContext';
 
 function Member({ member, handleShowLog }) {
 
@@ -9,31 +10,53 @@ function Member({ member, handleShowLog }) {
 
 
     const serverUrl = import.meta.env.VITE_SERVER_URL;
+    const { user } = useAuth();
 
     useEffect(() => {
-        try {
-            fetch(serverUrl + `/clickup/current-task/${member.id}`)
-                .then(res => res.json())
-                .then(data => {
-                    setCurrentTask(data);
+        const loadCurrentTask = async () => {
+            if (!user) {
+                return;
+            }
+
+            try {
+                const token = await user.getIdToken();
+                const response = await fetch(serverUrl + `/clickup/current-task/${member.id}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 });
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        }
-    }, [member.id, number]);
+                const data = await response.json();
+                setCurrentTask(data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        };
+
+        loadCurrentTask();
+    }, [member.id, number, serverUrl, user]);
 
     useEffect(() => {
-        try {
-            fetch(serverUrl + `/clickup/time-entries/${member.id}`)
-                .then(res => res.json())
-                .then(data => {                 
-                    const sortedData = data?.data.sort((a, b) => b.start - a.start);                 
-                    setTimeEntries(data.data);
+        const loadTimeEntries = async () => {
+            if (!user) {
+                return;
+            }
+
+            try {
+                const token = await user.getIdToken();
+                const response = await fetch(serverUrl + `/clickup/time-entries/${member.id}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 });
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        }
-    }, [member.id, number]);
+                const data = await response.json();
+                setTimeEntries(data.data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        };
+
+        loadTimeEntries();
+    }, [member.id, number, serverUrl, user]);
 
         // Update number to trigger useEffect every 1 minute
         useEffect(() => {

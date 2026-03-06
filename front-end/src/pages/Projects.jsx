@@ -4,6 +4,7 @@ import ListProject from "../components/ListProject";
 import DeleteBox from "../components/DeleteBox";
 import '../CSS/Projects.css';
 import { useActiveSelection } from "../context/selectionContext";
+import { getAuthHeaders } from '../utils/authHeaders';
 
 function Projects() {
     const [projects, setProjects] = useState([]);
@@ -29,8 +30,10 @@ function Projects() {
 
     const handleDelete = async (id) => {
         try {
+            const headers = await getAuthHeaders();
             await fetch(`${serverUrl}/api/projects/${id}`, {
                 method: 'DELETE',
+                headers,
             });
             setProjects((prev) => prev.filter((project) => project._id !== id));
             setIsDeleting(false);

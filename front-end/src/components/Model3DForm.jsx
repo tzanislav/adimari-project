@@ -6,6 +6,8 @@ import '../CSS/EditBrand.css';
 import { showOnlyName } from '../utils/utils';
 import DeleteBox from '../components/DeleteBox';
 import { useActiveSelection } from "../context/selectionContext";
+import { useAuth } from '../context/AuthContext';
+import { getAuthHeaders } from '../utils/authHeaders';
 
 function Model3dForm() {
   const { id } = useParams(); // Get ID from URL
@@ -29,6 +31,7 @@ function Model3dForm() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const { user } = useAuth();
   
 
   // Fetch model data if editing
@@ -92,8 +95,18 @@ function Model3dForm() {
       tags: ["Analyzing..."],
     }));
     try {
+      if (!user) {
+        setErrorMessage('You must be signed in to analyze images.');
+        return;
+      }
+
+      const token = await user.getIdToken();
       const response = await axios.post(`${serverUrl}/api/upload/analyze-image`, {
         imageUrl,
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
   
       // Extract top-level names
@@ -138,10 +151,11 @@ function Model3dForm() {
     const method = isEditing ? 'PUT' : 'POST';
 
     try {
+      const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
       const response = await axios({
         url,
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         data: formData,
       });
 
@@ -176,7 +190,9 @@ function Model3dForm() {
   // Delete model
   const handleDelete = async () => {
     try {
-      await axios.delete(`${serverUrl}/api/models3d/${id}`);
+      await axios.delete(`${serverUrl}/api/models3d/${id}`, {
+        headers: await getAuthHeaders(),
+      });
       setSuccessMessage('Model deleted successfully!');
       setTimeout(() => {
         window.location.href = '/api/models3d';

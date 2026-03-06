@@ -5,6 +5,7 @@ import EditSelection from "../components/EditSelection";
 import DeleteBox from "../components/DeleteBox";
 import axios from "axios";
 import '../CSS/EditProject.css';
+import { getAuthHeaders } from '../utils/authHeaders';
 
 function ProjectPage() {
     const { id } = useParams(); // Get project ID from URL
@@ -66,8 +67,11 @@ function ProjectPage() {
         console.log("Received selection ID:", selectionId);
 
         try {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
             const response = await axios.put(`${serverUrl}/api/projects/${id}`, {
                 selection: selectionId,
+            }, {
+                headers,
             });
             // Update the project state with the updated selection data
             const updatedProject = response.data.project;
@@ -88,7 +92,9 @@ function ProjectPage() {
             console.log("Deleting selection with ID:", editId);
 
             // Perform the deletion
-            await axios.delete(`${serverUrl}/api/selections/${editId}`);
+            await axios.delete(`${serverUrl}/api/selections/${editId}`, {
+                headers: await getAuthHeaders(),
+            });
 
             // Update the selections state directly
             setSelections((prevSelections) =>

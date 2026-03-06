@@ -4,6 +4,7 @@ import DeleteBox from '../components/DeleteBox';
 import axios from 'axios';
 import '../CSS/EditBrand.css';
 import { useActiveSelection } from "../context/selectionContext";
+import { getAuthHeaders } from '../utils/authHeaders';
 
 
 function ProjectForm() {
@@ -64,10 +65,11 @@ function ProjectForm() {
     const method = isEditing ? 'PUT' : 'POST';
 
     try {
+      const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
       const response = await axios({
         url,
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         data: formData,
       });
 
@@ -96,7 +98,9 @@ function ProjectForm() {
   // Delete model
   const handleDelete = async () => {
     try {
-      await axios.delete(`${serverUrl}/api/projects/${id}`);
+      await axios.delete(`${serverUrl}/api/projects/${id}`, {
+        headers: await getAuthHeaders(),
+      });
       setSuccessMessage('Model deleted successfully!');
       setTimeout(() => {
         window.location.href = '/api/projects';
