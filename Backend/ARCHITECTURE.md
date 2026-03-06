@@ -31,6 +31,7 @@ Application boot happens in this order inside `Backend/server.js`:
 3. Configure global middleware:
    - `helmet`
    - restricted `cors`
+   - explicit Content Security Policy for Firebase popup auth and local SPA serving
    - JSON body parsing with a 1 MB limit
    - route-specific rate limiting
 4. Read `MONGODB_URI` from the environment and connect Mongoose.
@@ -40,6 +41,7 @@ Application boot happens in this order inside `Backend/server.js`:
 8. Start listening on `PORT` or `5001`.
 
 If `MONGODB_URI` is missing, the server exits early rather than starting in a broken state.
+If `MONGODB_URI` points at an invalid host, the HTTP server can still come up, but database-backed routes will fail until MongoDB connectivity is fixed.
 
 ## Request Flow
 
@@ -56,6 +58,20 @@ Most requests follow this path:
 7. The handler returns JSON.
 
 There is no centralized service layer yet. Most route files talk directly to Mongoose models or external APIs.
+
+## Security Middleware
+
+The server now relies on several boot-time protections in `server.js`.
+
+- `helmet` sets browser security headers
+- `contentSecurityPolicy` is explicitly configured so Firebase Google popup auth works locally and in deployed builds
+- `cors` uses an allowlist plus same-origin checks so the backend can safely serve its own SPA assets
+- rate limits are applied separately for auth, upload, and automation-style routes
+
+Important local-development behavior:
+
+- when the frontend is served by the backend on `localhost:5001`, same-origin asset and API requests should succeed without adding extra CORS origins
+- if the frontend is built with a different `VITE_SERVER_URL`, CSP `connect-src` can block API calls even though the popup itself opens
 
 ## Authentication And Authorization
 
@@ -351,6 +367,8 @@ Behavior:
 
 This allows a single deployment artifact where the Node server handles both API routes and the compiled SPA.
 
+For local testing, the frontend should normally target the same backend origin, for example `http://localhost:5001`, so CSP and popup auth behavior stay aligned.
+
 ## Operational Configuration
 
 Documented in `Backend/.env.example`.
@@ -370,6 +388,12 @@ Key variables:
 - `CLICKUP_API_KEY`
 - `FIREBASE_SERVICE_ACCOUNT_PATH`
 - `FIREBASE_SERVICE_ACCOUNT_JSON`
+
+Local-development notes:
+
+- `MONGODB_URI` must be a real working connection string, not the example placeholder
+- `CORS_ALLOWED_ORIGINS` should include local frontend dev origins such as `http://localhost:5173` when using the Vite dev server
+- if you serve the built frontend from the backend, `http://localhost:5001` works as same-origin and does not need a separate frontend dev server
 
 ## Known Architectural Limitations
 

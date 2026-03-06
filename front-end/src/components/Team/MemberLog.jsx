@@ -11,9 +11,10 @@ import "../../CSS/Other/MemberLog.css";
 
 // Resolve API base URL from env (Vite, CRA) or fall back to hard‑coded value.
 const API_BASE_URL =
+  (typeof import.meta !== "undefined" ? import.meta.env?.VITE_SERVER_URL : undefined) ||
   (typeof process !== "undefined" ? process.env.REACT_APP_API_URL : undefined) ||
   (typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_URL : undefined) ||
-  "http://54.76.118.84:5001";
+  "";
 
 /**
  * @param {Object}   props
