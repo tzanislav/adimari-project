@@ -60,6 +60,36 @@ function getEntryFillPercentage(entryDurationMinutes, folderDurationMinutes) {
   return Math.max(0, Math.min(100, (entryDuration / folderDuration) * 100));
 }
 
+function groupFolderEntriesByName(entries) {
+  const groupedEntries = new Map();
+
+  entries.forEach((entry) => {
+    const entryName = entry.taskName || 'Unknown Task';
+    const normalizedDuration = Number(entry.durationMin) || 0;
+    const existingEntry = groupedEntries.get(entryName);
+
+    if (existingEntry) {
+      existingEntry.totalDurationMin += normalizedDuration;
+      existingEntry.entryCount += 1;
+
+      if (Number(entry.taskDate) > Number(existingEntry.latestTaskDate || 0)) {
+        existingEntry.latestTaskDate = entry.taskDate;
+      }
+
+      return;
+    }
+
+    groupedEntries.set(entryName, {
+      taskName: entryName,
+      totalDurationMin: normalizedDuration,
+      entryCount: 1,
+      latestTaskDate: entry.taskDate,
+    });
+  });
+
+  return Array.from(groupedEntries.values()).sort((left, right) => left.taskName.localeCompare(right.taskName));
+}
+
 function TeamSummary() {
   const { user } = useAuth();
   const serverUrl = import.meta.env.VITE_SERVER_URL || '';
@@ -80,23 +110,31 @@ function TeamSummary() {
 
     entries.forEach((entry) => {
       const folderKey = entry.folderId || 'no-folder';
+      const normalizedDuration = Number(entry.durationMin) || 0;
       const existingGroup = groupedEntries.get(folderKey);
 
       if (existingGroup) {
-        existingGroup.entries.push(entry);
-        existingGroup.totalDurationMin += entry.durationMin;
+        existingGroup.rawEntries.push(entry);
+        existingGroup.totalDurationMin += normalizedDuration;
         return;
       }
 
       groupedEntries.set(folderKey, {
         folderId: entry.folderId,
         folderName: entry.folderName || 'No Folder',
-        totalDurationMin: entry.durationMin,
-        entries: [entry],
+        totalDurationMin: normalizedDuration,
+        rawEntries: [entry],
       });
     });
 
-    return Array.from(groupedEntries.values()).sort((left, right) => left.folderName.localeCompare(right.folderName));
+    return Array.from(groupedEntries.values())
+      .map((folderGroup) => ({
+        folderId: folderGroup.folderId,
+        folderName: folderGroup.folderName,
+        totalDurationMin: folderGroup.totalDurationMin,
+        entries: groupFolderEntriesByName(folderGroup.rawEntries),
+      }))
+      .sort((left, right) => left.folderName.localeCompare(right.folderName));
   };
 
   useEffect(() => {
@@ -227,18 +265,23 @@ function TeamSummary() {
                               <ul className="team-summary-list">
                                 {folderGroup.entries.map((entry) => {
                                   const entryFillPercentage = getEntryFillPercentage(
-                                    entry.durationMin,
+                                    entry.totalDurationMin,
                                     folderGroup.totalDurationMin
                                   );
 
                                   return (
                                     <li
-                                      key={entry.id}
+                                      key={entry.taskName}
                                       className="team-summary-list-item"
                                       style={{ '--entry-fill-percentage': `${entryFillPercentage}%` }}
                                     >
-                                      <span>{entry.taskName}</span>
-                                      <strong>{formatDateCode(entry.taskDate)} - {formatDurationMinutes(entry.durationMin)}</strong>
+                                      <span>
+                                        {entry.taskName}
+                                        {entry.entryCount > 1 ? ` (${entry.entryCount} entries)` : ''}
+                                      </span>
+                                      <strong>
+                                        {formatDateCode(entry.latestTaskDate)} - {formatDurationMinutes(entry.totalDurationMin)}
+                                      </strong>
                                     </li>
                                   );
                                 })}
