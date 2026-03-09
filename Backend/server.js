@@ -121,6 +121,7 @@ const cspDirectives = {
     'https://apis.google.com',
     'https://*.firebaseapp.com',
   ],
+  upgradeInsecureRequests: null,
 };
 
 if (isProduction) {
@@ -132,6 +133,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
   crossOriginResourcePolicy: false,
+  originAgentCluster: false,
   contentSecurityPolicy: {
     useDefaults: true,
     directives: cspDirectives,
