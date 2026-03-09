@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from '../../context/AuthContext';
+import { fetchWithAuth } from '../../utils/authHeaders';
 
 function Member({ member, handleShowLog }) {
 
@@ -19,12 +20,12 @@ function Member({ member, handleShowLog }) {
             }
 
             try {
-                const token = await user.getIdToken();
-                const response = await fetch(serverUrl + `/clickup/current-task/${member.id}`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                const response = await fetchWithAuth(serverUrl + `/clickup/current-task/${member.id}`);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load current task: ${response.status}`);
+                }
+
                 const data = await response.json();
                 setCurrentTask(data);
             } catch (error) {
@@ -42,12 +43,12 @@ function Member({ member, handleShowLog }) {
             }
 
             try {
-                const token = await user.getIdToken();
-                const response = await fetch(serverUrl + `/clickup/time-entries/${member.id}`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                const response = await fetchWithAuth(serverUrl + `/clickup/time-entries/${member.id}`);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load time entries: ${response.status}`);
+                }
+
                 const data = await response.json();
                 setTimeEntries(data.data);
             } catch (error) {

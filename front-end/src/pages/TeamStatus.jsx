@@ -4,6 +4,7 @@ import Member from "../components/Team/Member";
 import '../CSS/TeamStatus.css';
 import { useAuth } from '../context/AuthContext';
 import TeamLog from "../components/TeamLog";
+import { fetchWithAuth } from '../utils/authHeaders';
 
 
 
@@ -21,12 +22,11 @@ function TeamStatus() {
             }
 
             try {
-                const token = await user.getIdToken();
-                const response = await fetch(serverUrl + '/clickup/members', {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                const response = await fetchWithAuth(serverUrl + '/clickup/members');
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load members: ${response.status}`);
+                }
 
                 const data = await response.json();
                 const members = Array.isArray(data.members) ? data.members : [];

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getAuthHeaders } from '../utils/authHeaders';
+import { fetchWithAuth, getAuthHeaders } from '../utils/authHeaders';
 import '../CSS/TeamSummary.css';
 
 const defaultProfileImage = 'https://cdn.iconscout.com/icon/free/png-256/avatar-380-456332.png';
@@ -112,7 +112,7 @@ function TeamSummary() {
 
       try {
         const headers = await getAuthHeaders();
-        const membersResponse = await fetch(`${serverUrl}/clickup/members`, {
+        const membersResponse = await fetchWithAuth(`${serverUrl}/clickup/members`, {
           headers,
         });
 
@@ -125,7 +125,7 @@ function TeamSummary() {
 
         const entriesByMember = await Promise.all(
           members.map(async (member) => {
-            const response = await fetch(`${serverUrl}/clickup/time-entries/all/${member.id}`, {
+            const response = await fetchWithAuth(`${serverUrl}/clickup/time-entries/all/${member.id}`, {
               headers,
             });
 
