@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^Set-Location Backend; node --check server\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

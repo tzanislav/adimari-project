@@ -22,6 +22,7 @@ const app = express();
 const { authenticate, authorizeRole } = require('./auth/authMiddleware');
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
+const isProduction = process.env.NODE_ENV === 'production';
 
 const defaultAllowedOrigins = [
   'http://localhost:3000',
@@ -39,6 +40,8 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || defaultAllowedOrigin
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const trustworthyHosts = new Set(['localhost', '127.0.0.1', '::1']);
+
 const isSameOriginRequest = (origin, requestHost) => {
   if (!origin || !requestHost) {
     return false;
@@ -51,6 +54,8 @@ const isSameOriginRequest = (origin, requestHost) => {
     return false;
   }
 };
+
+const isTrustworthyRequest = (req) => trustworthyHosts.has(req.hostname) || req.secure;
 
 const corsOptionsDelegate = (req, callback) => {
   const requestOrigin = req.header('Origin');
@@ -118,16 +123,27 @@ const cspDirectives = {
   ],
 };
 
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
 app.disable('x-powered-by');
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
-  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  crossOriginOpenerPolicy: false,
   crossOriginResourcePolicy: false,
   contentSecurityPolicy: {
     useDefaults: true,
     directives: cspDirectives,
   },
 }));
+app.use((req, res, next) => {
+  if (isTrustworthyRequest(req)) {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  }
+
+  next();
+});
 app.use(cors(corsOptionsDelegate));
 app.use(express.json({ limit: '1mb' })); // Parse JSON requests
 
