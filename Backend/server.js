@@ -80,14 +80,14 @@ const authLimiter = rateLimit({
 });
 
 const automationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 60 * 1000,
   max: isDevelopmentMode ? 3000 : 30,
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const uploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 60 * 1000,
   max: 50,
   standardHeaders: true,
   legacyHeaders: false,
