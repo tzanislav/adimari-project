@@ -2,6 +2,7 @@
 /FrontEnd/node_modules*
 /BackEnd/node_modules*
 /Backend/auth/account.json
+/Backend/cache/*.json
 
 .env.local
 .env

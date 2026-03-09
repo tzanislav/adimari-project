@@ -4,7 +4,10 @@ This document explains how the Team feature works in the frontend, which compone
 
 ## Overview
 
-The current Team feature is served at `/team` and renders the `TeamStatus` page.
+The current Team feature is served through two protected routes:
+
+- `/team` renders the `TeamStatus` page
+- `/team/summary` renders a placeholder `TeamSummary` page
 
 Primary purpose:
 
@@ -40,17 +43,23 @@ The active Team feature uses this tree:
 1. `App.jsx`
 2. `ProtectedRoute.jsx`
 3. `pages/TeamStatus.jsx`
-4. `components/Team/Member.jsx`
-5. `components/TeamLog.jsx`
-6. `components/Team/MemberLog.jsx`
-7. `components/Team/LogBar.jsx`
+4. `pages/TeamSummary.jsx`
+5. `components/Team/Member.jsx`
+6. `components/TeamLog.jsx`
+7. `components/Team/MemberLog.jsx`
+8. `components/Team/LogBar.jsx`
 
 CSS involved:
 
 - `src/CSS/TeamStatus.css`
+- `src/CSS/TeamSummary.css`
 - `src/CSS/Team-Log.css`
 - `src/CSS/Other/MemberLog.css`
 - `src/CSS/Other/LogBar.css`
+
+`TeamStatus` now includes a top-level navigation button that links to `TeamSummary`.
+
+At the moment, `TeamSummary` is intentionally a placeholder page with no data-loading behavior.
 
 ## High-Level Flow
 
@@ -102,11 +111,7 @@ Auth behavior:
 
 Important detail:
 
-- `teamMembers` is initialized as an array, but the response shape used later is an object with a `members` array
-- the component uses `teamMembers.length === 0` as a loading condition, then later renders `teamMembers.members.map(...)`
-- this works only because the initial load path replaces the array with the ClickUp response object before render continues
-
-That shape mismatch is a maintenance hazard.
+- `teamMembers` is stored as a normalized array of member objects after loading
 
 ## Member Card Flow
 

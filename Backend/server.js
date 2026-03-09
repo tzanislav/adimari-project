@@ -21,6 +21,8 @@ const { URL } = require('url');
 const app = express();
 const { authenticate, authorizeRole } = require('./auth/authMiddleware');
 
+const isDevelopmentMode = process.env.DEV_MODE === 'development';
+
 const defaultAllowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
@@ -74,7 +76,7 @@ const authLimiter = rateLimit({
 
 const automationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: isDevelopmentMode ? 3000 : 30,
   standardHeaders: true,
   legacyHeaders: false,
 });

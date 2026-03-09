@@ -14,10 +14,13 @@ import { ActiveSelectionProvider } from './context/selectionContext';
 import SignUp from './pages/SignUp';
 import Footer from './components/Footer';
 import TeamStatus from './pages/TeamStatus';
+import TeamSummary from './pages/TeamSummary';
 import Licenses from './pages/Licenses';
 import LogTest from './pages/Other/LogTest';
 
 import './App.css';
+
+const protectTeamSummary = false;
 
 function App() {
   return (
@@ -65,6 +68,10 @@ function App() {
           <Route
             path="/team"
             element={<ProtectedRoute element={<TeamStatus />} />}
+          />
+          <Route
+            path="/team/summary"
+            element={protectTeamSummary ? <ProtectedRoute element={<TeamSummary />} /> : <TeamSummary />}
           />
           <Route
             path="/licenses"
