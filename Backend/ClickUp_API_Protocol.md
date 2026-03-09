@@ -44,6 +44,10 @@
   ]
 }
 
+1.1 Sending GET to https://api.clickup.com/api/v2/team/{team_Id}/time_entries?start_date={Start_Date}&end_date={End_Date}&assignee={member_id}returns all entires in the time range. Time is in Unix time in milliseconds.
+
+
+
 2. Sending a GET to https://api.clickup.com/api/v2/task/{task_id} returns JSON in this format:
 
 {

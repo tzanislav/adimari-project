@@ -5,6 +5,8 @@ import { fetchWithAuth, getAuthHeaders } from '../utils/authHeaders';
 import '../CSS/TeamSummary.css';
 
 const defaultProfileImage = 'https://cdn.iconscout.com/icon/free/png-256/avatar-380-456332.png';
+const dayRangeOptions = [30, 60, 90];
+const millisecondsPerDay = 24 * 60 * 60 * 1000;
 
 function formatDateCode(dateCode) {
   const timestamp = Number(dateCode);
@@ -60,6 +62,24 @@ function getEntryFillPercentage(entryDurationMinutes, folderDurationMinutes) {
   return Math.max(0, Math.min(100, (entryDuration / folderDuration) * 100));
 }
 
+function getEntryTimestamp(value) {
+  const timestamp = Number(value);
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getEntryDayKey(value) {
+  const timestamp = getEntryTimestamp(value);
+
+  if (!timestamp) {
+    return 'unknown-day';
+  }
+
+  const date = new Date(timestamp);
+
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
 function groupFolderEntriesByName(entries) {
   const groupedEntries = new Map();
 
@@ -87,14 +107,29 @@ function groupFolderEntriesByName(entries) {
     });
   });
 
-  return Array.from(groupedEntries.values()).sort((left, right) => left.taskName.localeCompare(right.taskName));
+  return Array.from(groupedEntries.values()).sort(
+    (left, right) => getEntryTimestamp(right.latestTaskDate) - getEntryTimestamp(left.latestTaskDate)
+  );
+}
+
+function getRangeForLastDays(days) {
+  const normalizedDays = Number(days) || dayRangeOptions[0];
+  const endDate = Date.now();
+  const startDate = endDate - (normalizedDays * millisecondsPerDay);
+
+  return {
+    startDate,
+    endDate,
+  };
 }
 
 function TeamSummary() {
   const { user } = useAuth();
   const serverUrl = import.meta.env.VITE_SERVER_URL || '';
+  const [selectedDayRange, setSelectedDayRange] = useState(dayRangeOptions[0]);
   const [memberEntries, setMemberEntries] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState({});
+  const [groupedFolders, setGroupedFolders] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -102,6 +137,13 @@ function TeamSummary() {
     setExpandedFolders((currentFolders) => ({
       ...currentFolders,
       [folderKey]: !currentFolders[folderKey],
+    }));
+  };
+
+  const toggleGrouping = (folderKey) => {
+    setGroupedFolders((currentFolders) => ({
+      ...currentFolders,
+      [folderKey]: !(currentFolders[folderKey] ?? true),
     }));
   };
 
@@ -132,6 +174,9 @@ function TeamSummary() {
         folderId: folderGroup.folderId,
         folderName: folderGroup.folderName,
         totalDurationMin: folderGroup.totalDurationMin,
+        rawEntries: [...folderGroup.rawEntries].sort(
+          (left, right) => getEntryTimestamp(right.taskDate) - getEntryTimestamp(left.taskDate)
+        ),
         entries: groupFolderEntriesByName(folderGroup.rawEntries),
       }))
       .sort((left, right) => left.folderName.localeCompare(right.folderName));
@@ -149,6 +194,7 @@ function TeamSummary() {
       setError('');
 
       try {
+        const { startDate, endDate } = getRangeForLastDays(selectedDayRange);
         const headers = await getAuthHeaders();
         const membersResponse = await fetchWithAuth(`${serverUrl}/clickup/members`, {
           headers,
@@ -163,9 +209,12 @@ function TeamSummary() {
 
         const entriesByMember = await Promise.all(
           members.map(async (member) => {
-            const response = await fetchWithAuth(`${serverUrl}/clickup/time-entries/all/${member.id}`, {
+            const response = await fetchWithAuth(
+              `${serverUrl}/clickup/time-entries/range/${member.id}?start_date=${startDate}&end_date=${endDate}`,
+              {
               headers,
-            });
+              }
+            );
 
             if (!response.ok) {
               throw new Error(`Failed to load time entries for ${member.username}.`);
@@ -190,6 +239,7 @@ function TeamSummary() {
 
         setMemberEntries(entriesByMember);
         setExpandedFolders({});
+        setGroupedFolders({});
       } catch (loadError) {
         console.error('Error loading team summary:', loadError);
         setError('Failed to load Team Summary data.');
@@ -199,7 +249,7 @@ function TeamSummary() {
     };
 
     loadEntries();
-  }, [serverUrl, user]);
+  }, [selectedDayRange, serverUrl, user]);
 
   /*
   if (!user || (role !== 'admin' && role !== 'moderator')) {
@@ -211,9 +261,25 @@ function TeamSummary() {
       <div className="team-summary-header">
         <div>
           <h1>Team Summary</h1>
-          <p>Team members with their ClickUp time entry ids and durations.</p>
+          <p>Team members with their ClickUp time grouped by folder and task name.</p>
         </div>
-        <Link to="/team" className="team-summary-back-link">Back To Team Status</Link>
+        <div className="team-summary-header-actions">
+          <label className="team-summary-range-filter" htmlFor="team-summary-range-select">
+            <span>Range</span>
+            <select
+              id="team-summary-range-select"
+              value={selectedDayRange}
+              onChange={(event) => setSelectedDayRange(Number(event.target.value))}
+            >
+              {dayRangeOptions.map((days) => (
+                <option key={days} value={days}>
+                  Last {days} days
+                </option>
+              ))}
+            </select>
+          </label>
+          <Link to="/team" className="team-summary-back-link">Back To Team Status</Link>
+        </div>
       </div>
       <div className="team-summary-placeholder">
         {loading && <p>Loading...</p>}
@@ -240,6 +306,8 @@ function TeamSummary() {
                       (() => {
                         const folderKey = `${memberEntry.memberId}:${folderGroup.folderId || folderGroup.folderName}`;
                         const isExpanded = Boolean(expandedFolders[folderKey]);
+                        const isGrouped = groupedFolders[folderKey] ?? true;
+                        const visibleEntries = isGrouped ? folderGroup.entries : folderGroup.rawEntries;
                         const folderFillPercentage = getFolderFillPercentage(
                           folderGroup.totalDurationMin,
                           memberEntry.totalDurationMin
@@ -253,34 +321,48 @@ function TeamSummary() {
                           >
                             <div className="team-summary-folder-header">
                               <h3>{folderGroup.folderName}: {formatDurationMinutes(folderGroup.totalDurationMin)}</h3>
-                              <button
-                                type="button"
-                                className="team-summary-toggle-button"
-                                onClick={() => toggleFolder(folderKey)}
-                              >
-                                {isExpanded ? 'Hide entries' : 'Show entries'}
-                              </button>
+                              <div className="team-summary-folder-controls">
+                                <button
+                                  type="button"
+                                  className="team-summary-toggle-button"
+                                  onClick={() => toggleFolder(folderKey)}
+                                >
+                                  {isExpanded ? 'Hide entries' : 'Show entries'}
+                                </button>
+                                {isExpanded && (
+                                  <button
+                                    type="button"
+                                    className="team-summary-toggle-button team-summary-grouping-button"
+                                    onClick={() => toggleGrouping(folderKey)}
+                                  >
+                                    {isGrouped ? 'Disable grouping' : 'Enable grouping'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             {isExpanded && (
                               <ul className="team-summary-list">
-                                {folderGroup.entries.map((entry) => {
+                                {visibleEntries.map((entry, index) => {
                                   const entryFillPercentage = getEntryFillPercentage(
-                                    entry.totalDurationMin,
+                                    isGrouped ? entry.totalDurationMin : entry.durationMin,
                                     folderGroup.totalDurationMin
                                   );
+                                  const showDaySeparator = !isGrouped
+                                    && index > 0
+                                    && getEntryDayKey(entry.taskDate) !== getEntryDayKey(visibleEntries[index - 1].taskDate);
 
                                   return (
                                     <li
-                                      key={entry.taskName}
-                                      className="team-summary-list-item"
+                                      key={isGrouped ? entry.taskName : entry.id}
+                                      className={`team-summary-list-item${showDaySeparator ? ' team-summary-list-item-day-separator' : ''}`}
                                       style={{ '--entry-fill-percentage': `${entryFillPercentage}%` }}
                                     >
                                       <span>
-                                        {entry.taskName}
-                                        {entry.entryCount > 1 ? ` (${entry.entryCount} entries)` : ''}
+                                        <b>{formatDurationMinutes(isGrouped ? entry.totalDurationMin : entry.durationMin)}</b> - {entry.taskName} 
+                                        {isGrouped && entry.entryCount > 1 ? ` (${entry.entryCount} entries)` : ''}
                                       </span>
                                       <strong>
-                                        {formatDateCode(entry.latestTaskDate)} - {formatDurationMinutes(entry.totalDurationMin)}
+                                        {formatDateCode(isGrouped ? entry.latestTaskDate : entry.taskDate)}
                                       </strong>
                                     </li>
                                   );

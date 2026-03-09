@@ -15,6 +15,41 @@
     color: #4f4f4f;
 }
 
+.team-summary-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.team-summary-range-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid #d7d7d7;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #1f1f1f;
+    font-weight: 600;
+}
+
+.team-summary-range-filter span {
+    white-space: nowrap;
+}
+
+.team-summary-range-filter select {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.team-summary-range-filter select:focus {
+    outline: none;
+}
+
 .team-summary-placeholder {
     padding: 24px;
     border: 1px dashed #777;
@@ -88,6 +123,13 @@
     gap: 16px;
 }
 
+.team-summary-folder-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
 .team-summary-toggle-button {
     border: 1px solid #1f1f1f;
     font-size: 10px;
@@ -107,6 +149,14 @@
 .team-summary-toggle-button:focus-visible {
     outline: 2px solid #1f1f1f;
     outline-offset: 2px;
+}
+
+.team-summary-grouping-button {
+    background: #ffffff;
+}
+
+.team-summary-grouping-button:hover {
+    background: #f3efe5;
 }
 
 .team-summary-folder-group .team-summary-list {
@@ -130,6 +180,12 @@
 
 .team-summary-list-item:last-child {
     border-bottom: 0;
+}
+
+.team-summary-list-item-day-separator {
+    border-top: 1px solid rgba(31, 31, 31, 0.18);
+    margin-top: 6px;
+    padding-top: 16px;
 }
 
 .team-summary-back-link,
@@ -170,8 +226,17 @@
         align-items: stretch;
     }
 
+    .team-summary-header-actions,
+    .team-summary-range-filter {
+        width: 100%;
+    }
+
     .team-summary-folder-header {
         flex-direction: column;
+        align-items: stretch;
+    }
+
+    .team-summary-folder-controls {
         align-items: stretch;
     }
 
