@@ -5,7 +5,7 @@ import { fetchWithAuth, getAuthHeaders } from '../utils/authHeaders';
 import '../CSS/TeamSummary.css';
 
 const defaultProfileImage = 'https://cdn.iconscout.com/icon/free/png-256/avatar-380-456332.png';
-const dayRangeOptions = [30, 60, 90];
+const dayRangeOptions = [7, 30, 60, 90];
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 
 function formatDateCode(dateCode) {
