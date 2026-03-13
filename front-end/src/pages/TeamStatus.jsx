@@ -47,8 +47,6 @@ function TeamStatus() {
         setShownLog(member);
     }
 
-
-
     if (!user || (role !== 'admin' && role !== 'moderator')) {
         return <div>Not authorized</div>
     }

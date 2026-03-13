@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchWithAuth, getAuthHeaders } from '../utils/authHeaders';
@@ -123,15 +123,76 @@ function getRangeForLastDays(days) {
   };
 }
 
+function formatDateInputValue(value) {
+  const timestamp = getEntryTimestamp(value);
+
+  if (!timestamp) {
+    return '';
+  }
+
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const pad = (datePart) => String(datePart).padStart(2, '0');
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function getRangeForSpecificDates(startDateValue, endDateValue) {
+  if (!startDateValue || !endDateValue) {
+    return null;
+  }
+
+  const startDate = new Date(`${startDateValue}T00:00:00`);
+  const endDate = new Date(`${endDateValue}T23:59:59.999`);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return null;
+  }
+
+  const normalizedRange = {
+    startDate: startDate.getTime(),
+    endDate: endDate.getTime(),
+  };
+
+  if (normalizedRange.startDate > normalizedRange.endDate) {
+    return null;
+  }
+
+  return normalizedRange;
+}
+
+function getSpecificDateValidationMessage(startDateValue, endDateValue) {
+  if (!startDateValue || !endDateValue) {
+    return 'Select both a start and end date.';
+  }
+
+  if (!getRangeForSpecificDates(startDateValue, endDateValue)) {
+    return 'Start date must be on or before the end date.';
+  }
+
+  return '';
+}
+
 function TeamSummary() {
   const { user } = useAuth();
   const serverUrl = import.meta.env.VITE_SERVER_URL || '';
+  const initialSpecificDateRange = getRangeForLastDays(dayRangeOptions[0]);
   const [selectedDayRange, setSelectedDayRange] = useState(dayRangeOptions[0]);
+  const [useSpecificDates, setUseSpecificDates] = useState(false);
+  const [specificStartDate, setSpecificStartDate] = useState(() => formatDateInputValue(initialSpecificDateRange.startDate));
+  const [specificEndDate, setSpecificEndDate] = useState(() => formatDateInputValue(initialSpecificDateRange.endDate));
   const [memberEntries, setMemberEntries] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState({});
   const [groupedFolders, setGroupedFolders] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const specificDateValidationMessage = useSpecificDates
+    ? getSpecificDateValidationMessage(specificStartDate, specificEndDate)
+    : '';
 
   const toggleFolder = (folderKey) => {
     setExpandedFolders((currentFolders) => ({
@@ -145,6 +206,18 @@ function TeamSummary() {
       ...currentFolders,
       [folderKey]: !(currentFolders[folderKey] ?? true),
     }));
+  };
+
+  const handleSpecificDatesToggle = (event) => {
+    const isEnabled = event.target.checked;
+
+    if (isEnabled) {
+      const currentRange = getRangeForLastDays(selectedDayRange);
+      setSpecificStartDate(formatDateInputValue(currentRange.startDate));
+      setSpecificEndDate(formatDateInputValue(currentRange.endDate));
+    }
+
+    setUseSpecificDates(isEnabled);
   };
 
   const groupEntriesByFolder = (entries) => {
@@ -190,11 +263,25 @@ function TeamSummary() {
         return;
       }
 
+      let selectedRange = null;
+
+      if (useSpecificDates) {
+        selectedRange = getRangeForSpecificDates(specificStartDate, specificEndDate);
+
+        if (!selectedRange) {
+          setLoading(false);
+          setError('');
+          return;
+        }
+      } else {
+        selectedRange = getRangeForLastDays(selectedDayRange);
+      }
+
       setLoading(true);
       setError('');
 
       try {
-        const { startDate, endDate } = getRangeForLastDays(selectedDayRange);
+        const { startDate, endDate } = selectedRange;
         const headers = await getAuthHeaders();
         const membersResponse = await fetchWithAuth(`${serverUrl}/clickup/members`, {
           headers,
@@ -249,7 +336,7 @@ function TeamSummary() {
     };
 
     loadEntries();
-  }, [selectedDayRange, serverUrl, user]);
+  }, [selectedDayRange, serverUrl, specificEndDate, specificStartDate, useSpecificDates, user]);
 
   /*
   if (!user || (role !== 'admin' && role !== 'moderator')) {
@@ -264,20 +351,59 @@ function TeamSummary() {
           <p>Team members with their ClickUp time grouped by folder and task name.</p>
         </div>
         <div className="team-summary-header-actions">
-          <label className="team-summary-range-filter" htmlFor="team-summary-range-select">
-            <span>Range</span>
-            <select
-              id="team-summary-range-select"
-              value={selectedDayRange}
-              onChange={(event) => setSelectedDayRange(Number(event.target.value))}
-            >
-              {dayRangeOptions.map((days) => (
-                <option key={days} value={days}>
-                  Last {days} days
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="team-summary-filter-controls">
+            <label className="team-summary-range-filter" htmlFor="team-summary-range-select">
+              <span>Range</span>
+              <select
+                id="team-summary-range-select"
+                value={selectedDayRange}
+                onChange={(event) => setSelectedDayRange(Number(event.target.value))}
+                disabled={useSpecificDates}
+              >
+                {dayRangeOptions.map((days) => (
+                  <option key={days} value={days}>
+                    Last {days} days
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="team-summary-specific-dates-toggle" htmlFor="team-summary-specific-dates-toggle">
+              <input
+                id="team-summary-specific-dates-toggle"
+                type="checkbox"
+                checked={useSpecificDates}
+                onChange={handleSpecificDatesToggle}
+              />
+              <span>Specific Dates</span>
+            </label>
+            {useSpecificDates && (
+              <div className="team-summary-date-inputs">
+                <label className="team-summary-date-filter" htmlFor="team-summary-start-date">
+                  <span>Start</span>
+                  <input
+                    id="team-summary-start-date"
+                    type="date"
+                    value={specificStartDate}
+                    max={specificEndDate || undefined}
+                    onChange={(event) => setSpecificStartDate(event.target.value)}
+                  />
+                </label>
+                <label className="team-summary-date-filter" htmlFor="team-summary-end-date">
+                  <span>End</span>
+                  <input
+                    id="team-summary-end-date"
+                    type="date"
+                    value={specificEndDate}
+                    min={specificStartDate || undefined}
+                    onChange={(event) => setSpecificEndDate(event.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+            {specificDateValidationMessage && (
+              <p className="team-summary-filter-message">{specificDateValidationMessage}</p>
+            )}
+          </div>
           <Link to="/team" className="team-summary-back-link">Back To Team Status</Link>
         </div>
       </div>
