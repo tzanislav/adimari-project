@@ -2,7 +2,7 @@
 
 An admin can use **Download database backup** at the top of the Items page. The browser downloads a timestamped JSON file locally; the server does not retain another copy.
 
-The file uses strict MongoDB Extended JSON and contains every collection currently in the connected database, all documents, and collection indexes. This preserves values such as MongoDB ObjectIds and Dates instead of flattening them into ordinary strings.
+The file uses strict MongoDB Extended JSON and contains every collection currently in the connected database, all documents, and collection indexes, except `activity_log`. This preserves values such as MongoDB ObjectIds and Dates instead of flattening them into ordinary strings.
 
 To restore it into a replacement MongoDB database, set `MONGODB_URI` to the destination and run from `Backend`:
 

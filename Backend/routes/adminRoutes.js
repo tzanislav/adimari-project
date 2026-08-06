@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const { EJSON } = mongoose.mongo.BSON;
 
 const router = express.Router();
+const excludedCollectionNames = new Set(['activity_log']);
 
 const createBackupFilename = () => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -21,7 +22,7 @@ router.get('/backup', async (req, res) => {
     const collections = {};
 
     for (const collectionInfo of collectionInfos) {
-      if (collectionInfo.type !== 'collection') {
+      if (collectionInfo.type !== 'collection' || excludedCollectionNames.has(collectionInfo.name)) {
         continue;
       }
 
