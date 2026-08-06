@@ -13,6 +13,7 @@ const authRoutes = require('./routes/authRoutes'); // Import auth routes
 const clickUpRoutes = require('./routes/clickupRoutes'); // Import clickup routes
 const licenseEntryRoutes = require('./routes/licenseEntryRoutes'); // Import license routes
 const activityRoutes = require('./routes/activityRoute'); // Import activity routes
+const adminRoutes = require('./routes/adminRoutes'); // Import admin maintenance routes
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -179,6 +180,7 @@ app.use('/clickup', authenticate, authorizeRole(['admin', 'moderator']), automat
 app.use('/auth', authLimiter, authRoutes);
 app.use('/api/licenses', authenticate, licenseEntryRoutes);
 app.use('/api/activity', activityRoutes); // Add activity routes
+app.use('/api/admin', authenticate, authorizeRole('admin'), adminRoutes);
 
 // Test route for API
 app.get('/api/test', (req, res) => {

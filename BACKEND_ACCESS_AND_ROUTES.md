@@ -48,6 +48,7 @@ Legend: **Public** = no backend token check; **Signed in** = any valid Firebase 
 | `/api/openai` | `GET /?query=` | Signed in | Bing scrape + OpenAI price extraction; rate-limited. |
 | `/clickup` | `GET /time-entries/all/:user_id`, `GET /time-entries/range/:user_id`, `GET /time-entries`, `GET /time-entries/:user_id`, `GET /current-task/:user_id`, `GET /members` | Editor | ClickUp time and member proxy; rate-limited. |
 | `/api/activity` | `GET /time-entries`, `GET /time-entries/:id`, `POST /time-entries` | Public | Cached ClickUp-member list and Mongo activity-log access. |
+| `/api/admin` | `GET /backup` | Admin | Downloads a strict Extended JSON export of every database collection and its indexes. |
 | `/api/test` | `GET /api/test` | Public | Basic health/test response. |
 
 ### Authentication routes

@@ -5,6 +5,35 @@
 
 }
 
+.items-page-header
+{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.database-backup-button
+{
+    padding: 10px 14px;
+    border: 0;
+    border-radius: 6px;
+    color: white;
+    background-color: #1f6f43;
+    cursor: pointer;
+}
+
+.database-backup-button:disabled
+{
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.database-backup-error
+{
+    color: #b42318;
+}
+
 .items-container-list
 {
     width: 100%;
@@ -107,6 +136,12 @@
 
 @media screen and (max-width: 768px)
 {
+    .items-page-header
+    {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
     .filters
     {
         flex-direction: column;

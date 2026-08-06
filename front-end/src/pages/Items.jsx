@@ -6,7 +6,7 @@ import '../CSS/ListPage.css';
 import { useActiveSelection } from "../context/selectionContext";
 import ItemDetails from '../components/ItemDetails';
 import { useAuth } from '../context/AuthContext';
-import { getAuthHeaders } from '../utils/authHeaders';
+import { fetchWithAuth, getAuthHeaders } from '../utils/authHeaders';
 
 function Items() {
     const [items, setItems] = useState([]);
@@ -21,7 +21,9 @@ function Items() {
     const [classFilter, setClassFilter] = useState('All');
     const [modelFilter, setModelFilter] = useState('All');
     const [selecteditem, setSelectedItem] = useState(null);
-    const { user } = useAuth();
+    const { user, role } = useAuth();
+    const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
+    const [backupError, setBackupError] = useState(null);
 
 
 
@@ -223,6 +225,33 @@ function Items() {
         setSelectedItem(null);
     };
 
+    const handleDownloadBackup = async () => {
+        setIsDownloadingBackup(true);
+        setBackupError(null);
+
+        try {
+            const response = await fetchWithAuth(`${serverUrl}/api/admin/backup`);
+            if (!response.ok) {
+                const responseBody = await response.json().catch(() => null);
+                throw new Error(responseBody?.error || 'Failed to download the database backup.');
+            }
+
+            const backupBlob = await response.blob();
+            const downloadUrl = URL.createObjectURL(backupBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = downloadUrl;
+            downloadLink.download = `adimari-mongodb-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            downloadLink.remove();
+            URL.revokeObjectURL(downloadUrl);
+        } catch (error) {
+            setBackupError(error.message);
+        } finally {
+            setIsDownloadingBackup(false);
+        }
+    };
+
 
     if (loading && items === null) {
         return <p>Loading...</p>;
@@ -236,7 +265,20 @@ function Items() {
         <div className="items-container">
             {selecteditem && <ItemDetails item={selecteditem} handleClickItem={(property) => setSearch(property)} user={user} onClose={onClose}/>}
 
-            <h1>Items</h1>
+            <div className="items-page-header">
+                <h1>Items</h1>
+                {role === 'admin' && (
+                    <button
+                        className="database-backup-button"
+                        type="button"
+                        onClick={handleDownloadBackup}
+                        disabled={isDownloadingBackup}
+                    >
+                        {isDownloadingBackup ? 'Preparing backup...' : 'Download database backup'}
+                    </button>
+                )}
+            </div>
+            {backupError && <p className="database-backup-error">{backupError}</p>}
             <div className="search-container">
                 <input className='search-box' type="text" placeholder="Search Items" value={search} onChange={(e) => setSearch(e.target.value)} />
                 {search != "" ? (<button className='search-button' onClick={() => setSearch('')}>Clear</button>) : null}
