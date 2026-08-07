@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 require('dotenv').config();
+const { getLicensePasswordCrypto } = require('./security/licensePasswordCrypto');
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const brandRoutes = require('./routes/brandRoutes'); // Import brand routes
 const uploadRoutes = require('./routes/upload'); // Import upload route
@@ -21,6 +22,9 @@ const path = require('path');
 const { URL } = require('url');
 const app = express();
 const { authenticate, authorizeRole } = require('./auth/authMiddleware');
+
+// Fail closed before accepting requests if the server-side license encryption key is unavailable.
+getLicensePasswordCrypto();
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -178,7 +182,7 @@ app.use('/api/items', itemRoutes);
 app.use('/api/openai', authenticate, automationLimiter, openairoute); 
 app.use('/clickup', authenticate, authorizeRole(['admin', 'moderator']), automationLimiter, clickUpRoutes);
 app.use('/auth', authLimiter, authRoutes);
-app.use('/api/licenses', authenticate, licenseEntryRoutes);
+app.use('/api/licenses', licenseEntryRoutes);
 app.use('/api/activity', activityRoutes); // Add activity routes
 app.use('/api/admin', authenticate, authorizeRole('admin'), adminRoutes);
 

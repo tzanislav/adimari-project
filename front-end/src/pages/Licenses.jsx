@@ -27,29 +27,26 @@ function Licenses() {
                         'Authorization': `Bearer ${token}`
                     }
                 });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch licenses.');
+                }
                 const data = await response.json();
                 //Sort by platform
                 data.sort((a, b) => a.platform.localeCompare(b.platform));
-                if (role == 'admin') {
-                    setLicenses(data);
-                    setFilteredLicenses(data);
-                }
-                else {
-                    setLicenses(data.filter(license => license.clearances != 'admin'));
-                    setFilteredLicenses(data.filter(license => license.clearances != 'admin'));
-                }
+                // The API already applies the role, clearance, and owner filters.
+                setLicenses(data);
+                setFilteredLicenses(data);
             } catch (error) {
                 console.error('Error fetching data:', error);
             }
         };
 
         fetchData();
-    }, [number]);
+    }, [number, user]);
 
 
 
     const handleEdit = (entry) => {
-        console.log(entry);
         setCurrentLicense(entry);
         setShowEdit(true);
     };
@@ -82,9 +79,9 @@ function Licenses() {
                         const search = e.target.value.toLowerCase();
                         setFilteredLicenses(licenses.filter(license =>
                             license.user.toLowerCase().includes(search) ||
-                            license.usedBy.toLowerCase().includes(search) ||
-                            license.platform.toLowerCase().includes(search) ||
-                            license.comment.toLowerCase().includes(search)
+                            (license.usedBy || '').toLowerCase().includes(search) ||
+                            (license.platform || '').toLowerCase().includes(search) ||
+                            (license.comment || '').toLowerCase().includes(search)
                         ));
                     }
                     } />

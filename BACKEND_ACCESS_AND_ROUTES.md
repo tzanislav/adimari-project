@@ -42,7 +42,7 @@ Legend: **Public** = no backend token check; **Signed in** = any valid Firebase 
 | `/api/selections` | `GET /`, `GET /:id` | Public | Browse selections; detail includes expanded `itemDetails`. |
 |  | `POST /`, `PUT /:id`, `DELETE /:id` | Editor | Selection management. Creating one resolves `body.project` into `parentProject`. |
 | `/api/users` | `POST /add`, `GET /all`, `DELETE /delete/:id` | Admin | Legacy Mongo user-record management. |
-| `/api/licenses` | `GET /`, `POST /`, `GET /:id`, `PUT /:id`, `DELETE /:id` | Signed in | License-record CRUD; protected at mount level only. |
+| `/api/licenses` | `GET /`, `POST /`, `GET /:id`, `PUT /:id`, `DELETE /:id` | Moderator or admin | Server-enforced license CRUD. Moderators access moderator-visible records and their own private records; admins access all records. |
 | `/api/upload` | `GET /`, `POST /?folder=` | Signed in | Upload up to 10 files (4 MB each) directly to S3. |
 |  | `POST /analyze-image`, `GET /analyze-s3-image?key=` | Signed in | Rekognition image-label analysis. |
 | `/api/openai` | `GET /?query=` | Signed in | Bing scrape + OpenAI price extraction; rate-limited. |
@@ -75,11 +75,10 @@ The navbar can show links such as Team and Licenses to guests, but the destinati
 
 ## Important review findings
 
-1. **License access is too broad for its contents.** Every authenticated Firebase user can read, create, update, and delete license records. The schema includes plaintext `password`, while the frontend only *hides* edits from non-admins. This should be server-enforced and the secret storage approach should be reviewed.
-2. **Activity endpoints are completely public.** Anyone can read stored activity logs or submit entries for an existing cached ClickUp member. If these endpoints are intended for internal team use, add authentication and an appropriate role check.
-3. **Catalog/project reads are public by design in the current code.** That includes selection details and item data. Confirm this matches the desired visibility before treating the API as internal-only.
-4. **Writes use broad request bodies.** CRUD handlers generally pass `req.body` to Mongoose without per-field allowlists or robust request validation. Add schema validation/allowlists before exposing the app more widely.
-5. **Role updates require refreshed Firebase tokens.** After `/auth/update-role`, the client must refresh its ID token (or sign in again) before the new custom claim is reflected by server authorization.
+1. **Activity endpoints are completely public.** Anyone can read stored activity logs or submit entries for an existing cached ClickUp member. If these endpoints are intended for internal team use, add authentication and an appropriate role check.
+2. **Catalog/project reads are public by design in the current code.** That includes selection details and item data. Confirm this matches the desired visibility before treating the API as internal-only.
+3. **Some non-license writes use broad request bodies.** Add schema validation/allowlists before exposing those routes more widely.
+4. **Role updates require refreshed Firebase tokens.** After `/auth/update-role`, the client must refresh its ID token (or sign in again) before the new custom claim is reflected by server authorization.
 
 ## Key source locations
 

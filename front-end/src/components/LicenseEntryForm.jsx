@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useActiveSelection } from '../context/selectionContext';
@@ -79,7 +78,6 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        console.log('Fetched license:', id);
         const existingLicense = response.data;
 
         // format expiresAt for <input type="date" />
@@ -144,7 +142,6 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
 
   // Create or update license
   const handleSubmit = async (e) => {
-    console.log('Submitting form:', formData);
     e.preventDefault();
     if (!user) {
       setErrorMessage('You must be logged in');
@@ -169,7 +166,7 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
       handleClose();
     } catch (error) {
       console.error('Error submitting license form:', error);
-      setErrorMessage(`Failed to submit form: ${error.message}`);
+      setErrorMessage('Failed to submit license changes.');
     } finally {
       setLoading(false);
     }
@@ -191,7 +188,7 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
       handleRefresh(); // Refresh the list of licenses
     } catch (error) {
       console.error('Failed to delete license:', error);
-      setErrorMessage(`Failed to delete license: ${error.message}`);
+      setErrorMessage('Failed to delete license.');
     }
   };
 
@@ -262,7 +259,7 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
           <label>
             Password*:
             <input
-              type="text"
+              type="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
@@ -331,16 +328,23 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
                 value={formData.clearances || 'moderator'}
                 onChange={handleChange}
               >
-                <option value="moderator">All</option>
+                <option value="moderator">Moderators and admins</option>
+                <option value="private">Only me and admins</option>
                 <option value="admin">Admin Only</option>
               </select>
             </label>
           ) : (
-            <input
-              type="hidden"
-              name="clearances"
-              value="moderator"
-            />
+            <label>
+              Visible to:
+              <select
+                name="clearances"
+                value={formData.clearances || 'moderator'}
+                onChange={handleChange}
+              >
+                <option value="moderator">Moderators and admins</option>
+                <option value="private">Only me and admins</option>
+              </select>
+            </label>
           )}
 
           <div className='buttons-container' style={{ marginTop: '1rem' }}>

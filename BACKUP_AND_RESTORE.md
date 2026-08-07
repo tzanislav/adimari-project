@@ -18,3 +18,10 @@ node scripts/restoreBackup.js 'C:\path\to\backup.json' --replace
 ```
 
 Backups contain license credentials and other application data. Store them as sensitive files and verify a restore into a separate test database before retiring the current MongoDB service.
+
+After the license-password security migration, license passwords in new backups are encrypted with
+the backend's server-only `LICENSE_ENCRYPTION_KEY_V1`. A restored database therefore also requires
+the corresponding encryption key to display or edit license passwords. Keep the key in the
+approved secret manager, separate from backups, and retain older key versions for as long as any
+retained backup still requires them. Pre-migration backups contain plaintext license passwords and
+need a short, explicitly approved retention period before secure deletion.

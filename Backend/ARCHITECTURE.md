@@ -217,9 +217,11 @@ Defined in `models/LicenseEntry.js`.
 
 This stores license credentials and ownership information. It is sensitive data and should be treated accordingly.
 
-Important caveat:
-
-- the schema currently includes a plaintext `password` field
+License passwords are stored only as versioned AES-256-GCM encrypted payloads in
+`passwordEncrypted`. The backend decrypts a password only after Firebase authentication,
+moderator/admin authorization, and record-level clearance checks. The server-side encryption key
+is configured through `LICENSE_ENCRYPTION_KEY_V1`; it must never be stored in MongoDB or exposed
+to the frontend.
 
 ### User
 
