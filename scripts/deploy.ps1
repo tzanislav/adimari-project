@@ -44,6 +44,18 @@ if (-not (Test-Path -LiteralPath $KeyPath -PathType Leaf)) {
     throw "SSH key not found: $KeyPath"
 }
 
+$sshCandidates = @(
+    (Get-Command ssh.exe -ErrorAction SilentlyContinue).Source,
+    (Join-Path $env:WINDIR 'System32\OpenSSH\ssh.exe'),
+    (Join-Path $env:ProgramFiles 'Git\usr\bin\ssh.exe')
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
+
+if ($sshCandidates.Count -eq 0) {
+    throw 'OpenSSH client was not found. Install the Windows OpenSSH Client optional feature, then rerun this script.'
+}
+
+$sshExecutable = $sshCandidates[0]
+
 Write-Host "Committing local changes on '$Branch'..."
 Invoke-NativeCommand git add --all
 
@@ -113,7 +125,7 @@ exit 1
 '@ -f $quotedRemoteDirectory, $quotedBranch
 
 Write-Host "Deploying to $RemoteUser@$RemoteHost..."
-$remoteScript | & ssh -i $KeyPath -o BatchMode=yes "$RemoteUser@$RemoteHost" 'bash -s'
+$remoteScript | & $sshExecutable -i $KeyPath -o BatchMode=yes "$RemoteUser@$RemoteHost" 'bash -s'
 if ($LASTEXITCODE -ne 0) {
     throw "Remote deployment failed with exit code $LASTEXITCODE."
 }
