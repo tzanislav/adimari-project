@@ -390,6 +390,7 @@ Key variables:
 - `CLICKUP_API_KEY`
 - `FIREBASE_SERVICE_ACCOUNT_PATH`
 - `FIREBASE_SERVICE_ACCOUNT_JSON`
+- `CSP_CONNECT_SRC`
 
 Local-development notes:
 

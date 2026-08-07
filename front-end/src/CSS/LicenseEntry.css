@@ -1,181 +1,145 @@
-.license-header
-{
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    margin: 40px 0;
-}
-.license-container ,.form-container
-{
-    width: 80%;
-    margin: 0 auto;
+.license-header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  margin: 40px 0;
 }
 
-.buttons-container
-{
-    display: flex;
-    justify-content: space-between;
-    margin: 40px 0;
+.license-container,
+.form-container {
+  width: 80%;
+  margin: 0 auto;
+}
+
+.buttons-container {
+  display: flex;
+  justify-content: space-between;
+  margin: 40px 0;
 }
 
 table {
-    width: 100%;
-    border-collapse: separate; 
-    border-spacing: 0;
-    margin: 1em 0;
-    font-family: "Helvetica Neue", Arial, sans-serif;
-    background: #fff;
-    overflow: hidden;
-    border-radius: 0.5em;
-  }
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1em 0;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  background: #fff;
+  overflow: hidden;
+  border-radius: 0.5em;
+}
 
-table h5
+table h5 {
+  display: none;
+}
+
+.form-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+}
+
+.platform-header {
+  text-align: center;
+  font-size: 1.5em;
+  font-weight: 600;
+  background-color: #e4e4e4;
+}
+
+thead {
+  background-color: #ececec;
+}
+
+th {
+  padding: 0.75em 1em;
+  font-weight: bold;
+  color: #333;
+  text-align: left;
+  font-size: .85em;
+}
+
+tbody tr {
+  border-top: 1px solid #ddd;
+}
+
+tbody tr:hover {
+  background-color: #f9f9f9;
+  /* Row highlight on hover */
+}
+
+tbody td {
+  padding: 0.75em 1em;
+  border-bottom: 1px solid #ddd;
+  /* Subtle bottom border */
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+  /* Remove border for final row */
+}
+
+
+.password:hover {
+  color: black;
+}
+
+.license-entry-action {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid #333;
+  border-radius: 0.3rem;
+  background: #f5f5f5;
+  color: #333;
+  cursor: pointer;
+  font-size: 0.6rem;
+  margin: 0;
+
+}
+
+.license-entry-action:hover,
+.license-entry-action:focus-visible {
+  background: #333;
+  color: #fff;
+}
+
+
+
+
+
+.entry-admin {
+  background-color: rgb(218, 213, 204);
+}
+
+.license-entry--expiring,
+tbody tr.license-entry--expiring:hover {
+  color: #5c4600;
+  background-color: #fff3bf;
+}
+
+.license-entry--expired,
+tbody tr.license-entry--expired:hover {
+  color: #9b1c1c;
+  background-color: #ffd6d6;
+}
+
+
+@media screen and (max-width: 1000px) {
+  table {
+    border: 0;
+  }
+.license-container
 {
+  margin: auto;
+}
+
+
+.license-row-nonEssential {
     display: none;
+    background-color: #2b2255
+  }
+
+
+
+
 }
-
-  .form-container
-  {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1000;
-  }
-
-  .platform-header
-  {
-    text-align: center;
-    font-size: 1.5em;
-    font-weight: 600;
-    background-color: #e4e4e4;
-  }
-  
-  thead {
-    background-color: #ececec;
-  }
-  
-  th {
-    padding: 0.75em 1em;
-    font-weight: bold;
-    color: #333;
-    text-align: left;
-    font-size: .85em;
-  }
-  
-  tbody tr {
-    border-top: 1px solid #ddd; 
-  }
-  
-  tbody tr:hover {
-    background-color: #f9f9f9; /* Row highlight on hover */
-  }
-  
-  tbody td {
-    padding: 0.75em 1em;
-    border-bottom: 1px solid #ddd; /* Subtle bottom border */
-  }
-  
-  tbody tr:last-child td {
-    border-bottom: none; /* Remove border for final row */
-  }
-
-
-  .password:hover
-  {
-    color: black;
-  }
-
-  .license-entry-action
-  {
-    padding: 0.25rem 0.55rem;
-    border: 1px solid #333;
-    border-radius: 0.3rem;
-    background: #f5f5f5;
-    color: #333;
-    cursor: pointer;
-    font-size: 0.8rem;
-  }
-
-  .license-entry-action:hover,
-  .license-entry-action:focus-visible
-  {
-    background: #333;
-    color: #fff;
-  }
-
-  .entry-admin
-  {
-    background-color: rgb(218, 213, 204);
-  }
-
-  .license-entry--expiring,
-  tbody tr.license-entry--expiring:hover
-  {
-    color: #5c4600;
-    background-color: #fff3bf;
-  }
-
-  .license-entry--expired,
-  tbody tr.license-entry--expired:hover
-  {
-    color: #9b1c1c;
-    background-color: #ffd6d6;
-  }
-
-
-  @media screen and (max-width: 600px) {
-    table {
-      border: 0;
-
-    }
-    table caption {
-      font-size: 1.3em;
-    }
-    table thead {
-      border: none;
-      clip: rect(0 0 0 0);
-      height: 1px;
-      margin: -1px;
-      overflow: hidden;
-      padding: 0;
-      position: absolute;
-      width: 1px;
-    }
-    table tr {
-      border-bottom: 3px solid #ddd;
-      display: block;
-      text-align: center;
-      margin-bottom: 0.625em;
-    }
-    table td {
-      border-bottom: 1px solid #ddd;
-      display: block;
-      text-align: center;
-      border: none;
-    }
-    table .btn-simple
-    {
-      display: block;
-      margin: 0 auto;
-    }
-
-    th
-    {
-      display: none;
-    }
-
-    table h5
-{
-    display: inline;
-}
-
-.password
-{
-    color: #333;
-}
-
-
-    
-  }

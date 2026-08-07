@@ -45,6 +45,30 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || defaultAllowedOrigin
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const additionalConnectSources = (process.env.CSP_CONNECT_SRC || '')
+  .split(',')
+  .map((source) => source.trim())
+  .filter(Boolean)
+  .map((source) => {
+    let parsedSource;
+    try {
+      parsedSource = new URL(source);
+    } catch {
+      throw new Error(`Invalid CSP_CONNECT_SRC value: ${source}`);
+    }
+
+    if (!['http:', 'https:'].includes(parsedSource.protocol)
+      || parsedSource.pathname !== '/'
+      || parsedSource.search
+      || parsedSource.hash
+      || parsedSource.username
+      || parsedSource.password) {
+      throw new Error(`CSP_CONNECT_SRC must contain only HTTP(S) origins: ${source}`);
+    }
+
+    return parsedSource.origin;
+  });
+
 const trustworthyHosts = new Set(['localhost', '127.0.0.1', '::1']);
 
 const isSameOriginRequest = (origin, requestHost) => {
@@ -119,6 +143,7 @@ const cspDirectives = {
     'https://securetoken.googleapis.com',
     'https://firebaseinstallations.googleapis.com',
     'https://www.gstatic.com',
+    ...additionalConnectSources,
   ],
   frameSrc: [
     "'self'",

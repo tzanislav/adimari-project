@@ -90,7 +90,7 @@ function LicenseEntry({ entry , handleEdit }) {
         <tr className={rowClassName}>
             <td>{entry.user} </td>
             <td className="password">
-                <h5>Password:</h5> <span className="password-mask">••••••••</span>
+                <h5>Password:</h5> 
                 <button
                     type="button"
                     className="license-entry-action"
@@ -100,10 +100,10 @@ function LicenseEntry({ entry , handleEdit }) {
                     {copyStatus || 'Copy'}
                 </button>
             </td>
-            <td>{entry.usedBy}</td>
-            <td> {entry.price && "EUR"} {entry.price}</td>
-            <td>{entry.comment}</td>
-            <td>{expiry.label}</td>
+            <td className='license-row-usedBy license-row-nonEssential'>{entry.usedBy}</td>
+            <td className='license-row-price license-row-nonEssential'> {entry.price && "EUR"} {entry.price}</td>
+            <td className='license-row-comment license-row-nonEssential'>{entry.comment}</td>
+            <td className='license-row-expiry license-row-nonEssential'>{expiry.label}</td>
             <td>
                 <button
                     type="button"

@@ -103,10 +103,10 @@ function Licenses() {
                                             <tr>
                                                 <th>Username</th>
                                                 <th>Password</th>
-                                                <th>Used By</th>
-                                                <th>Price</th>
-                                                <th>Comment</th>
-                                                <th>Expires At</th>
+                                                <th className = 'license-row-nonEssential' >Used By</th>
+                                                <th className = 'license-row-nonEssential'>Price</th>
+                                                <th className = 'license-row-nonEssential'>Comment</th>
+                                                <th className = 'license-row-nonEssential'>Expires At</th>
                                                 <th>Edit</th>
                                             </tr>
 
