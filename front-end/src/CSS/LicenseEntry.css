@@ -87,22 +87,22 @@ table h5
     color: black;
   }
 
-  .copy-password-button
+  .license-entry-action
   {
-    margin-left: 0.6rem;
     padding: 0.25rem 0.55rem;
-    border: 1px solid currentColor;
+    border: 1px solid #333;
     border-radius: 0.3rem;
-    background: transparent;
-    color: inherit;
+    background: #f5f5f5;
+    color: #333;
     cursor: pointer;
     font-size: 0.8rem;
   }
 
-  .copy-password-button:hover,
-  .copy-password-button:focus-visible
+  .license-entry-action:hover,
+  .license-entry-action:focus-visible
   {
-    background: rgba(0, 0, 0, 0.08);
+    background: #333;
+    color: #fff;
   }
 
   .entry-admin

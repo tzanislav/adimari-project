@@ -90,10 +90,10 @@ function LicenseEntry({ entry , handleEdit }) {
         <tr className={rowClassName}>
             <td>{entry.user} </td>
             <td className="password">
-                <h5>Password:</h5> {entry.password}
+                <h5>Password:</h5> <span className="password-mask">••••••••</span>
                 <button
                     type="button"
-                    className="copy-password-button"
+                    className="license-entry-action"
                     onClick={copyPassword}
                     aria-label="Copy password to clipboard"
                 >
@@ -104,7 +104,15 @@ function LicenseEntry({ entry , handleEdit }) {
             <td> {entry.price && "EUR"} {entry.price}</td>
             <td>{entry.comment}</td>
             <td>{expiry.label}</td>
-            <td><div className="btn-simple"  onClick={ () => { handleEdit(entry)}}>Edit</div></td>
+            <td>
+                <button
+                    type="button"
+                    className="license-entry-action"
+                    onClick={() => handleEdit(entry)}
+                >
+                    Edit
+                </button>
+            </td>
         </tr>
 
     );

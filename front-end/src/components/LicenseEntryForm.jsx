@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useActiveSelection } from '../context/selectionContext';
 import SuggestionsBox from '../components/SuggestionsBox';
+import '../CSS/EditBrand.css';
 
 function LicenseForm({ handleRefresh, id, handleClose }) {
   const isEditing = Boolean(id);
@@ -12,6 +13,7 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
   const { serverUrl } = useActiveSelection();
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -258,13 +260,23 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
           {/* PASSWORD field - no suggestions typically */}
           <label>
             Password*:
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-            />
+            <div className="password-field">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+              />
+              <button
+                type="button"
+                className="password-visibility-toggle"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </label>
 
           {/* USED BY field with suggestions */}

@@ -29,6 +29,32 @@
   .brand-form textarea {
     height: 100px;
   }
+
+  .brand-form .password-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .brand-form .password-field input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .password-visibility-toggle {
+    padding: 8px 12px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background: #f5f5f5;
+    color: #333;
+    cursor: pointer;
+  }
+
+  .password-visibility-toggle:hover,
+  .password-visibility-toggle:focus-visible {
+    background: #333;
+    color: #fff;
+  }
   
 
 
