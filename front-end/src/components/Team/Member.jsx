@@ -10,7 +10,7 @@ function Member({ member, handleShowLog }) {
     const [number, setNumber] = useState(0);
 
 
-    const serverUrl = import.meta.env.VITE_SERVER_URL;
+    const serverUrl = import.meta.env.VITE_SERVER_URL || '';
     const { user } = useAuth();
 
     useEffect(() => {

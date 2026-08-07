@@ -22,7 +22,7 @@ function Licenses() {
         const fetchData = async () => {
             const token = await user.getIdToken();
             try {
-                const response = await fetch(import.meta.env.VITE_SERVER_URL + '/api/licenses', {
+                const response = await fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/licenses', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }

@@ -11,7 +11,7 @@ import { fetchWithAuth } from '../utils/authHeaders';
 function TeamStatus() {
 
     const [teamMembers, setTeamMembers] = useState([]);
-    const serverUrl = import.meta.env.VITE_SERVER_URL;
+    const serverUrl = import.meta.env.VITE_SERVER_URL || '';
     const { user, role } = useAuth();
     const [shownLog, setShownLog] = useState(null);
 

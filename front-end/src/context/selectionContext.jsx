@@ -12,7 +12,7 @@ export const ActiveSelectionProvider = ({ children }) => {
   const [activeSelection, setActiveSelection] = useState(null);
 
   // Load server URL from environment variables
-  const serverUrl = import.meta.env.VITE_SERVER_URL;
+  const serverUrl = import.meta.env.VITE_SERVER_URL || '';
 
   // Clear active selection when user logs out
   useEffect(() => {
