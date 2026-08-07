@@ -87,6 +87,24 @@ table h5
     color: black;
   }
 
+  .copy-password-button
+  {
+    margin-left: 0.6rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid currentColor;
+    border-radius: 0.3rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .copy-password-button:hover,
+  .copy-password-button:focus-visible
+  {
+    background: rgba(0, 0, 0, 0.08);
+  }
+
   .entry-admin
   {
     background-color: rgb(218, 213, 204);

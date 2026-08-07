@@ -1,7 +1,29 @@
+import { useEffect, useRef, useState } from 'react';
 import "../CSS/LicenseEntry.css";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const EXPIRING_SOON_DAYS = 30;
+
+const copyText = async (text) => {
+    if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+    }
+
+    const temporaryInput = document.createElement('textarea');
+    temporaryInput.value = text;
+    temporaryInput.setAttribute('readonly', '');
+    temporaryInput.style.position = 'fixed';
+    temporaryInput.style.opacity = '0';
+    document.body.appendChild(temporaryInput);
+    temporaryInput.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(temporaryInput);
+
+    if (!copied) {
+        throw new Error('Clipboard copy failed.');
+    }
+};
 
 const getExpiryDetails = (dateValue) => {
     if (!dateValue) {
@@ -35,6 +57,8 @@ const getExpiryDetails = (dateValue) => {
 };
 
 function LicenseEntry({ entry , handleEdit }) {
+    const [copyStatus, setCopyStatus] = useState('');
+    const resetCopyStatusTimer = useRef(null);
     const expiry = getExpiryDetails(entry.expiresAt);
     const rowClassName = [
         'license-entry',
@@ -42,11 +66,40 @@ function LicenseEntry({ entry , handleEdit }) {
         expiry.status !== 'none' && `license-entry--${expiry.status}`,
     ].filter(Boolean).join(' ');
 
+    useEffect(() => () => {
+        window.clearTimeout(resetCopyStatusTimer.current);
+    }, []);
+
+    const copyPassword = async () => {
+        if (!entry.password) {
+            return;
+        }
+
+        try {
+            await copyText(entry.password);
+            setCopyStatus('Copied');
+        } catch {
+            setCopyStatus('Unavailable');
+        }
+
+        window.clearTimeout(resetCopyStatusTimer.current);
+        resetCopyStatusTimer.current = window.setTimeout(() => setCopyStatus(''), 1500);
+    };
 
     return (
         <tr className={rowClassName}>
             <td>{entry.user} </td>
-            <td className = "password"> <h5>Password:</h5> {entry.password}</td>
+            <td className="password">
+                <h5>Password:</h5> {entry.password}
+                <button
+                    type="button"
+                    className="copy-password-button"
+                    onClick={copyPassword}
+                    aria-label="Copy password to clipboard"
+                >
+                    {copyStatus || 'Copy'}
+                </button>
+            </td>
             <td>{entry.usedBy}</td>
             <td> {entry.price && "EUR"} {entry.price}</td>
             <td>{entry.comment}</td>
