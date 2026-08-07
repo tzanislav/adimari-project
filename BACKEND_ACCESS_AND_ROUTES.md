@@ -42,7 +42,7 @@ Legend: **Public** = no backend token check; **Signed in** = any valid Firebase 
 | `/api/selections` | `GET /`, `GET /:id` | Public | Browse selections; detail includes expanded `itemDetails`. |
 |  | `POST /`, `PUT /:id`, `DELETE /:id` | Editor | Selection management. Creating one resolves `body.project` into `parentProject`. |
 | `/api/users` | `POST /add`, `GET /all`, `DELETE /delete/:id` | Admin | Legacy Mongo user-record management. |
-| `/api/licenses` | `GET /`, `POST /`, `GET /:id`, `PUT /:id`, `DELETE /:id` | Moderator or admin | Server-enforced license CRUD. Moderators access moderator-visible records and their own private records; admins access all records. |
+| `/api/licenses` | `GET /`, `POST /`, `GET /:id`, `PUT /:id`, `DELETE /:id` | Moderator or admin | Server-enforced license CRUD. Moderators access moderator-visible records; admins access all records. |
 | `/api/upload` | `GET /`, `POST /?folder=` | Signed in | Upload up to 10 files (4 MB each) directly to S3. |
 |  | `POST /analyze-image`, `GET /analyze-s3-image?key=` | Signed in | Rekognition image-label analysis. |
 | `/api/openai` | `GET /?query=` | Signed in | Bing scrape + OpenAI price extraction; rate-limited. |

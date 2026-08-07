@@ -14,19 +14,11 @@ const moderator = { role: 'moderator', uid: 'moderator-uid' };
 const admin = { role: 'admin', uid: 'admin-uid' };
 const regular = { role: 'regular', uid: 'regular-uid' };
 
-test('moderators can query moderator-visible records and only their own private records', () => {
-  assert.deepEqual(readableLicenseFilter(moderator), {
-    $or: [
-      { clearances: CLEARANCES.MODERATOR },
-      { clearances: CLEARANCES.PRIVATE, createdByUid: 'moderator-uid' },
-    ],
-  });
+test('moderators can query only moderator-visible records', () => {
+  assert.deepEqual(readableLicenseFilter(moderator), { clearances: CLEARANCES.MODERATOR });
   assert.deepEqual(licenseFilterById(moderator, 'license-id'), {
     _id: 'license-id',
-    $or: [
-      { clearances: CLEARANCES.MODERATOR },
-      { clearances: CLEARANCES.PRIVATE, createdByUid: 'moderator-uid' },
-    ],
+    clearances: CLEARANCES.MODERATOR,
   });
 });
 
@@ -35,11 +27,11 @@ test('admins can query every record and regular users receive a no-match filter'
   assert.deepEqual(readableLicenseFilter(regular), { _id: null });
 });
 
-test('only admins can set admin-only clearance, while moderators can set private or moderator', () => {
+test('only admins can set admin-only clearance', () => {
   assert.equal(canSetClearance(moderator, CLEARANCES.MODERATOR), true);
-  assert.equal(canSetClearance(moderator, CLEARANCES.PRIVATE), true);
   assert.equal(canSetClearance(moderator, CLEARANCES.ADMIN), false);
   assert.equal(canSetClearance(admin, CLEARANCES.ADMIN), true);
+  assert.equal(canSetClearance(admin, 'private'), false);
   assert.equal(canSetClearance(regular, CLEARANCES.MODERATOR), false);
   assert.equal(canSetClearance(admin, 'unknown'), false);
 });

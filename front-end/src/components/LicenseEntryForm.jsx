@@ -329,23 +329,10 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
                 onChange={handleChange}
               >
                 <option value="moderator">Moderators and admins</option>
-                <option value="private">Only me and admins</option>
                 <option value="admin">Admin Only</option>
               </select>
             </label>
-          ) : (
-            <label>
-              Visible to:
-              <select
-                name="clearances"
-                value={formData.clearances || 'moderator'}
-                onChange={handleChange}
-              >
-                <option value="moderator">Moderators and admins</option>
-                <option value="private">Only me and admins</option>
-              </select>
-            </label>
-          )}
+          ) : null}
 
           <div className='buttons-container' style={{ marginTop: '1rem' }}>
             <button type="submit">

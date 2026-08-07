@@ -87,18 +87,23 @@ table h5
     color: black;
   }
 
-  .expired
-  {
-    color: red;
-    background-color: #ffcaca;
-  }
-
-  .expired.password
-  {color: #ffcaca;}
-
   .entry-admin
   {
     background-color: rgb(218, 213, 204);
+  }
+
+  .license-entry--expiring,
+  tbody tr.license-entry--expiring:hover
+  {
+    color: #5c4600;
+    background-color: #fff3bf;
+  }
+
+  .license-entry--expired,
+  tbody tr.license-entry--expired:hover
+  {
+    color: #9b1c1c;
+    background-color: #ffd6d6;
   }
 
 
@@ -156,4 +161,3 @@ table h5
 
     
   }
-  

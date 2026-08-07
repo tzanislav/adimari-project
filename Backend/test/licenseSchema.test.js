@@ -15,8 +15,7 @@ test('license schema accepts the versioned encrypted-password payload used by th
   const license = new LicenseEntry({
     user: 'license-user',
     platform: 'Example platform',
-    clearances: 'private',
-    createdByUid: 'firebase-user-id',
+    clearances: 'moderator',
     passwordEncrypted: {
       version: 1,
       algorithm: 'aes-256-gcm',
@@ -38,4 +37,22 @@ test('license schema rejects new records without encrypted password data', () =>
   });
 
   assert.equal(license.validateSync().errors.passwordEncrypted.kind, 'required');
+});
+
+test('license schema rejects the retired private clearance value', () => {
+  const license = new LicenseEntry({
+    user: 'license-user',
+    platform: 'Example platform',
+    clearances: 'private',
+    passwordEncrypted: {
+      version: 1,
+      algorithm: 'aes-256-gcm',
+      keyId: 'v1',
+      iv: Buffer.alloc(12).toString('base64'),
+      ciphertext: Buffer.from('ciphertext').toString('base64'),
+      authTag: Buffer.alloc(16).toString('base64'),
+    },
+  });
+
+  assert.equal(license.validateSync().errors.clearances.kind, 'enum');
 });

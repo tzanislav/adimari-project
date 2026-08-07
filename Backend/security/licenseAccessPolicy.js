@@ -2,7 +2,6 @@
 
 const CLEARANCES = Object.freeze({
   MODERATOR: 'moderator',
-  PRIVATE: 'private',
   ADMIN: 'admin',
 });
 
@@ -20,8 +19,7 @@ const canSetClearance = (user, clearance) => {
     return false;
   }
 
-  return isAdmin(user) || (isModerator(user)
-    && (clearance === CLEARANCES.MODERATOR || clearance === CLEARANCES.PRIVATE));
+  return isAdmin(user) || (isModerator(user) && clearance === CLEARANCES.MODERATOR);
 };
 
 const readableLicenseFilter = (user) => {
@@ -29,13 +27,8 @@ const readableLicenseFilter = (user) => {
     return {};
   }
 
-  if (isModerator(user) && user.uid) {
-    return {
-      $or: [
-        { clearances: CLEARANCES.MODERATOR },
-        { clearances: CLEARANCES.PRIVATE, createdByUid: user.uid },
-      ],
-    };
+  if (isModerator(user)) {
+    return { clearances: CLEARANCES.MODERATOR };
   }
 
   return { _id: null };

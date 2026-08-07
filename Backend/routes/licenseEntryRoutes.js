@@ -49,7 +49,6 @@ const isValidId = (id) => mongoose.isValidObjectId(id);
 const licenseResponse = (license) => {
     const response = license.toObject ? license.toObject() : { ...license };
     response.password = getLicensePasswordCrypto().decrypt(response.passwordEncrypted);
-    delete response.createdByUid;
     delete response.passwordEncrypted;
     return response;
 };
@@ -90,7 +89,6 @@ router.post('/', async (req, res) => {
         const newLicense = new LicenseEntry({
             ...copyWritableFields(req.body),
             clearances: clearance,
-            createdByUid: req.user.uid,
             createdBy: req.user.email || req.user.uid,
             passwordEncrypted: getLicensePasswordCrypto().encrypt(password),
         });
@@ -139,12 +137,6 @@ router.put('/:id', async (req, res) => {
         if (!clearance) {
             return invalidLicenseData(res);
         }
-        if (clearance === CLEARANCES.PRIVATE && !currentLicense.createdByUid) {
-            return res.status(409).send({
-                error: 'This license needs an owner before it can be made private.',
-            });
-        }
-
         const password = submittedPassword(req.body);
         if (password === null) {
             return invalidLicenseData(res);
