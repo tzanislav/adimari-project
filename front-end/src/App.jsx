@@ -46,10 +46,7 @@ function App() {
             path="/items/:id"
             element={<ProtectedRoute element={<ItemForm />} />}
           />
-          <Route
-            path="/projects"
-            element={<ProtectedRoute element={<Projects />} />}
-          />
+          <Route path="/projects" element={<Projects />} />
           <Route
             path="/projects/selection"
             element={<ProtectedRoute element={<SelectionProjects />} />}

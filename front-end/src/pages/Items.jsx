@@ -266,7 +266,7 @@ function Items() {
             {selecteditem && <ItemDetails item={selecteditem} handleClickItem={(property) => setSearch(property)} user={user} onClose={onClose}/>}
 
             <div className="items-page-header">
-                <h1>Items</h1>
+                <h1>3D Models</h1>
                 {role === 'admin' && (
                     <button
                         className="database-backup-button"
@@ -280,7 +280,7 @@ function Items() {
             </div>
             {backupError && <p className="database-backup-error">{backupError}</p>}
             <div className="search-container">
-                <input className='search-box' type="text" placeholder="Search Items" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <input className='search-box' type="text" placeholder="Search 3D Models" value={search} onChange={(e) => setSearch(e.target.value)} />
                 {search != "" ? (<button className='search-button' onClick={() => setSearch('')}>Clear</button>) : null}
             </div>
             <div className='filters'>

@@ -18,11 +18,11 @@ const Footer = () => {
           <div className="footer-nav-group">
             <span className="footer-nav-title">Explore</span>
             <Link to="/">Home</Link>
-            <Link to="/items">Items</Link>
+            <Link to="/projects">Projects</Link>
           </div>
           <div className="footer-nav-group">
             <span className="footer-nav-title">Workspace</span>
-            {user && <Link to="/projects">Projects</Link>}
+            <Link to="/projects">Projects</Link>
             <Link to="/team">Team</Link>
             <Link to="/licenses">Licenses</Link>
           </div>

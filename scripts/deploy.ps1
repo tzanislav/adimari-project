@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$CommitMessage = "Deploy $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
+    [string]$m = "Deploy $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
     [string]$Branch = 'main',
     [string]$RemoteHost = 'ec2-54-76-118-84.eu-west-1.compute.amazonaws.com',
     [string]$RemoteUser = 'ubuntu',
@@ -66,7 +66,7 @@ Invoke-NativeCommand git add --all
 
 & git diff --cached --quiet
 if ($LASTEXITCODE -eq 1) {
-    Invoke-NativeCommand git commit -m $CommitMessage
+    Invoke-NativeCommand git commit -m $m
 }
 elseif ($LASTEXITCODE -ne 0) {
     throw 'Unable to determine whether there are staged changes.'

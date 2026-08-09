@@ -3,6 +3,13 @@ import '../CSS/Projects.css';
 
 const projectLinks = [
   {
+    title: '3D Models',
+    description: 'Browse and manage the library of 3D models.',
+    to: '/items',
+    thumbnail: '/3d.png',
+    thumbnailAlt: '3D cube',
+  },
+  {
     title: 'Selection',
     description: 'Browse and manage your existing project selections.',
     to: '/projects/selection',
@@ -25,7 +32,7 @@ const projectLinks = [
     title: 'Gaussian Splat',
     description: 'Explore the Gaussian Splat 3D viewer.',
     href: 'https://3dsplatviewer.com',
-    thumbnail: '/3d.png',
+    thumbnail: '/gauss.png',
   },
   {
     title: 'Nesting App',

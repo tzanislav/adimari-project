@@ -13,8 +13,7 @@ function Navbar() {
   const closeMenu = () => setIsMenuOpen(false);
   const navigationItems = [
     { to: '/', label: 'Home' },
-    { to: '/items', label: 'Items' },
-    ...(user ? [{ to: '/projects', label: 'Projects' }] : []),
+    { to: '/projects', label: 'Projects' },
     { to: '/team', label: 'Team' },
     { to: '/licenses', label: 'Licenses' },
   ];
@@ -23,7 +22,7 @@ function Navbar() {
     <nav className="navbar">
       <div className="navbar-top">
         <div className="navbar-container">
-          <Link to="/" className="navbar-logo" onClick={closeMenu}>Adimari</Link>
+          <Link to="/" className="navbar-logo" onClick={closeMenu}>Adimari Database</Link>
           <button
             className="navbar-toggle"
             onClick={toggleMenu}
