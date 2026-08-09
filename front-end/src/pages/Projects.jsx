@@ -40,6 +40,13 @@ const projectLinks = [
     href: 'http://ec2-54-76-118-84.eu-west-1.compute.amazonaws.com',
     thumbnail: '/nest.png',
   },
+  {
+    title: 'Email',
+    description: 'Our Email application.',
+    href: 'https://adimari.studio:2096/',
+    thumbnail: '/mail.png',
+  },
+  
 ];
 
 function Projects() {
