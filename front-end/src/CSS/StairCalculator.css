@@ -195,6 +195,87 @@
     text-align: right;
 }
 
+.stair-schematic-legend
+{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 14px;
+    color: #666;
+    font-size: 0.82rem;
+}
+
+.stair-schematic-legend span
+{
+    display: inline-flex;
+    gap: 7px;
+    align-items: center;
+}
+
+.stair-schematic-legend i
+{
+    display: inline-block;
+    width: 22px;
+    border-top: 3px solid;
+}
+
+.stair-schematic-controls
+{
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    margin: 0 0 16px;
+}
+
+.stair-schematic-controls button
+{
+    min-width: 32px;
+    padding: 5px 9px;
+    color: #333;
+    border: 1px solid #bbb;
+    background: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.stair-schematic-controls button:hover:not(:disabled)
+{
+    background: #f1f1f1;
+}
+
+.stair-schematic-controls button:disabled
+{
+    color: #aaa;
+    cursor: not-allowed;
+}
+
+.stair-schematic-controls output
+{
+    min-width: 43px;
+    color: #666;
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+.stair-schematic-viewport
+{
+    max-height: min(70vh, 700px);
+    overflow: auto;
+}
+
+.stair-schematic-key-finish
+{
+    height: 10px;
+    border: 1px solid #b69a7d;
+    background: #decdb9;
+}
+
+.stair-schematic-key-concrete
+{
+    border-color: #8b6b4f;
+}
+
 .stair-schematic-drawing
 {
     display: block;
@@ -203,9 +284,12 @@
     overflow: visible;
 }
 
-.stair-schematic-fill
+.stair-schematic-drawing line,
+.stair-schematic-drawing path,
+.stair-schematic-drawing rect,
+.stair-schematic-drawing polygon
 {
-    fill: #ededed;
+    vector-effect: non-scaling-stroke;
 }
 
 .stair-schematic-steps
@@ -215,6 +299,37 @@
     stroke-linecap: square;
     stroke-linejoin: miter;
     stroke-width: 3;
+}
+
+.stair-schematic-concrete-fill
+{
+    fill: #e7e7e7;
+}
+
+.stair-schematic-flooring-fill
+{
+    fill: #decdb9;
+}
+
+.stair-schematic-concrete-outline
+{
+    fill: none;
+    stroke: #8b6b4f;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+    stroke-width: 3;
+}
+
+.stair-schematic-concrete-measurement
+{
+    stroke: #8b6b4f;
+    stroke-width: 1.2;
+}
+
+.stair-schematic-concrete-measurement-label
+{
+    fill: #8b6b4f;
+    font-size: 15px;
 }
 
 .stair-schematic-floor
@@ -285,5 +400,16 @@
     {
         margin-top: 8px;
         text-align: left;
+    }
+
+    .stair-schematic-legend
+    {
+        gap: 10px 14px;
+    }
+
+    .stair-schematic-controls
+    {
+        justify-content: flex-start;
+        margin: 0 0 14px;
     }
 }
