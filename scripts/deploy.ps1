@@ -44,11 +44,16 @@ if (-not (Test-Path -LiteralPath $KeyPath -PathType Leaf)) {
     throw "SSH key not found: $KeyPath"
 }
 
+$sshCommand = Get-Command ssh.exe -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+
 $sshCandidates = @(
-    (Get-Command ssh.exe -ErrorAction SilentlyContinue).Source,
-    (Join-Path $env:WINDIR 'System32\OpenSSH\ssh.exe'),
-    (Join-Path $env:ProgramFiles 'Git\usr\bin\ssh.exe')
-) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
+    @(
+        if ($sshCommand) { $sshCommand.Path }
+        (Join-Path $env:WINDIR 'System32\OpenSSH\ssh.exe'),
+        (Join-Path $env:ProgramFiles 'Git\usr\bin\ssh.exe')
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
+)
 
 if ($sshCandidates.Count -eq 0) {
     throw 'OpenSSH client was not found. Install the Windows OpenSSH Client optional feature, then rerun this script.'

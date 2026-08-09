@@ -16,6 +16,23 @@ function StairCalculator() {
 
   const slope = (2 * rise) + tread;
   const slopeStatus = slope >= MIN_IDEAL_SLOPE && slope <= MAX_IDEAL_SLOPE;
+  const totalRise = rise * steps;
+  const totalRun = tread * steps;
+  const drawing = { width: 1000, height: 460, left: 92, right: 60, top: 48, bottom: 88 };
+  const drawingScale = Math.min(
+    (drawing.width - drawing.left - drawing.right - 120) / totalRun,
+    (drawing.height - drawing.top - drawing.bottom) / totalRise,
+  );
+  const stairStart = { x: drawing.left, y: drawing.height - drawing.bottom };
+  const stairCommands = Array.from({ length: steps }, (_, index) => {
+    const x = stairStart.x + ((index + 1) * tread * drawingScale);
+    const y = stairStart.y - ((index + 1) * rise * drawingScale);
+    return `H ${x} V ${y}`;
+  }).join(' ');
+  const stairEnd = {
+    x: stairStart.x + (totalRun * drawingScale),
+    y: stairStart.y - (totalRise * drawingScale),
+  };
 
   function handleRiseChange(event) {
     const nextRise = Number(event.target.value);
@@ -107,6 +124,63 @@ function StairCalculator() {
             {slopeStatus ? 'Within the ideal 620–640 mm range' : 'Outside the ideal 620–640 mm range'}
           </span>
         </div>
+      </section>
+
+      <section className="stair-schematic" aria-labelledby="stair-schematic-title">
+        <div className="stair-schematic-heading">
+          <div>
+            <p className="stair-calculator-eyebrow">Side view</p>
+            <h2 id="stair-schematic-title">Stair schematic</h2>
+          </div>
+          <p>{steps} steps · {roundToTenth(rise)} mm rise · {roundToTenth(tread)} mm tread</p>
+        </div>
+        <svg
+          className="stair-schematic-drawing"
+          viewBox={`0 0 ${drawing.width} ${drawing.height}`}
+          role="img"
+          aria-label={`Side view of ${steps} stairs with a ${roundToTenth(rise)} millimetre rise and ${roundToTenth(tread)} millimetre tread`}
+        >
+          <defs>
+            <marker id="dimension-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" />
+            </marker>
+          </defs>
+          <path
+            className="stair-schematic-fill"
+            d={`M ${stairStart.x} ${stairStart.y} ${stairCommands} L ${stairEnd.x} ${stairStart.y} Z`}
+          />
+          <path className="stair-schematic-steps" d={`M ${stairStart.x} ${stairStart.y} ${stairCommands}`} />
+          <line className="stair-schematic-floor" x1="46" y1={stairStart.y} x2={stairEnd.x + 28} y2={stairStart.y} />
+          <line className="stair-schematic-landing" x1={stairEnd.x} y1={stairEnd.y} x2={drawing.width - 46} y2={stairEnd.y} />
+          <line className="stair-schematic-extension" x1={stairStart.x} y1={stairStart.y + 8} x2={stairStart.x} y2={stairStart.y + 50} />
+          <line className="stair-schematic-extension" x1={stairEnd.x} y1={stairStart.y + 8} x2={stairEnd.x} y2={stairStart.y + 50} />
+          <line
+            className="stair-schematic-dimension"
+            x1={stairStart.x + 7}
+            y1={stairStart.y + 38}
+            x2={stairEnd.x - 7}
+            y2={stairStart.y + 38}
+            markerStart="url(#dimension-arrow)"
+            markerEnd="url(#dimension-arrow)"
+          />
+          <text className="stair-schematic-label" x={(stairStart.x + stairEnd.x) / 2} y={stairStart.y + 66} textAnchor="middle">
+            {roundToTenth(totalRun / 1000)} m total run
+          </text>
+          <line className="stair-schematic-extension" x1={stairStart.x - 8} y1={stairStart.y} x2={stairStart.x - 56} y2={stairStart.y} />
+          <line className="stair-schematic-extension" x1={stairStart.x - 8} y1={stairEnd.y} x2={stairStart.x - 56} y2={stairEnd.y} />
+          <line
+            className="stair-schematic-dimension"
+            x1={stairStart.x - 38}
+            y1={stairStart.y - 7}
+            x2={stairStart.x - 38}
+            y2={stairEnd.y + 7}
+            markerStart="url(#dimension-arrow)"
+            markerEnd="url(#dimension-arrow)"
+          />
+          <text className="stair-schematic-label" x={stairStart.x - 58} y={(stairStart.y + stairEnd.y) / 2} textAnchor="middle" transform={`rotate(-90 ${stairStart.x - 58} ${(stairStart.y + stairEnd.y) / 2})`}>
+            {roundToTenth(totalRise / 1000)} m total rise
+          </text>
+        </svg>
       </section>
 
       <p className="stair-calculator-note">

@@ -157,6 +157,102 @@
     line-height: 1.6;
 }
 
+.stair-schematic
+{
+    margin-top: 24px;
+    padding: 28px;
+    background: #fff;
+    border: 1px solid #dedede;
+}
+
+.stair-schematic-heading
+{
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: end;
+    margin-bottom: 18px;
+}
+
+.stair-schematic-heading .stair-calculator-eyebrow
+{
+    margin-bottom: 5px;
+}
+
+.stair-schematic h2
+{
+    margin: 0;
+    color: #222;
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+.stair-schematic-heading > p
+{
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+    text-align: right;
+}
+
+.stair-schematic-drawing
+{
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.stair-schematic-fill
+{
+    fill: #ededed;
+}
+
+.stair-schematic-steps
+{
+    fill: none;
+    stroke: #222;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+    stroke-width: 3;
+}
+
+.stair-schematic-floor
+{
+    stroke: #777;
+    stroke-width: 1.5;
+}
+
+.stair-schematic-landing
+{
+    stroke: #222;
+    stroke-width: 3;
+}
+
+.stair-schematic-extension
+{
+    stroke: #aaa;
+    stroke-dasharray: 4 4;
+    stroke-width: 1;
+}
+
+.stair-schematic-dimension
+{
+    stroke: #555;
+    stroke-width: 1.2;
+}
+
+.stair-schematic-drawing marker path
+{
+    fill: #555;
+}
+
+.stair-schematic-label
+{
+    fill: #555;
+    font-size: 18px;
+}
+
 @media (max-width: 680px)
 {
     .stair-calculator-card
@@ -173,5 +269,21 @@
     .stair-calculator-result
     {
         padding: 24px 22px;
+    }
+
+    .stair-schematic
+    {
+        padding: 22px;
+    }
+
+    .stair-schematic-heading
+    {
+        display: block;
+    }
+
+    .stair-schematic-heading > p
+    {
+        margin-top: 8px;
+        text-align: left;
     }
 }

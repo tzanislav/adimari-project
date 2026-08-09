@@ -6,31 +6,32 @@ const projectLinks = [
     title: 'Selection',
     description: 'Browse and manage your existing project selections.',
     to: '/projects/selection',
-    thumbnail: null,
+    thumbnail: '/select.png',
   },
   {
     title: 'Stair Calculator',
     description: 'Plan comfortable stair proportions using the ideal slope formula.',
     to: '/projects/stair-calculator',
-    thumbnail: null,
+    thumbnail: '/man-climbing-stairs.png',
+    thumbnailAlt: 'Person climbing a staircase',
   },
   {
     title: 'History Around',
     description: 'Explore the History Around application.',
     href: 'https://historyaround.com',
-    thumbnail: null,
+    thumbnail: '/column.png',
   },
   {
     title: 'Gaussian Splat',
     description: 'Explore the Gaussian Splat 3D viewer.',
     href: 'https://3dsplatviewer.com',
-    thumbnail: null,
+    thumbnail: '/3d.png',
   },
   {
     title: 'Nesting App',
     description: 'Open the nesting application and its project workspace.',
     href: 'http://ec2-54-76-118-84.eu-west-1.compute.amazonaws.com',
-    thumbnail: null,
+    thumbnail: '/nest.png',
   },
 ];
 
