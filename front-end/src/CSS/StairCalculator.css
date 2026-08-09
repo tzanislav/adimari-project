@@ -1,0 +1,177 @@
+.stair-calculator
+{
+    width: min(100% - 40px, 960px);
+    margin: 32px auto 80px;
+}
+
+.stair-calculator-back
+{
+    display: inline-block;
+    margin-bottom: 28px;
+    color: #333;
+    text-decoration: none;
+}
+
+.stair-calculator-back:hover
+{
+    text-decoration: underline;
+}
+
+.stair-calculator-heading
+{
+    max-width: 680px;
+}
+
+.stair-calculator-eyebrow
+{
+    margin: 0 0 8px;
+    color: #666;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.stair-calculator h1
+{
+    margin: 0;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 500;
+}
+
+.stair-calculator-heading > p:last-child
+{
+    margin: 12px 0 30px;
+    color: #555;
+    line-height: 1.6;
+}
+
+.stair-calculator-card
+{
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.52fr);
+    background: #fff;
+    border: 1px solid #dedede;
+}
+
+.stair-calculator-fields
+{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+    padding: 28px;
+}
+
+.stair-calculator-fields label
+{
+    display: grid;
+    gap: 8px;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.stair-calculator-input
+{
+    display: flex;
+    align-items: center;
+    border: 1px solid #c9c9c9;
+    background: #fff;
+}
+
+.stair-calculator-input:focus-within
+{
+    border-color: #555;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+
+.stair-calculator-input input
+{
+    width: 100%;
+    min-width: 0;
+    padding: 11px 10px;
+    border: 0;
+    outline: 0;
+    color: #222;
+    font: inherit;
+}
+
+.stair-calculator-input span
+{
+    padding: 0 12px 0 4px;
+    color: #666;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.stair-calculator-result
+{
+    display: grid;
+    align-content: center;
+    gap: 9px;
+    padding: 28px;
+    color: #fff;
+    background: #303030;
+}
+
+.stair-calculator-result p,
+.stair-calculator-result strong,
+.stair-calculator-result span
+{
+    margin: 0;
+}
+
+.stair-calculator-result p
+{
+    color: #d5d5d5;
+    font-size: 0.9rem;
+}
+
+.stair-calculator-result strong
+{
+    font-size: 2.2rem;
+    font-weight: 500;
+}
+
+.stair-calculator-result span
+{
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.stair-calculator-result .is-ideal
+{
+    color: #bce4bc;
+}
+
+.stair-calculator-result .is-outside-ideal
+{
+    color: #ffd0a6;
+}
+
+.stair-calculator-note
+{
+    max-width: 740px;
+    margin: 22px 0 0;
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+@media (max-width: 680px)
+{
+    .stair-calculator-card
+    {
+        grid-template-columns: 1fr;
+    }
+
+    .stair-calculator-fields
+    {
+        grid-template-columns: 1fr;
+        padding: 22px;
+    }
+
+    .stair-calculator-result
+    {
+        padding: 24px 22px;
+    }
+}

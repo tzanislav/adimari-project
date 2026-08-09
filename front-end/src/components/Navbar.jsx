@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useActiveSelection } from '../context/selectionContext';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import '../CSS/Navbar.css';
 
 function Navbar() {
@@ -9,40 +9,57 @@ function Navbar() {
   const { activeSelection, clearActiveSelection } = useActiveSelection();
   const { user, logout, role } = useAuth();
 
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  const toggleMenu = () => setIsMenuOpen((isOpen) => !isOpen);
+  const closeMenu = () => setIsMenuOpen(false);
+  const navigationItems = [
+    { to: '/', label: 'Home' },
+    { to: '/items', label: 'Items' },
+    ...(user ? [{ to: '/projects', label: 'Projects' }] : []),
+    { to: '/team', label: 'Team' },
+    { to: '/licenses', label: 'Licenses' },
+  ];
 
   return (
     <nav className="navbar">
       <div className="navbar-top">
         <div className="navbar-container">
-          <Link to="/" className="navbar-logo">Adimari</Link>
-          <button className="navbar-toggle" onClick={toggleMenu} aria-label="Toggle menu">☰</button>
-          <ul  onClick={toggleMenu} className={`navbar-links ${isMenuOpen ? 'open' : ''}` }>
-            <li><Link to="/">Home</Link></li>
-            <li><Link to="/items">Items</Link></li>
-            {user  && <li><Link to="/projects">Projects</Link></li>}
-            <li><Link to="/team">Team</Link></li>
-            <li><Link to="/licenses">Licenses</Link></li>
-
+          <Link to="/" className="navbar-logo" onClick={closeMenu}>Adimari</Link>
+          <button
+            className="navbar-toggle"
+            onClick={toggleMenu}
+            aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMenuOpen}
+            aria-controls="primary-navigation"
+          >
+            <span></span><span></span><span></span>
+          </button>
+          <ul id="primary-navigation" className={`navbar-links ${isMenuOpen ? 'open' : ''}`}>
+            {navigationItems.map(({ to, label }) => (
+              <li key={to}>
+                <NavLink to={to} end={to === '/'} onClick={closeMenu}>
+                  {label}
+                </NavLink>
+              </li>
+            ))}
             {user ? (
-              <div className="navbar-auth-mobile">
-                <Link to="/signup" className="auth-link">{user.email}</Link>
-                <span className="user-email auth-link">{role}</span>
+              <li className="navbar-auth-mobile">
+                <Link to="/signup" className="auth-link" onClick={closeMenu}>{user.email}</Link>
+                <span className="user-role">{role}</span>
                 <button onClick={logout} className="logout-button">Sign out</button>
-              </div>
+              </li>
             ) : (
-              <Link to="/signup" className="auth-link">Sign In</Link>
+              <li className="navbar-auth-mobile"><Link to="/signup" className="auth-link" onClick={closeMenu}>Sign in</Link></li>
             )}
           </ul>
           <div className="navbar-auth">
             {user ? (
               <>
                 <Link to="/signup" className="auth-link">{user.email}</Link>
-                <span className="user-email auth-link">{role}</span>
+                <span className="user-role">{role}</span>
                 <button onClick={logout} className="logout-button">Sign out</button>
               </>
             ) : (
-              <Link to="/signup" className="auth-link">Sign In</Link>
+              <Link to="/signup" className="auth-link">Sign in</Link>
             )}
           </div>
         </div>

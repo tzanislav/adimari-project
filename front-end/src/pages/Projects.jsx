@@ -1,72 +1,51 @@
-import React, {useState, useEffect} from "react";
-import { Link } from "react-router-dom";
-import ListProject from "../components/ListProject";
-import DeleteBox from "../components/DeleteBox";
+import ProjectLinkCard from '../components/ProjectLinkCard';
 import '../CSS/Projects.css';
-import { useActiveSelection } from "../context/selectionContext";
-import { getAuthHeaders } from '../utils/authHeaders';
+
+const projectLinks = [
+  {
+    title: 'Selection',
+    description: 'Browse and manage your existing project selections.',
+    to: '/projects/selection',
+    thumbnail: null,
+  },
+  {
+    title: 'Stair Calculator',
+    description: 'Plan comfortable stair proportions using the ideal slope formula.',
+    to: '/projects/stair-calculator',
+    thumbnail: null,
+  },
+  {
+    title: 'History Around',
+    description: 'Explore the History Around application.',
+    href: 'https://historyaround.com',
+    thumbnail: null,
+  },
+  {
+    title: 'Gaussian Splat',
+    description: 'Explore the Gaussian Splat 3D viewer.',
+    href: 'https://3dsplatviewer.com',
+    thumbnail: null,
+  },
+  {
+    title: 'Nesting App',
+    description: 'Open the nesting application and its project workspace.',
+    href: 'http://ec2-54-76-118-84.eu-west-1.compute.amazonaws.com',
+    thumbnail: null,
+  },
+];
 
 function Projects() {
-    const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const {serverUrl} = useActiveSelection();
-
-    useEffect(() => {
-        fetch(`${serverUrl}/api/projects`)
-            .then((response) => response.json())
-            .then((data) => {
-                setProjects(data);
-                setLoading(false);
-                setIsDeleting(false);
-            })
-            .catch((error) => {
-                setError(error);
-                setLoading(false);
-            });
-    }, []);
-
-
-    const handleDelete = async (id) => {
-        try {
-            const headers = await getAuthHeaders();
-            await fetch(`${serverUrl}/api/projects/${id}`, {
-                method: 'DELETE',
-                headers,
-            });
-            setProjects((prev) => prev.filter((project) => project._id !== id));
-            setIsDeleting(false);
-        } catch (error) {
-            console.error("Failed to delete project:", error);
-        }
-    };
-
-    if (loading) {
-        return <p>Loading...</p>;
-    }
-
-    if (error) {
-        return <p>Failed to load projects: {error.toString()}</p>;
-    }
-
-    return (
-        <div className="projects-page"> 
-            <h1>Projects</h1>
-            <Link to="/projects/new" className="link">Add a new project</Link>
-
-            {isDeleting && (
-                <DeleteBox itemName="project" deleteFunction={() => handleDelete(isDeleting)} closeFunction={() => setIsDeleting(false)}/>
-            )}
-
-                {projects.map((project) => (
-                    <div key={project._id} className='list-project-container'>
-                        <ListProject _project={project} onDelete={setIsDeleting} />
-                    </div>
-                ))}
-
-        </div>
-    );
+  return (
+    <main className="project-directory">
+      <h1>Projects</h1>
+      <p className="project-directory-intro">Choose a project to continue.</p>
+      <div className="project-link-card-grid">
+        {projectLinks.map((project) => (
+          <ProjectLinkCard key={project.title} {...project} />
+        ))}
+      </div>
+    </main>
+  );
 }
 
 export default Projects;

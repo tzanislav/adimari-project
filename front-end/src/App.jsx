@@ -1,7 +1,7 @@
-import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Home from './pages/Home'; // Optional component to show a single model
 import Projects from './pages/Projects'; // Optional component to show projects
+import SelectionProjects from './pages/SelectionProjects';
 import ProjectForm from './components/ProjectForm';
 import ShowProject from './pages/ShowProject'; // Optional component to show a single project
 import ShowSelection from './pages/ShowSelection';
@@ -17,6 +17,7 @@ import TeamStatus from './pages/TeamStatus';
 import TeamSummary from './pages/TeamSummary';
 import Licenses from './pages/Licenses';
 import LogTest from './pages/Other/LogTest';
+import StairCalculator from './pages/StairCalculator';
 
 import './App.css';
 
@@ -48,6 +49,14 @@ function App() {
           <Route
             path="/projects"
             element={<ProtectedRoute element={<Projects />} />}
+          />
+          <Route
+            path="/projects/selection"
+            element={<ProtectedRoute element={<SelectionProjects />} />}
+          />
+          <Route
+            path="/projects/stair-calculator"
+            element={<ProtectedRoute element={<StairCalculator />} />}
           />
           <Route
             path="/projects/:id"

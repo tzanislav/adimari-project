@@ -1,9 +1,90 @@
-.home
-{
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 80vh;
-    background-color: #f5f5f5;
+.home {
+  position: relative;
+  display: grid;
+  min-height: calc(100svh - 68px);
+  overflow: hidden;
+  place-items: center;
+  isolation: isolate;
+  background: #242321;
+}
+
+.home-background-video,
+.home-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.home-background-video {
+  z-index: 0;
+  object-fit: cover;
+}
+
+.home-overlay {
+  z-index: 1;
+  background: linear-gradient(135deg, rgba(24, 23, 20, 0.62), rgba(24, 23, 20, 0.28));
+}
+
+.home-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 36px 24px;
+  color: #fff;
+  font-family: 'DM Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  text-align: center;
+}
+
+.home-logo {
+  width: clamp(120px, 18vw, 190px);
+  height: auto;
+  filter: brightness(0) invert(1);
+}
+
+.home-welcome {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.55;
+}
+
+.home-welcome strong {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.home-signin {
+  margin-top: 4px;
+  padding: 10px 17px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.home-signin:hover {
+  border-color: #fff;
+  background: #fff;
+  color: #242321;
+}
+
+@media (max-width: 768px) {
+  .home { min-height: calc(100svh - 60px); }
+  .home-content { gap: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-background-video { display: none; }
 }
