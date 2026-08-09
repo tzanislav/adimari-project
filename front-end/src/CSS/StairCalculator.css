@@ -70,6 +70,37 @@
     font-size: 0.95rem;
 }
 
+.stair-calculator-fields .stair-calculator-ratio-toggle
+{
+    grid-column: 1 / -1;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 10px;
+    padding-top: 2px;
+    cursor: pointer;
+}
+
+.stair-calculator-ratio-toggle input
+{
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: #303030;
+}
+
+.stair-calculator-ratio-toggle span
+{
+    display: grid;
+    gap: 2px;
+}
+
+.stair-calculator-ratio-toggle small
+{
+    color: #666;
+    font-size: 0.8rem;
+    font-weight: normal;
+}
+
 .stair-calculator-input
 {
     display: flex;
@@ -264,6 +295,28 @@
     overflow: auto;
 }
 
+.stair-schematic-download
+{
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.stair-schematic-download button
+{
+    padding: 9px 13px;
+    color: #fff;
+    border: 1px solid #303030;
+    background: #303030;
+    font: inherit;
+    cursor: pointer;
+}
+
+.stair-schematic-download button:hover
+{
+    background: #4a4a4a;
+}
+
 .stair-schematic-key-finish
 {
     height: 10px;
@@ -411,5 +464,10 @@
     {
         justify-content: flex-start;
         margin: 0 0 14px;
+    }
+
+    .stair-schematic-download
+    {
+        justify-content: flex-start;
     }
 }

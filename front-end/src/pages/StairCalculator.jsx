@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../CSS/StairCalculator.css';
 
@@ -11,7 +11,9 @@ const MIN_SCHEMATIC_ZOOM = 0.75;
 const MAX_SCHEMATIC_ZOOM = 2.5;
 const SCHEMATIC_ZOOM_STEP = 0.25;
 
-const roundToTenth = (value) => Math.round(value * 10) / 10;
+const roundToMillimetre = (value) => Math.round(value);
+const metresFromMillimetres = (value) => roundToMillimetre(value) / 1000;
+const formatMetres = (value) => metresFromMillimetres(value).toFixed(3);
 
 function StairCalculator() {
   const [rise, setRise] = useState(160);
@@ -21,13 +23,15 @@ function StairCalculator() {
   const [landingFlooring, setLandingFlooring] = useState(50);
   const [stepFlooring, setStepFlooring] = useState(20);
   const [schematicZoom, setSchematicZoom] = useState(1);
+  const [maintainPerfectRatio, setMaintainPerfectRatio] = useState(true);
+  const schematicRef = useRef(null);
 
   const slope = (2 * rise) + tread;
   const slopeStatus = slope >= MIN_IDEAL_SLOPE && slope <= MAX_IDEAL_SLOPE;
   const totalRise = rise * steps;
   const treadCount = Math.max(steps - 1, 0);
   const totalRun = tread * treadCount;
-  const drawing = { width: 1000, height: 500, left: 92, right: 60, top: 48, bottom: 128 };
+  const drawing = { width: 1000, height: 560, left: 92, right: 60, top: 48, bottom: 188 };
   const drawingScale = Math.min(
     (drawing.width - drawing.left - drawing.right - 120) / Math.max(totalRun, 1),
     (drawing.height - drawing.top - drawing.bottom) / totalRise,
@@ -86,8 +90,8 @@ function StairCalculator() {
   const totalRunLabelY = totalRunDimensionY + 28;
   const firstConcreteStepTopY = stairStart.y - (rise * drawingScale) + stepFlooringOffset;
   const lastConcreteStepTopY = stairStart.y - (treadCount * rise * drawingScale) + stepFlooringOffset;
-  const firstConcreteRiserHeight = roundToTenth(rise + landingFlooring - stepFlooring);
-  const lastConcreteRiserHeight = roundToTenth(rise - landingFlooring + stepFlooring);
+  const firstConcreteRiserHeight = roundToMillimetre(rise + landingFlooring - stepFlooring);
+  const lastConcreteRiserHeight = roundToMillimetre(rise - landingFlooring + stepFlooring);
   const firstRiserDimensionX = concreteStart.x - 18;
   const lastRiserDimensionX = upperLandingConcreteStart + 18;
 
@@ -96,28 +100,39 @@ function StairCalculator() {
     if (!Number.isFinite(nextRise) || nextRise <= 0) return;
 
     setRise(nextRise);
-    setTread(roundToTenth(IDEAL_SLOPE - (2 * nextRise)));
-    setFloorHeight(roundToTenth((nextRise * steps) / 1000));
+    if (maintainPerfectRatio) {
+      setTread(roundToMillimetre(IDEAL_SLOPE - (2 * nextRise)));
+    }
+    setFloorHeight(metresFromMillimetres(nextRise * steps));
   }
 
   function handleTreadChange(event) {
     const nextTread = Number(event.target.value);
     if (!Number.isFinite(nextTread) || nextTread <= 0) return;
 
-    const nextRise = roundToTenth((IDEAL_SLOPE - nextTread) / 2);
-    if (nextRise <= 0) return;
+    if (maintainPerfectRatio) {
+      const nextRise = roundToMillimetre((IDEAL_SLOPE - nextTread) / 2);
+      if (nextRise <= 0) return;
+
+      setTread(nextTread);
+      setRise(nextRise);
+      setFloorHeight(metresFromMillimetres(nextRise * steps));
+      return;
+    }
 
     setTread(nextTread);
-    setRise(nextRise);
-    setFloorHeight(roundToTenth((nextRise * steps) / 1000));
   }
 
   function handleStepsChange(event) {
     const nextSteps = Math.round(Number(event.target.value));
     if (!Number.isFinite(nextSteps) || nextSteps < 1) return;
 
+    const nextRise = roundToMillimetre((floorHeight * 1000) / nextSteps);
     setSteps(nextSteps);
-    setRise(roundToTenth((floorHeight * 1000) / nextSteps));
+    setRise(nextRise);
+    if (maintainPerfectRatio) {
+      setTread(roundToMillimetre(IDEAL_SLOPE - (2 * nextRise)));
+    }
   }
 
   function handleFloorHeightChange(event) {
@@ -125,12 +140,14 @@ function StairCalculator() {
     if (!Number.isFinite(nextFloorHeight) || nextFloorHeight <= 0) return;
 
     const nextSteps = Math.max(1, Math.round((nextFloorHeight * 1000) / rise));
-    const nextRise = roundToTenth((nextFloorHeight * 1000) / nextSteps);
+    const nextRise = roundToMillimetre((nextFloorHeight * 1000) / nextSteps);
 
     setFloorHeight(nextFloorHeight);
     setSteps(nextSteps);
     setRise(nextRise);
-    setTread(roundToTenth(IDEAL_SLOPE - (2 * nextRise)));
+    if (maintainPerfectRatio) {
+      setTread(roundToMillimetre(IDEAL_SLOPE - (2 * nextRise)));
+    }
   }
 
   function handleLandingFlooringChange(event) {
@@ -149,6 +166,53 @@ function StairCalculator() {
 
   function changeSchematicZoom(amount) {
     setSchematicZoom((currentZoom) => Math.min(MAX_SCHEMATIC_ZOOM, Math.max(MIN_SCHEMATIC_ZOOM, currentZoom + amount)));
+  }
+
+  function handleMaintainPerfectRatioChange(event) {
+    const nextMaintainPerfectRatio = event.target.checked;
+    setMaintainPerfectRatio(nextMaintainPerfectRatio);
+
+    if (nextMaintainPerfectRatio) {
+      setTread(roundToMillimetre(IDEAL_SLOPE - (2 * rise)));
+    }
+  }
+
+  function saveSchematicAsPng() {
+    const svg = schematicRef.current;
+    if (!svg) return;
+
+    const { width, height } = svg.viewBox.baseVal;
+    const svgBlob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const image = new Image();
+
+    image.onload = () => {
+      const scale = 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.scale(scale, scale);
+      context.drawImage(image, 0, 0, width, height);
+      URL.revokeObjectURL(svgUrl);
+
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) return;
+
+        const pngUrl = URL.createObjectURL(pngBlob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = pngUrl;
+        downloadLink.download = 'stair-schematic.png';
+        downloadLink.click();
+        URL.revokeObjectURL(pngUrl);
+      }, 'image/png');
+    };
+
+    image.onerror = () => URL.revokeObjectURL(svgUrl);
+    image.src = svgUrl;
   }
 
   return (
@@ -204,11 +268,18 @@ function StairCalculator() {
               <span>mm</span>
             </span>
           </label>
+          <label className="stair-calculator-ratio-toggle">
+            <input type="checkbox" checked={maintainPerfectRatio} onChange={handleMaintainPerfectRatioChange} />
+            <span>
+              Maintain perfect ratio
+              <small>Keep 2 × rise + tread at 630 mm</small>
+            </span>
+          </label>
         </div>
 
         <div className="stair-calculator-result" aria-live="polite">
           <p>Calculated slope</p>
-          <strong>{roundToTenth(slope)} mm</strong>
+          <strong>{roundToMillimetre(slope)} mm</strong>
           <span className={slopeStatus ? 'is-ideal' : 'is-outside-ideal'}>
             {slopeStatus ? 'Within the ideal 620–640 mm range' : 'Outside the ideal 620–640 mm range'}
           </span>
@@ -221,7 +292,7 @@ function StairCalculator() {
             <p className="stair-calculator-eyebrow">Side view</p>
             <h2 id="stair-schematic-title">Stair schematic</h2>
           </div>
-          <p>{steps} steps · {roundToTenth(rise)} mm rise · {roundToTenth(tread)} mm tread</p>
+          <p>{steps} steps · {roundToMillimetre(rise)} mm rise · {roundToMillimetre(tread)} mm tread</p>
         </div>
         <div className="stair-schematic-legend" aria-label="Schematic key">
           <span><i className="stair-schematic-key-finish" aria-hidden="true" />Finished flooring</span>
@@ -235,17 +306,36 @@ function StairCalculator() {
         </div>
         <div className="stair-schematic-viewport">
           <svg
+            ref={schematicRef}
+            xmlns="http://www.w3.org/2000/svg"
             className="stair-schematic-drawing"
             style={{ width: `${schematicZoom * 100}%` }}
             viewBox={`0 0 ${drawing.width} ${drawing.height}`}
             role="img"
-            aria-label={`Side view of ${steps} stairs with a ${roundToTenth(rise)} millimetre rise and ${roundToTenth(tread)} millimetre tread`}
+            aria-label={`Side view of ${steps} stairs with a ${roundToMillimetre(rise)} millimetre rise and ${roundToMillimetre(tread)} millimetre tread`}
           >
           <defs>
             <marker id="dimension-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" />
             </marker>
           </defs>
+          <style>{`
+            text { font-family: Arial, sans-serif; }
+            .stair-schematic-steps { fill: none; stroke: #222; stroke-linecap: square; stroke-linejoin: miter; stroke-width: 3; vector-effect: non-scaling-stroke; }
+            .stair-schematic-concrete-fill { fill: #e7e7e7; }
+            .stair-schematic-flooring-fill { fill: #decdb9; }
+            .stair-schematic-concrete-outline { fill: none; stroke: #8b6b4f; stroke-linecap: square; stroke-linejoin: miter; stroke-width: 3; vector-effect: non-scaling-stroke; }
+            .stair-schematic-floor { stroke: #777; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+            .stair-schematic-landing { stroke: #222; stroke-width: 3; vector-effect: non-scaling-stroke; }
+            .stair-schematic-extension { stroke: #aaa; stroke-dasharray: 4 4; stroke-width: 1; vector-effect: non-scaling-stroke; }
+            .stair-schematic-dimension { stroke: #555; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+            .stair-schematic-concrete-measurement { stroke: #8b6b4f; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+            .stair-schematic-label { fill: #555; font-size: 18px; }
+            .stair-schematic-concrete-measurement-label { fill: #8b6b4f; font-size: 15px; }
+            .stair-schematic-export-details { fill: #555; font-size: 14px; }
+            .stair-schematic-export-divider { stroke: #d0d0d0; stroke-width: 1; vector-effect: non-scaling-stroke; }
+            marker path { fill: #555; }
+          `}</style>
           <rect
             className="stair-schematic-concrete-fill"
             x="46"
@@ -342,7 +432,7 @@ function StairCalculator() {
                 markerEnd="url(#dimension-arrow)"
               />
               <text className="stair-schematic-label" x={(stairStart.x + stairEnd.x) / 2} y={totalRunLabelY} textAnchor="middle">
-                {roundToTenth(totalRun / 1000)} m total run
+                {formatMetres(totalRun)} m total run
               </text>
             </>
           )}
@@ -358,14 +448,24 @@ function StairCalculator() {
             markerEnd="url(#dimension-arrow)"
           />
           <text className="stair-schematic-label" x={riseDimensionLabelX} y={(stairStart.y + stairEnd.y) / 2} textAnchor="middle" transform={`rotate(-90 ${riseDimensionLabelX} ${(stairStart.y + stairEnd.y) / 2})`}>
-            {roundToTenth(totalRise / 1000)} m total rise
+            {formatMetres(totalRise)} m total rise
+          </text>
+          <line className="stair-schematic-export-divider" x1="46" y1={drawing.height - 64} x2={drawing.width - 46} y2={drawing.height - 64} />
+          <text className="stair-schematic-export-details" x="46" y={drawing.height - 38}>
+            Rise: {rise} mm   Tread: {tread} mm   Steps: {steps}   Floor-to-floor: {floorHeight} m
+          </text>
+          <text className="stair-schematic-export-details" x="46" y={drawing.height - 16}>
+            Landing flooring: {landingFlooring} mm   Step flooring: {stepFlooring} mm   Maintain perfect ratio: {maintainPerfectRatio ? 'Yes' : 'No'}
           </text>
           </svg>
+        </div>
+        <div className="stair-schematic-download">
+          <button type="button" onClick={saveSchematicAsPng}>Save as PNG</button>
         </div>
       </section>
 
       <p className="stair-calculator-note">
-        Changing rise or tread keeps the slope at 630 mm. Changing floor height selects the closest whole number of steps; changing step count keeps the floor height and tread unchanged.
+        With “Maintain perfect ratio” enabled, recalculations keep 2 × rise + tread as close as possible to 630 mm. Changing floor height always selects the closest whole number of steps while preserving the entered floor-to-floor height.
       </p>
     </main>
   );
