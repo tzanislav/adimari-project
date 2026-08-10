@@ -70,6 +70,34 @@
     font-size: 0.95rem;
 }
 
+.stair-calculator-field-label
+{
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stair-calculator-rise-toggle
+{
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    color: #666;
+    font-size: 0.75rem;
+    font-weight: normal;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.stair-calculator-rise-toggle input
+{
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: #303030;
+}
+
 .stair-calculator-fields .stair-calculator-ratio-toggle
 {
     grid-column: 1 / -1;
@@ -101,6 +129,59 @@
     font-weight: normal;
 }
 
+.stair-calculator-residual,
+.stair-calculator-actions
+{
+    grid-column: 1 / -1;
+}
+
+.stair-calculator-residual
+{
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 12px;
+    align-items: baseline;
+    padding: 12px 14px;
+    color: #555;
+    background: #f4f4f4;
+}
+
+.stair-calculator-residual strong
+{
+    color: #222;
+    font-size: 1.05rem;
+    font-weight: 500;
+    text-align: right;
+}
+
+.stair-calculator-residual small
+{
+    grid-column: 1 / -1;
+    color: #777;
+    font-size: 0.78rem;
+}
+
+.stair-calculator-actions
+{
+    display: flex;
+    justify-content: flex-end;
+}
+
+.stair-calculator-actions button
+{
+    padding: 10px 15px;
+    color: #fff;
+    border: 1px solid #303030;
+    background: #303030;
+    font: inherit;
+    cursor: pointer;
+}
+
+.stair-calculator-actions button:hover
+{
+    background: #4a4a4a;
+}
+
 .stair-calculator-input
 {
     display: flex;
@@ -124,6 +205,13 @@
     outline: 0;
     color: #222;
     font: inherit;
+}
+
+.stair-calculator-input input:disabled
+{
+    color: #777;
+    background: #f2f2f2;
+    cursor: not-allowed;
 }
 
 .stair-calculator-input span

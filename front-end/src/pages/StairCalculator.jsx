@@ -14,6 +14,29 @@ const SCHEMATIC_ZOOM_STEP = 0.25;
 const roundToMillimetre = (value) => Math.round(value);
 const metresFromMillimetres = (value) => roundToMillimetre(value) / 1000;
 const formatMetres = (value) => metresFromMillimetres(value).toFixed(3);
+const findIdealStepCountForTread = (floorHeight, tread, currentSteps) => {
+  const idealRise = (IDEAL_SLOPE - tread) / 2;
+  if (idealRise <= 0) return currentSteps;
+
+  const floorHeightInMillimetres = floorHeight * 1000;
+  const estimatedSteps = Math.max(1, roundToMillimetre(floorHeightInMillimetres / idealRise));
+  let bestSteps = estimatedSteps;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let candidate = Math.max(1, estimatedSteps - 3); candidate <= estimatedSteps + 3; candidate += 1) {
+    const candidateRise = roundToMillimetre(floorHeightInMillimetres / candidate);
+    const slopeDifference = Math.abs((2 * candidateRise) + tread - IDEAL_SLOPE);
+    const heightResidual = Math.abs(floorHeightInMillimetres - (candidateRise * candidate));
+    const score = (slopeDifference * 1000) + heightResidual + (Math.abs(candidate - currentSteps) * 0.001);
+
+    if (score < bestScore) {
+      bestSteps = candidate;
+      bestScore = score;
+    }
+  }
+
+  return bestSteps;
+};
 
 function StairCalculator() {
   const [rise, setRise] = useState(160);
@@ -23,12 +46,22 @@ function StairCalculator() {
   const [landingFlooring, setLandingFlooring] = useState(50);
   const [stepFlooring, setStepFlooring] = useState(20);
   const [schematicZoom, setSchematicZoom] = useState(1);
-  const [maintainPerfectRatio, setMaintainPerfectRatio] = useState(true);
+  const [isRiseUnlocked, setIsRiseUnlocked] = useState(false);
+  const [fieldValues, setFieldValues] = useState({
+    rise: '160',
+    tread: '310',
+    steps: '16',
+    floorHeight: '2.56',
+    landingFlooring: '50',
+    stepFlooring: '20',
+  });
+  const [lastEditedField, setLastEditedField] = useState('steps');
   const schematicRef = useRef(null);
 
   const slope = (2 * rise) + tread;
   const slopeStatus = slope >= MIN_IDEAL_SLOPE && slope <= MAX_IDEAL_SLOPE;
   const totalRise = rise * steps;
+  const floorHeightResidual = roundToMillimetre((floorHeight * 1000) - totalRise);
   const treadCount = Math.max(steps - 1, 0);
   const totalRun = tread * treadCount;
   const drawing = { width: 1000, height: 560, left: 92, right: 60, top: 48, bottom: 188 };
@@ -95,85 +128,107 @@ function StairCalculator() {
   const firstRiserDimensionX = concreteStart.x - 18;
   const lastRiserDimensionX = upperLandingConcreteStart + 18;
 
-  function handleRiseChange(event) {
-    const nextRise = Number(event.target.value);
-    if (!Number.isFinite(nextRise) || nextRise <= 0) return;
-
-    setRise(nextRise);
-    if (maintainPerfectRatio) {
-      setTread(roundToMillimetre(IDEAL_SLOPE - (2 * nextRise)));
-    }
-    setFloorHeight(metresFromMillimetres(nextRise * steps));
+  function applyCalculatorValues(nextValues) {
+    setRise(nextValues.rise);
+    setTread(nextValues.tread);
+    setSteps(nextValues.steps);
+    setFloorHeight(nextValues.floorHeight);
+    setLandingFlooring(nextValues.landingFlooring);
+    setStepFlooring(nextValues.stepFlooring);
+    setFieldValues({
+      rise: String(nextValues.rise),
+      tread: String(nextValues.tread),
+      steps: String(nextValues.steps),
+      floorHeight: String(nextValues.floorHeight),
+      landingFlooring: String(nextValues.landingFlooring),
+      stepFlooring: String(nextValues.stepFlooring),
+    });
   }
 
-  function handleTreadChange(event) {
-    const nextTread = Number(event.target.value);
-    if (!Number.isFinite(nextTread) || nextTread <= 0) return;
+  function resetFieldValues() {
+    applyCalculatorValues({ rise, tread, steps, floorHeight, landingFlooring, stepFlooring });
+  }
 
-    if (maintainPerfectRatio) {
-      const nextRise = roundToMillimetre((IDEAL_SLOPE - nextTread) / 2);
-      if (nextRise <= 0) return;
+  function handleFieldInput(field, event) {
+    setFieldValues((currentValues) => ({ ...currentValues, [field]: event.target.value }));
+    setLastEditedField(field);
+  }
 
-      setTread(nextTread);
-      setRise(nextRise);
-      setFloorHeight(metresFromMillimetres(nextRise * steps));
+  function commitField(field) {
+    const inputValue = Number(fieldValues[field]);
+    const currentValues = { rise, tread, steps, floorHeight, landingFlooring, stepFlooring };
+    const nextValues = { ...currentValues };
+
+    if (!Number.isFinite(inputValue)) {
+      resetFieldValues();
       return;
     }
 
-    setTread(nextTread);
-  }
-
-  function handleStepsChange(event) {
-    const nextSteps = Math.round(Number(event.target.value));
-    if (!Number.isFinite(nextSteps) || nextSteps < 1) return;
-
-    const nextRise = roundToMillimetre((floorHeight * 1000) / nextSteps);
-    setSteps(nextSteps);
-    setRise(nextRise);
-    if (maintainPerfectRatio) {
-      setTread(roundToMillimetre(IDEAL_SLOPE - (2 * nextRise)));
+    if (field === 'rise') {
+      if (inputValue <= 0) return resetFieldValues();
+      nextValues.rise = roundToMillimetre(inputValue);
+      if (!isRiseUnlocked) nextValues.tread = roundToMillimetre(IDEAL_SLOPE - (2 * nextValues.rise));
     }
-  }
 
-  function handleFloorHeightChange(event) {
-    const nextFloorHeight = Number(event.target.value);
-    if (!Number.isFinite(nextFloorHeight) || nextFloorHeight <= 0) return;
-
-    const nextSteps = Math.max(1, Math.round((nextFloorHeight * 1000) / rise));
-    const nextRise = roundToMillimetre((nextFloorHeight * 1000) / nextSteps);
-
-    setFloorHeight(nextFloorHeight);
-    setSteps(nextSteps);
-    setRise(nextRise);
-    if (maintainPerfectRatio) {
-      setTread(roundToMillimetre(IDEAL_SLOPE - (2 * nextRise)));
+    if (field === 'tread') {
+      if (inputValue <= 0) return resetFieldValues();
+      nextValues.tread = roundToMillimetre(inputValue);
+      if (!isRiseUnlocked) {
+        nextValues.steps = findIdealStepCountForTread(floorHeight, nextValues.tread, steps);
+        nextValues.rise = roundToMillimetre((floorHeight * 1000) / nextValues.steps);
+      }
     }
+
+    if (field === 'steps') {
+      if (inputValue < 1) return resetFieldValues();
+      nextValues.steps = Math.max(1, roundToMillimetre(inputValue));
+      if (!isRiseUnlocked) {
+        nextValues.rise = roundToMillimetre((floorHeight * 1000) / nextValues.steps);
+        nextValues.tread = roundToMillimetre(IDEAL_SLOPE - (2 * nextValues.rise));
+      }
+    }
+
+    if (field === 'floorHeight') {
+      if (inputValue <= 0) return resetFieldValues();
+      nextValues.floorHeight = inputValue;
+      nextValues.rise = roundToMillimetre((inputValue * 1000) / steps);
+      nextValues.tread = roundToMillimetre(IDEAL_SLOPE - (2 * nextValues.rise));
+    }
+
+    if (field === 'landingFlooring' || field === 'stepFlooring') {
+      if (inputValue < 0) return resetFieldValues();
+      nextValues[field] = roundToMillimetre(inputValue);
+    }
+
+    applyCalculatorValues(nextValues);
   }
 
-  function handleLandingFlooringChange(event) {
-    const nextThickness = Number(event.target.value);
-    if (!Number.isFinite(nextThickness) || nextThickness < 0) return;
+  function handleFieldKeyDown(field, event) {
+    if (event.key !== 'Enter') return;
 
-    setLandingFlooring(nextThickness);
-  }
-
-  function handleStepFlooringChange(event) {
-    const nextThickness = Number(event.target.value);
-    if (!Number.isFinite(nextThickness) || nextThickness < 0) return;
-
-    setStepFlooring(nextThickness);
+    event.preventDefault();
+    commitField(field);
+    event.currentTarget.blur();
   }
 
   function changeSchematicZoom(amount) {
     setSchematicZoom((currentZoom) => Math.min(MAX_SCHEMATIC_ZOOM, Math.max(MIN_SCHEMATIC_ZOOM, currentZoom + amount)));
   }
 
-  function handleMaintainPerfectRatioChange(event) {
-    const nextMaintainPerfectRatio = event.target.checked;
-    setMaintainPerfectRatio(nextMaintainPerfectRatio);
+  function handleRiseUnlockChange(event) {
+    const nextIsRiseUnlocked = event.target.checked;
+    setIsRiseUnlocked(nextIsRiseUnlocked);
 
-    if (nextMaintainPerfectRatio) {
-      setTread(roundToMillimetre(IDEAL_SLOPE - (2 * rise)));
+    if (!nextIsRiseUnlocked) {
+      const nextRise = roundToMillimetre((floorHeight * 1000) / steps);
+      applyCalculatorValues({
+        rise: nextRise,
+        tread: roundToMillimetre(IDEAL_SLOPE - (2 * nextRise)),
+        steps,
+        floorHeight,
+        landingFlooring,
+        stepFlooring,
+      });
     }
   }
 
@@ -227,54 +282,61 @@ function StairCalculator() {
       <section className="stair-calculator-card" aria-label="Stair dimensions">
         <div className="stair-calculator-fields">
           <label>
-            Step height (rise)
+            <span className="stair-calculator-field-label">
+              Step height (rise)
+              <span className="stair-calculator-rise-toggle">
+                <input type="checkbox" checked={isRiseUnlocked} onChange={handleRiseUnlockChange} />
+                Enter manually
+              </span>
+            </span>
             <span className="stair-calculator-input">
-              <input type="number" min="1" step="0.1" value={rise} onChange={handleRiseChange} />
+              <input type="number" min="1" step="0.1" value={fieldValues.rise} disabled={!isRiseUnlocked} onChange={(event) => handleFieldInput('rise', event)} onBlur={() => commitField('rise')} onKeyDown={(event) => handleFieldKeyDown('rise', event)} />
               <span>mm</span>
             </span>
           </label>
           <label>
             Step depth (tread)
             <span className="stair-calculator-input">
-              <input type="number" min="1" step="0.1" value={tread} onChange={handleTreadChange} />
+              <input type="number" min="1" step="0.1" value={fieldValues.tread} onChange={(event) => handleFieldInput('tread', event)} onBlur={() => commitField('tread')} onKeyDown={(event) => handleFieldKeyDown('tread', event)} />
               <span>mm</span>
             </span>
           </label>
           <label>
             Total number of steps
             <span className="stair-calculator-input">
-              <input type="number" min="1" step="1" value={steps} onChange={handleStepsChange} />
+              <input type="number" min="1" step="1" value={fieldValues.steps} onChange={(event) => handleFieldInput('steps', event)} onBlur={() => commitField('steps')} onKeyDown={(event) => handleFieldKeyDown('steps', event)} />
               <span>steps</span>
             </span>
           </label>
           <label>
             Floor-to-floor height
             <span className="stair-calculator-input">
-              <input type="number" min="0.01" step="0.01" value={floorHeight} onChange={handleFloorHeightChange} />
+              <input type="number" min="0.01" step="0.001" value={fieldValues.floorHeight} disabled={isRiseUnlocked} onChange={(event) => handleFieldInput('floorHeight', event)} onBlur={() => commitField('floorHeight')} onKeyDown={(event) => handleFieldKeyDown('floorHeight', event)} />
               <span>m</span>
             </span>
           </label>
           <label>
             Landing flooring thickness
             <span className="stair-calculator-input">
-              <input type="number" min="0" step="0.1" value={landingFlooring} onChange={handleLandingFlooringChange} />
+              <input type="number" min="0" step="0.1" value={fieldValues.landingFlooring} onChange={(event) => handleFieldInput('landingFlooring', event)} onBlur={() => commitField('landingFlooring')} onKeyDown={(event) => handleFieldKeyDown('landingFlooring', event)} />
               <span>mm</span>
             </span>
           </label>
           <label>
             Step flooring thickness
             <span className="stair-calculator-input">
-              <input type="number" min="0" step="0.1" value={stepFlooring} onChange={handleStepFlooringChange} />
+              <input type="number" min="0" step="0.1" value={fieldValues.stepFlooring} onChange={(event) => handleFieldInput('stepFlooring', event)} onBlur={() => commitField('stepFlooring')} onKeyDown={(event) => handleFieldKeyDown('stepFlooring', event)} />
               <span>mm</span>
             </span>
           </label>
-          <label className="stair-calculator-ratio-toggle">
-            <input type="checkbox" checked={maintainPerfectRatio} onChange={handleMaintainPerfectRatioChange} />
-            <span>
-              Maintain perfect ratio
-              <small>Keep 2 × rise + tread at 630 mm</small>
-            </span>
-          </label>
+          <div className="stair-calculator-residual">
+            <span>Floor-height residual</span>
+            <strong>{floorHeightResidual > 0 ? '+' : ''}{floorHeightResidual} mm</strong>
+            <small>Floor-to-floor height − calculated total rise</small>
+          </div>
+          <div className="stair-calculator-actions">
+            <button type="button" onClick={() => commitField(lastEditedField)}>Recalculate</button>
+          </div>
         </div>
 
         <div className="stair-calculator-result" aria-live="polite">
@@ -455,7 +517,7 @@ function StairCalculator() {
             Rise: {rise} mm   Tread: {tread} mm   Steps: {steps}   Floor-to-floor: {floorHeight} m
           </text>
           <text className="stair-schematic-export-details" x="46" y={drawing.height - 16}>
-            Landing flooring: {landingFlooring} mm   Step flooring: {stepFlooring} mm   Maintain perfect ratio: {maintainPerfectRatio ? 'Yes' : 'No'}
+            Landing flooring: {landingFlooring} mm   Step flooring: {stepFlooring} mm   Manual rise: {isRiseUnlocked ? 'Yes' : 'No'}
           </text>
           </svg>
         </div>
@@ -465,7 +527,7 @@ function StairCalculator() {
       </section>
 
       <p className="stair-calculator-note">
-        With “Maintain perfect ratio” enabled, recalculations keep 2 × rise + tread as close as possible to 630 mm. Changing floor height always selects the closest whole number of steps while preserving the entered floor-to-floor height.
+        Floor-to-floor height and step count calculate the rise, then the tread is calculated from the 630 mm ideal slope. Editing tread searches nearby whole step counts for the closest ideal slope; enable “Enter manually” to set the rise while keeping the floor-to-floor height fixed.
       </p>
     </main>
   );
