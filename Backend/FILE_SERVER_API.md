@@ -8,6 +8,8 @@ All endpoints below require a Firebase bearer token from a user with the `modera
 | --- | --- |
 | `GET /api/files?folder=&cursor=&limit=100` | List a virtual S3 folder. The maximum `limit` is 1,000. |
 | `GET /api/files/object?key=files/path/name.ext` | Get direct S3 object metadata. |
+| `GET /api/files/folders` | List all existing folders for the Move dropdown. |
+| `GET /api/files/download?key=files/path/name.ext` | Get a short-lived direct S3 URL for an authenticated manager. JPG, PNG, and WebP files are served inline; other files download as attachments. |
 | `POST /api/files/folders` with `{ "folder": "Projects/2026" }` | Create an empty visible folder using a hidden `.keep` marker. |
 
 ## Multipart upload lifecycle
@@ -34,6 +36,8 @@ Moves use S3 copy-then-delete. After S3 succeeds, active share records are updat
 | `POST /api/files/shares` with `{ "key": "files/path/name.ext" }` | Create a permanent share link. The response is the only time its raw URL is returned. |
 | `GET /api/files/shares?key=files/path/name.ext` | List active and revoked links for a file, including download count and last-download time. |
 | `POST /api/files/shares/:shareId/revoke` | Revoke one active link. |
-| `GET /download/:token` | Public endpoint. Validates an active token, records a download start, and redirects to a five-minute S3 download URL. |
+| `GET /download/:token/info` | Public endpoint used by the branded share page to display the file name and size. It does not increment the count. |
+| `POST /download/:token/download` | Records a download start and returns a five-minute S3 download URL for the selected file. |
+| `GET /download/:token` | Backwards-compatible route: redirects an old direct link to the branded share page. |
 
-Share tokens contain 256 bits of randomness and only their SHA-256 hashes are stored. The public endpoint returns the same generic 404 for malformed, revoked, or unknown links and never lists S3 contents. Its redirect contains a short-lived signed URL for the single requested object, which is necessary to download very large files directly from S3 without proxying them through the backend.
+Share tokens contain 256 bits of randomness and only their SHA-256 hashes are stored. Public endpoints return the same generic 404 for malformed, revoked, or unknown links and never list S3 contents. The Download button obtains a short-lived signed URL for the single requested object, which is necessary to download very large files directly from S3 without proxying them through the backend.

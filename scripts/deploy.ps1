@@ -5,7 +5,7 @@ param(
     [string]$RemoteHost = 'ec2-54-76-118-84.eu-west-1.compute.amazonaws.com',
     [string]$RemoteUser = 'ubuntu',
     [string]$RemoteDirectory = '/home/ubuntu/adimari-project',
-    [string]$KeyPath = 'D:\Libraries\Work\Dev\Web Development\adimari-key-pair.pem'
+    [string]$KeyPath = 'C:\Users\tzani\OneDrive\Software Dev\WebArch\adimari-key-pair.pem'
 )
 
 Set-StrictMode -Version Latest

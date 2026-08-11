@@ -24,6 +24,7 @@ const { createShareToken } = require('../services/fileShareToken');
 
 const UPLOAD_OPERATION_TYPES = ['upload', 'replace'];
 const CONFLICT_STRATEGIES = new Set(['cancel', 'replace']);
+const INLINE_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
 
 const currentActorUid = (user) => user?.uid || user?.user_id || user?.email || null;
 
@@ -54,6 +55,11 @@ const toFileDetails = (key, object) => ({
 });
 
 const isNotFound = (error) => error instanceof FileStorageError && error.code === 'FILE_NOT_FOUND';
+
+const isInlineImage = (key, contentType = '') => {
+  if (/^image\/(jpeg|png|webp)$/i.test(contentType)) return true;
+  return INLINE_IMAGE_EXTENSIONS.has(key.split('.').pop()?.toLowerCase());
+};
 
 const serializeShare = (share) => {
   const serialized = typeof share?.toObject === 'function' ? share.toObject() : { ...share };
@@ -147,6 +153,31 @@ const createFileRoutes = (dependencies = {}) => {
     }
   });
 
+  router.get('/folders', async (req, res) => {
+    try {
+      res.json({ folders: await storage.listAllFolders() });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  router.get('/download', async (req, res) => {
+    try {
+      const key = String(req.query.key || '');
+      const object = await storage.headFile({ key });
+      const openInNewTab = isInlineImage(key, object.ContentType);
+      const fileName = key.slice(key.lastIndexOf('/') + 1);
+      const url = await storage.getDownloadUrl({
+        key,
+        fileName,
+        disposition: openInNewTab ? 'inline' : 'attachment',
+      });
+      res.json({ url, openInNewTab });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
   router.post('/folders', async (req, res) => {
     const actorUid = currentActorUid(req.user);
     try {
@@ -200,7 +231,7 @@ const createFileRoutes = (dependencies = {}) => {
         }
       }
 
-      const shareUrl = new URL(`/download/${rawToken}`, config.publicBaseUrl).toString();
+      const shareUrl = new URL(`/file-download/${rawToken}`, config.publicBaseUrl).toString();
       await audit({ action: 'share_created', result: 'success', actorUid, s3Key: key, fileShareId: createdShare._id });
       res.status(201).json({ share: serializeShare(createdShare), url: shareUrl });
     } catch (error) {

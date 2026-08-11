@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Home from './pages/Home'; // Optional component to show a single model
 import Projects from './pages/Projects'; // Optional component to show projects
 import SelectionProjects from './pages/SelectionProjects';
@@ -19,19 +19,22 @@ import Licenses from './pages/Licenses';
 import LogTest from './pages/Other/LogTest';
 import StairCalculator from './pages/StairCalculator';
 import FileServer from './pages/FileServer';
+import PublicFileDownload from './pages/PublicFileDownload';
 
 import './App.css';
 
 const protectTeamSummary = false;
 
-function App() {
+function AppContent() {
+  const location = useLocation();
+  const isPublicFileDownload = location.pathname.startsWith('/file-download/');
+
   return (
-    <div>
-      <AuthProvider>
-      <ActiveSelectionProvider>
-        <Navbar />
+    <>
+        {!isPublicFileDownload && <Navbar />}
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/file-download/:token" element={<PublicFileDownload />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/items" element={<Items />} />
         
@@ -93,7 +96,17 @@ function App() {
             element={<ProtectedRoute element={<LogTest />} />}
           />
         </Routes>
-        <Footer />
+        {!isPublicFileDownload && <Footer />}
+    </>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <AuthProvider>
+      <ActiveSelectionProvider>
+        <AppContent />
         </ActiveSelectionProvider>
       </AuthProvider>
     </div>

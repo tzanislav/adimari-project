@@ -6,7 +6,8 @@
 }
 
 .file-server-page button,
-.file-server-page input {
+.file-server-page input,
+.file-server-page select {
   font: inherit;
   letter-spacing: normal;
   text-transform: none;
@@ -59,7 +60,7 @@
 
 .file-server-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .file-server-new-folder { display: flex; gap: 8px; }
-.file-server-new-folder input, .file-server-field input { min-width: 0; padding: 9px 10px; border: 1px solid #aeb8c4; border-radius: 6px; background: #fff; color: #20242a; }
+.file-server-new-folder input, .file-server-field input, .file-server-field select { min-width: 0; padding: 9px 10px; border: 1px solid #aeb8c4; border-radius: 6px; background: #fff; color: #20242a; }
 
 .file-server-dropzone { display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; min-height: 110px; box-sizing: border-box; border: 2px dashed #aeb8c4; border-radius: 8px; background: #f8fafc; color: #596575; text-align: center; }
 .file-server-dropzone strong { color: #2d3b4d; }
@@ -95,7 +96,8 @@
 .file-server-modal p { line-height: 1.5; }
 .file-server-modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .file-server-field { display: grid; gap: 6px; margin-top: 14px; color: #415163; font-size: 12px; font-weight: 600; }
-.file-server-field input { width: 100%; box-sizing: border-box; font-weight: 400; }
+.file-server-field input, .file-server-field select { width: 100%; box-sizing: border-box; font-weight: 400; }
+.file-server-field-hint { color: #607083; font-size: 12px; font-weight: 400; }
 .file-server-muted { color: #607083; }
 .file-server-new-link { display: flex; align-items: end; gap: 10px; padding: 12px; border: 1px solid #b8d2ed; border-radius: 7px; background: #f0f7ff; }
 .file-server-new-link .file-server-field { flex: 1; margin-top: 0; }

@@ -98,14 +98,16 @@ const normalizeCompletedParts = (value) => {
 
 const encodeCopySource = (bucketName, key) => `/${bucketName}/${encodeURIComponent(key).replace(/%2F/g, '/')}`;
 
-const buildDownloadDisposition = (fileName) => {
+const buildContentDisposition = (fileName, dispositionType = 'attachment') => {
   const normalizedFileName = normalizeFileName(fileName);
   const fallback = normalizedFileName
     .replace(/[\\"]/g, '_')
     .replace(/[^\x20-\x7E]/g, '_');
   const encoded = encodeURIComponent(normalizedFileName).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
-  return `attachment; filename="${fallback || 'download'}"; filename*=UTF-8''${encoded}`;
+  return `${dispositionType}; filename="${fallback || 'download'}"; filename*=UTF-8''${encoded}`;
 };
+
+const buildDownloadDisposition = (fileName) => buildContentDisposition(fileName, 'attachment');
 
 const createS3Client = (config) => new S3Client({
   region: config.region,
@@ -168,6 +170,31 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
         })),
         nextContinuationToken: result.NextContinuationToken || null,
       };
+    },
+
+    async listAllFolders() {
+      const folders = new Set();
+      let continuationToken;
+
+      do {
+        const result = await send(new ListObjectsV2Command({
+          Bucket: config.bucketName,
+          Prefix: config.prefix,
+          MaxKeys: 1_000,
+          ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+        }));
+
+        (result.Contents || []).forEach((object) => {
+          if (!object.Key || !object.Key.startsWith(config.prefix)) return;
+          const parts = object.Key.slice(config.prefix.length).split('/').filter(Boolean);
+          for (let index = 1; index < parts.length; index += 1) {
+            folders.add(parts.slice(0, index).join('/'));
+          }
+        });
+        continuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+      } while (continuationToken);
+
+      return Array.from(folders).sort((left, right) => left.localeCompare(right));
     },
 
     async headFile({ key }) {
@@ -235,16 +262,19 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
       }));
     },
 
-    async getDownloadUrl({ key, fileName, expiresIn = config.downloadUrlTtlSeconds } = {}) {
+    async getDownloadUrl({ key, fileName, disposition = 'attachment', expiresIn = config.downloadUrlTtlSeconds } = {}) {
       const managedS3Key = managedKey(key);
       if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > config.downloadUrlTtlSeconds) {
         throw new FileStorageValidationError('Download URL expiry is invalid.');
+      }
+      if (!['attachment', 'inline'].includes(disposition)) {
+        throw new FileStorageValidationError('Download disposition is invalid.');
       }
 
       return sign(new GetObjectCommand({
         Bucket: config.bucketName,
         Key: managedS3Key,
-        ResponseContentDisposition: buildDownloadDisposition(fileName),
+        ResponseContentDisposition: buildContentDisposition(fileName, disposition),
       }), expiresIn);
     },
 
@@ -295,6 +325,7 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
 
 module.exports = {
   FileStorageError,
+  buildContentDisposition,
   buildDownloadDisposition,
   createFileStorageService,
   createS3Client,

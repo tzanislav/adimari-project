@@ -101,7 +101,7 @@ function ConflictDialog({ conflict, onReplace, onRename, onClose }) {
   );
 }
 
-function MoveDialog({ move, onSubmit, onClose }) {
+function MoveDialog({ move, folders, loadingFolders, onSubmit, onClose }) {
   const [destinationFolder, setDestinationFolder] = useState(move.destinationFolder);
   const [destinationFileName, setDestinationFileName] = useState(move.destinationFileName);
 
@@ -112,7 +112,11 @@ function MoveDialog({ move, onSubmit, onClose }) {
         <p className="file-server-muted">{move.file.name}</p>
         <label className="file-server-field">
           Destination folder
-          <input value={destinationFolder} placeholder="Root folder" onChange={(event) => setDestinationFolder(event.target.value)} />
+          <select value={destinationFolder} disabled={loadingFolders} onChange={(event) => setDestinationFolder(event.target.value)}>
+            <option value="">Root folder</option>
+            {folders.map((folderPath) => <option key={folderPath} value={folderPath}>{folderPath}</option>)}
+          </select>
+          {loadingFolders && <span className="file-server-field-hint">Loading folders…</span>}
         </label>
         <label className="file-server-field">
           File name
@@ -197,6 +201,8 @@ function FileServer() {
   const [dragging, setDragging] = useState(false);
   const [uploadState, setUploadState] = useState(null);
   const [moveDialog, setMoveDialog] = useState(null);
+  const [moveFolders, setMoveFolders] = useState([]);
+  const [loadingMoveFolders, setLoadingMoveFolders] = useState(false);
   const [deleteFile, setDeleteFile] = useState(null);
   const [conflict, setConflict] = useState(null);
   const [shareDialog, setShareDialog] = useState(null);
@@ -375,6 +381,34 @@ function FileServer() {
     }
   };
 
+  const openMoveDialog = (file) => {
+    setMoveDialog({ file, destinationFolder: folder, destinationFileName: file.name });
+    setLoadingMoveFolders(true);
+    void apiRequest('/folders')
+      .then((result) => setMoveFolders(result.folders || []))
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoadingMoveFolders(false));
+  };
+
+  const downloadFile = async (file) => {
+    try {
+      setError('');
+      const result = await apiRequest(`/download?key=${encodeURIComponent(file.key)}`);
+      if (result.openInNewTab) {
+        window.open(result.url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = result.url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
   const loadShares = async (file, { preserveUrl = false } = {}) => {
     setShareDialog((previous) => ({
       ...(previous || { file }),
@@ -537,8 +571,9 @@ function FileServer() {
                 <span>{formatBytes(file.size)}</span>
                 <span>{formatDate(file.lastModified)}</span>
                 <div className="file-server-row-actions">
+                  <button className="file-server-button compact" onClick={() => void downloadFile(file)}>Download</button>
                   <button className="file-server-button compact" onClick={() => openShares(file)}>Share</button>
-                  <button className="file-server-button compact" onClick={() => setMoveDialog({ file, destinationFolder: folder, destinationFileName: file.name })}>Move</button>
+                  <button className="file-server-button compact" onClick={() => openMoveDialog(file)}>Move</button>
                   <button className="file-server-button danger compact" onClick={() => setDeleteFile(file)}>Delete</button>
                 </div>
               </article>
@@ -554,7 +589,7 @@ function FileServer() {
         </button>
       )}
 
-      {moveDialog && <MoveDialog move={moveDialog} onSubmit={submitMove} onClose={() => setMoveDialog(null)} />}
+      {moveDialog && <MoveDialog move={moveDialog} folders={moveFolders} loadingFolders={loadingMoveFolders} onSubmit={submitMove} onClose={() => setMoveDialog(null)} />}
       {deleteFile && <DeleteDialog file={deleteFile} onDelete={() => void confirmDelete()} onClose={() => setDeleteFile(null)} />}
       {conflict && <ConflictDialog conflict={conflict} onReplace={() => resolveConflict('replace')} onRename={(name) => resolveConflict('rename', name)} onClose={() => setConflict(null)} />}
       {shareDialog && <ShareDialog state={shareDialog} onCreate={() => void createShare()} onRevoke={(shareId) => void revokeShare(shareId)} onCopy={(url) => void copyShareUrl(url)} onClose={() => setShareDialog(null)} />}

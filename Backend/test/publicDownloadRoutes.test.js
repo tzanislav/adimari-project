@@ -16,7 +16,7 @@ const startApp = async (router) => {
   return { server, url: `http://127.0.0.1:${server.address().port}` };
 };
 
-test('a valid public link redirects to a signed download URL and increments the counter', async () => {
+test('a valid public link exposes metadata without counting, then returns a signed URL and increments on download', async () => {
   const { token, tokenHash } = createShareToken();
   const share = {
     _id: '507f1f77bcf86cd799439011',
@@ -27,9 +27,9 @@ test('a valid public link redirects to a signed download URL and increments the 
   };
   let updateCalled = false;
   const app = await startApp(createPublicDownloadRoutes({
-    config: { prefix: 'files/' },
+    config: { prefix: 'files/', publicBaseUrl: 'https://adimari-db.com' },
     storage: {
-      headFile: async () => ({}),
+      headFile: async () => ({ ContentLength: 123 }),
       getDownloadUrl: async () => 'https://signed.example/download',
     },
     FileShareModel: {
@@ -42,9 +42,14 @@ test('a valid public link redirects to a signed download URL and increments the 
     FileAuditEventModel: { create: async () => ({}) },
   }));
   try {
-    const response = await fetch(`${app.url}/download/${token}`, { redirect: 'manual' });
-    assert.equal(response.status, 302);
-    assert.equal(response.headers.get('location'), 'https://signed.example/download');
+    const info = await fetch(`${app.url}/download/${token}/info`);
+    assert.equal(info.status, 200);
+    assert.equal((await info.json()).file.size, 123);
+    assert.equal(updateCalled, false);
+
+    const response = await fetch(`${app.url}/download/${token}/download`, { method: 'POST' });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).downloadUrl, 'https://signed.example/download');
     assert.equal(response.headers.get('cache-control'), 'no-store, private');
     assert.equal(updateCalled, true);
   } finally {
@@ -55,7 +60,7 @@ test('a valid public link redirects to a signed download URL and increments the 
 test('an invalid public link returns a generic not-found response without querying S3', async () => {
   let storageCalled = false;
   const app = await startApp(createPublicDownloadRoutes({
-    config: { prefix: 'files/' },
+    config: { prefix: 'files/', publicBaseUrl: 'https://adimari-db.com' },
     storage: {
       headFile: async () => { storageCalled = true; },
       getDownloadUrl: async () => { storageCalled = true; },

@@ -24,20 +24,53 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
     }
   };
 
-  router.get('/:token', async (req, res) => {
+  const findActiveShare = async (token) => {
     let tokenHash;
     try {
-      tokenHash = hashShareToken(req.params.token);
+      tokenHash = hashShareToken(token);
     } catch {
-      return notFound(res);
+      return null;
     }
+    return FileShareModel.findOne({ tokenHash, status: 'active' }).select('+tokenHash');
+  };
 
+  const loadExistingShare = async (req, res) => {
+    const share = await findActiveShare(req.params.token);
+    if (!share) {
+      notFound(res);
+      return null;
+    }
+    return share;
+  };
+
+  router.get('/:token/info', async (req, res) => {
     try {
-      const share = await FileShareModel.findOne({ tokenHash, status: 'active' }).select('+tokenHash');
-      if (!share) {
+      const share = await loadExistingShare(req, res);
+      if (!share) return undefined;
+      const object = await storage.headFile({ key: share.s3Key });
+      return res.json({
+        file: {
+          name: share.originalFileName,
+          size: object.ContentLength || 0,
+          contentType: object.ContentType || 'application/octet-stream',
+        },
+      });
+    } catch (error) {
+      if (error instanceof FileStorageError && error.code === 'FILE_NOT_FOUND') {
         return notFound(res);
       }
+      if (error instanceof FileStorageError) {
+        return res.status(503).json({ error: 'File download is temporarily unavailable.' });
+      }
+      console.error('Public file information lookup failed:', error.code || error.name || 'unknown');
+      return res.status(503).json({ error: 'File download is temporarily unavailable.' });
+    }
+  });
 
+  router.post('/:token/download', async (req, res) => {
+    try {
+      const share = await loadExistingShare(req, res);
+      if (!share) return undefined;
       await storage.headFile({ key: share.s3Key });
       const downloadUrl = await storage.getDownloadUrl({
         key: share.s3Key,
@@ -62,7 +95,7 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
         'Cache-Control': 'no-store, private',
         'Referrer-Policy': 'no-referrer',
       });
-      return res.redirect(302, downloadUrl);
+      return res.json({ downloadUrl });
     } catch (error) {
       if (error instanceof FileStorageError && error.code === 'FILE_NOT_FOUND') {
         return notFound(res);
@@ -73,6 +106,20 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
       }
 
       console.error('Public file download failed:', error.code || error.name || 'unknown');
+      return res.status(503).json({ error: 'File download is temporarily unavailable.' });
+    }
+  });
+
+  // Keep already-created /download/:token links working, but show the branded page.
+  router.get('/:token', async (req, res) => {
+    try {
+      const share = await loadExistingShare(req, res);
+      if (!share) return undefined;
+      const destination = new URL(`/file-download/${encodeURIComponent(req.params.token)}`, config.publicBaseUrl).toString();
+      res.set({ 'Cache-Control': 'no-store, private', 'Referrer-Policy': 'no-referrer' });
+      return res.redirect(302, destination);
+    } catch (error) {
+      console.error('Public share-page redirect failed:', error.code || error.name || 'unknown');
       return res.status(503).json({ error: 'File download is temporarily unavailable.' });
     }
   });
