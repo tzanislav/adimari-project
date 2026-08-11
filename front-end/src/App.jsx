@@ -18,6 +18,7 @@ import TeamSummary from './pages/TeamSummary';
 import Licenses from './pages/Licenses';
 import LogTest from './pages/Other/LogTest';
 import StairCalculator from './pages/StairCalculator';
+import FileServer from './pages/FileServer';
 
 import './App.css';
 
@@ -54,6 +55,10 @@ function App() {
           <Route
             path="/projects/stair-calculator"
             element={<ProtectedRoute element={<StairCalculator />} />}
+          />
+          <Route
+            path="/projects/file-server"
+            element={<ProtectedRoute element={<FileServer />} />}
           />
           <Route
             path="/projects/:id"

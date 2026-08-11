@@ -1,14 +1,14 @@
 /* eslint-disable react/prop-types */
 import { Link } from 'react-router-dom';
 
-function ProjectLinkCard({ title, description, thumbnail = null, thumbnailAlt = '', to, href }) {
+function ProjectLinkCard({ title, description, thumbnail = null, thumbnailAlt = '', thumbnailPlaceholder = 'Thumbnail', to, href }) {
   const cardContent = (
     <>
       <div className="project-link-card-thumbnail">
         {thumbnail ? (
           <img src={thumbnail} alt={thumbnailAlt || `${title} thumbnail`} />
         ) : (
-          <span aria-hidden="true">Thumbnail</span>
+          <span aria-hidden="true">{thumbnailPlaceholder}</span>
         )}
       </div>
       <div className="project-link-card-content">

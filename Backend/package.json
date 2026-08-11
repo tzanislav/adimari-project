@@ -1,7 +1,11 @@
 {
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.723.0",
     "@aws-sdk/client-s3": "^3.723.0",
+    "@aws-sdk/s3-request-presigner": "3.723.0",
     "axios": "^1.7.9",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",

@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const { getLicensePasswordCrypto } = require('./security/licensePasswordCrypto');
+const { getFileServerConfig } = require('./config/fileServerConfig');
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const brandRoutes = require('./routes/brandRoutes'); // Import brand routes
 const uploadRoutes = require('./routes/upload'); // Import upload route
@@ -15,6 +16,8 @@ const clickUpRoutes = require('./routes/clickupRoutes'); // Import clickup route
 const licenseEntryRoutes = require('./routes/licenseEntryRoutes'); // Import license routes
 const activityRoutes = require('./routes/activityRoute'); // Import activity routes
 const adminRoutes = require('./routes/adminRoutes'); // Import admin maintenance routes
+const { createFileRoutes } = require('./routes/fileRoutes'); // Private S3 file-manager routes
+const { createPublicDownloadRoutes } = require('./routes/publicDownloadRoutes'); // Anonymous share downloads
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -25,6 +28,8 @@ const { authenticate, authorizeRole } = require('./auth/authMiddleware');
 
 // Fail closed before accepting requests if the server-side license encryption key is unavailable.
 getLicensePasswordCrypto();
+// Fail closed before accepting requests if private file-server settings are incomplete or malformed.
+getFileServerConfig();
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -122,6 +127,20 @@ const uploadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const fileManagerLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isDevelopmentMode ? 500 : 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const publicDownloadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isDevelopmentMode ? 500 : 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const cspDirectives = {
   defaultSrc: ["'self'"],
   baseUri: ["'self'"],
@@ -200,6 +219,8 @@ mongoose
 app.use('/api/users', userRoutes); 
 app.use('/api/brands', brandRoutes); 
 app.use('/api/upload', authenticate, uploadLimiter, uploadRoutes); 
+app.use('/api/files', fileManagerLimiter, createFileRoutes());
+app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes());
 app.use('/api/models3d', modelRoutes); 
 app.use('/api/projects', projectRoutes); 
 app.use('/api/selections', selectRoutes); 

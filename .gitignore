@@ -35,3 +35,6 @@ Thumbs.db
 /scripts/*
 /backup/*
 
+# Backend example configuration contains placeholders only and must be shared.
+!Backend/.env.example
+

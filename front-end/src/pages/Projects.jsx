@@ -1,7 +1,15 @@
 import ProjectLinkCard from '../components/ProjectLinkCard';
+import { useAuth } from '../context/AuthContext';
 import '../CSS/Projects.css';
 
 const projectLinks = [
+  {
+    title: 'File Server',
+    description: 'Manage private files and create download-only share links.',
+    to: '/projects/file-server',
+    thumbnailPlaceholder: 'Files',
+    requiresEditor: true,
+  },
   {
     title: '3D Models',
     description: 'Browse and manage the library of 3D models.',
@@ -50,12 +58,16 @@ const projectLinks = [
 ];
 
 function Projects() {
+  const { user, role } = useAuth();
+  const canManageFiles = Boolean(user) && ['moderator', 'admin'].includes(role);
+  const visibleProjectLinks = projectLinks.filter((project) => !project.requiresEditor || canManageFiles);
+
   return (
     <main className="project-directory">
       <h1>Projects</h1>
       <p className="project-directory-intro">Choose a project to continue.</p>
       <div className="project-link-card-grid">
-        {projectLinks.map((project) => (
+        {visibleProjectLinks.map((project) => (
           <ProjectLinkCard key={project.title} {...project} />
         ))}
       </div>
