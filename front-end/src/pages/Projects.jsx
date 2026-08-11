@@ -7,7 +7,8 @@ const projectLinks = [
     title: 'File Server',
     description: 'Manage private files and create download-only share links.',
     to: '/projects/file-server',
-    thumbnailPlaceholder: '/file.png',
+    thumbnail: '/file.png',
+    thumbnailPlaceholder: 'Files',
     requiresEditor: true,
   },
   {
