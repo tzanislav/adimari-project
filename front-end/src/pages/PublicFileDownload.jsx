@@ -63,6 +63,7 @@ function PublicFileDownload() {
       <div className="public-file-download-overlay" />
       <header className="public-file-download-topbar">Adimari Database</header>
       <section className="public-file-download-content">
+        <img src={logo} alt="Adimari" className="public-file-download-logo" />
         <article className="public-file-download-card" aria-live="polite">
           {loading && <p>Loading file details…</p>}
           {!loading && error && <><h1>Link unavailable</h1><p>{error}</p></>}
@@ -76,7 +77,7 @@ function PublicFileDownload() {
             </button>
           </>}
         </article>
-        <img src={logo} alt="Adimari" className="public-file-download-logo" />
+        
       </section>
     </main>
   );

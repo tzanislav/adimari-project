@@ -70,7 +70,7 @@
 .public-file-download-card button:hover:not(:disabled) { background: #e9e9e4; }
 .public-file-download-card button:disabled { cursor: wait; opacity: .7; }
 .public-file-download-error { margin-top: 16px !important; color: #ffd0d0 !important; }
-.public-file-download-logo { width: clamp(120px, 18vw, 185px); height: auto; filter: brightness(0) invert(1); }
+.public-file-download-logo { width: clamp(80px, 14vw, 125px); height: auto; filter: brightness(0) invert(1); }
 
 @media (max-width: 600px) {
   .public-file-download-topbar { min-height: 32px; padding: 0 12px; }
