@@ -146,6 +146,21 @@ function DeleteDialog({ file, onDelete, onClose }) {
   );
 }
 
+function DeleteFolderDialog({ folder, onDelete, onClose }) {
+  return (
+    <div className="file-server-modal-backdrop" role="presentation">
+      <section className="file-server-modal" role="dialog" aria-modal="true" aria-labelledby="delete-folder-title">
+        <h2 id="delete-folder-title">Delete folder and all contents?</h2>
+        <p><strong>{folder.name}</strong>, every file in it, and all nested folders will be permanently deleted. Any active share links for those files will be revoked.</p>
+        <div className="file-server-modal-actions">
+          <button className="file-server-button danger" onClick={onDelete}>Delete folder</button>
+          <button className="file-server-button ghost" onClick={onClose}>Cancel</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ShareDialog({ state, onCreate, onRevoke, onCopy, onClose }) {
   const { file, shares, loading, createdUrl, busy } = state;
   return (
@@ -204,8 +219,10 @@ function FileServer() {
   const [moveFolders, setMoveFolders] = useState([]);
   const [loadingMoveFolders, setLoadingMoveFolders] = useState(false);
   const [deleteFile, setDeleteFile] = useState(null);
+  const [deleteFolder, setDeleteFolder] = useState(null);
   const [conflict, setConflict] = useState(null);
   const [shareDialog, setShareDialog] = useState(null);
+  const [stats, setStats] = useState(null);
   const fileInputRef = useRef(null);
 
   const loadFolder = useCallback(async ({ cursor = null, append = false, targetFolder = folder } = {}) => {
@@ -229,11 +246,23 @@ function FileServer() {
     }
   }, [folder]);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const result = await apiRequest('/stats');
+      setStats(result);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }, []);
+
   useEffect(() => {
     void loadFolder({ targetFolder: folder });
-  }, [folder, loadFolder]);
+    void loadStats();
+  }, [folder, loadFolder, loadStats]);
 
-  const refresh = () => loadFolder({ targetFolder: folder });
+  const refresh = async () => {
+    await Promise.all([loadFolder({ targetFolder: folder }), loadStats()]);
+  };
 
   const createFolder = async (event) => {
     event.preventDefault();
@@ -381,6 +410,18 @@ function FileServer() {
     }
   };
 
+  const confirmFolderDelete = async () => {
+    if (!deleteFolder) return;
+    try {
+      const result = await apiRequest(`/folder?folder=${encodeURIComponent(deleteFolder.path)}`, { method: 'DELETE' });
+      setNotice(`Deleted folder “${deleteFolder.name}” and ${result.deletedCount} object${result.deletedCount === 1 ? '' : 's'}.`);
+      setDeleteFolder(null);
+      await refresh();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
   const openMoveDialog = (file) => {
     setMoveDialog({ file, destinationFolder: folder, destinationFileName: file.name });
     setLoadingMoveFolders(true);
@@ -506,18 +547,7 @@ function FileServer() {
         <button className="file-server-button" onClick={() => void refresh()} disabled={loading}>Refresh</button>
       </header>
 
-      <nav className="file-server-breadcrumbs" aria-label="File location">
-        <button className="file-server-crumb" onClick={() => setFolder('')}>Files</button>
-        {breadcrumbs.map((segment, index) => {
-          const path = breadcrumbs.slice(0, index + 1).join('/');
-          return (
-            <span key={path}>
-              <span aria-hidden="true">/</span>
-              <button className="file-server-crumb" onClick={() => setFolder(path)}>{segment}</button>
-            </span>
-          );
-        })}
-      </nav>
+
 
       <section className="file-server-toolbar" aria-label="File actions">
         <form className="file-server-new-folder" onSubmit={createFolder}>
@@ -551,6 +581,19 @@ function FileServer() {
       {error && <p className="file-server-message error" role="alert">{error}</p>}
       {notice && <p className="file-server-message success" role="status">{notice}</p>}
 
+            <nav className="file-server-breadcrumbs" aria-label="File location">
+        <button className="file-server-crumb" onClick={() => setFolder('')}>Files</button>
+        {breadcrumbs.map((segment, index) => {
+          const path = breadcrumbs.slice(0, index + 1).join('/');
+          return (
+            <span key={path}>
+              <span aria-hidden="true">/</span>
+              <button className="file-server-crumb" onClick={() => setFolder(path)}>{segment}</button>
+            </span>
+          );
+        })}
+      </nav>
+
       <section className="file-server-browser" aria-label="File browser">
         <div className="file-server-browser-heading">
           <span>Name</span><span>Size</span><span>Modified</span><span>Actions</span>
@@ -562,7 +605,10 @@ function FileServer() {
                 <button className="file-server-name-button" onClick={() => setFolder(folderPath(folder, item.name))}>
                   <span aria-hidden="true">▸</span> {item.name}
                 </button>
-                <span>Folder</span><span>—</span><span />
+                <span>Folder</span><span>—</span>
+                <div className="file-server-row-actions">
+                  <button className="file-server-button danger compact" onClick={() => setDeleteFolder({ name: item.name, path: folderPath(folder, item.name) })}>Delete</button>
+                </div>
               </article>
             ))}
             {listing.files.map((file) => (
@@ -589,8 +635,16 @@ function FileServer() {
         </button>
       )}
 
+      <section className="file-server-stats" aria-label="File server storage statistics">
+        <span>Storage: {stats ? formatBytes(stats.totalBytes) : 'Loading…'}</span>
+        <span>Files: {stats ? stats.fileCount.toLocaleString() : '—'}</span>
+        <span>Folders: {stats ? stats.folderCount.toLocaleString() : '—'}</span>
+        <span>Last file change: {stats ? formatDate(stats.lastModified) : '—'}</span>
+      </section>
+
       {moveDialog && <MoveDialog move={moveDialog} folders={moveFolders} loadingFolders={loadingMoveFolders} onSubmit={submitMove} onClose={() => setMoveDialog(null)} />}
       {deleteFile && <DeleteDialog file={deleteFile} onDelete={() => void confirmDelete()} onClose={() => setDeleteFile(null)} />}
+      {deleteFolder && <DeleteFolderDialog folder={deleteFolder} onDelete={() => void confirmFolderDelete()} onClose={() => setDeleteFolder(null)} />}
       {conflict && <ConflictDialog conflict={conflict} onReplace={() => resolveConflict('replace')} onRename={(name) => resolveConflict('rename', name)} onClose={() => setConflict(null)} />}
       {shareDialog && <ShareDialog state={shareDialog} onCreate={() => void createShare()} onRevoke={(shareId) => void revokeShare(shareId)} onCopy={(url) => void copyShareUrl(url)} onClose={() => setShareDialog(null)} />}
     </main>

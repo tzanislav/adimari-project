@@ -6,6 +6,7 @@ const {
   CopyObjectCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
@@ -197,6 +198,41 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
       return Array.from(folders).sort((left, right) => left.localeCompare(right));
     },
 
+    async getUsageStats() {
+      const folders = new Set();
+      let continuationToken;
+      let fileCount = 0;
+      let totalBytes = 0;
+      let lastModified = null;
+
+      do {
+        const result = await send(new ListObjectsV2Command({
+          Bucket: config.bucketName,
+          Prefix: config.prefix,
+          MaxKeys: 1_000,
+          ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+        }));
+
+        (result.Contents || []).forEach((object) => {
+          if (!object.Key || !object.Key.startsWith(config.prefix)) return;
+          const relativeKey = object.Key.slice(config.prefix.length);
+          const parts = relativeKey.split('/').filter(Boolean);
+          for (let index = 1; index < parts.length; index += 1) {
+            folders.add(parts.slice(0, index).join('/'));
+          }
+          if (!relativeKey || relativeKey.endsWith('/.keep')) return;
+          fileCount += 1;
+          totalBytes += Number(object.Size) || 0;
+          if (object.LastModified && (!lastModified || object.LastModified > lastModified)) {
+            lastModified = object.LastModified;
+          }
+        });
+        continuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+      } while (continuationToken);
+
+      return { fileCount, folderCount: folders.size, totalBytes, lastModified };
+    },
+
     async headFile({ key }) {
       const managedS3Key = managedKey(key);
       return send(new HeadObjectCommand({ Bucket: config.bucketName, Key: managedS3Key }));
@@ -303,6 +339,44 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
     async deleteFile({ key } = {}) {
       const managedS3Key = managedKey(key);
       return send(new DeleteObjectCommand({ Bucket: config.bucketName, Key: managedS3Key }));
+    },
+
+    async deleteFolder({ folder } = {}) {
+      const normalizedFolder = normalizeFolderPath(folder);
+      if (!normalizedFolder) {
+        throw new FileStorageValidationError('The root folder cannot be deleted.');
+      }
+
+      const prefix = `${config.prefix}${normalizedFolder}/`;
+      let continuationToken;
+      let deletedCount = 0;
+
+      do {
+        const result = await send(new ListObjectsV2Command({
+          Bucket: config.bucketName,
+          Prefix: prefix,
+          MaxKeys: 1_000,
+          ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+        }));
+        const objects = (result.Contents || []).filter(({ Key }) => Key && Key.startsWith(prefix));
+        if (objects.length) {
+          const deletion = await send(new DeleteObjectsCommand({
+            Bucket: config.bucketName,
+            Delete: { Objects: objects.map(({ Key }) => ({ Key })), Quiet: true },
+          }));
+          if (deletion.Errors?.length) {
+            throw new FileStorageError({
+              code: 'FILE_FOLDER_DELETE_INCOMPLETE',
+              message: 'Some objects in the folder could not be deleted.',
+              status: 502,
+            });
+          }
+          deletedCount += objects.length;
+        }
+        continuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+      } while (continuationToken);
+
+      return { folder: normalizedFolder, prefix, deletedCount };
     },
 
     async createFolderMarker({ folder } = {}) {

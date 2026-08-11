@@ -61,6 +61,8 @@ const isInlineImage = (key, contentType = '') => {
   return INLINE_IMAGE_EXTENSIONS.has(key.split('.').pop()?.toLowerCase());
 };
 
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const serializeShare = (share) => {
   const serialized = typeof share?.toObject === 'function' ? share.toObject() : { ...share };
   delete serialized.tokenHash;
@@ -156,6 +158,14 @@ const createFileRoutes = (dependencies = {}) => {
   router.get('/folders', async (req, res) => {
     try {
       res.json({ folders: await storage.listAllFolders() });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  router.get('/stats', async (req, res) => {
+    try {
+      res.json({ ...(await storage.getUsageStats()), generatedAt: new Date() });
     } catch (error) {
       sendError(res, error);
     }
@@ -504,6 +514,46 @@ const createFileRoutes = (dependencies = {}) => {
       }
       await audit({ action: 'file_deleted', result: 'failure', actorUid, operationId: operation?._id, details: { code: error.code || error.name } });
       sendError(res, error);
+    }
+  });
+
+  router.delete('/folder', async (req, res) => {
+    const actorUid = currentActorUid(req.user);
+    let operation;
+    try {
+      if (!actorUid) {
+        throw new FileStorageValidationError('Authenticated user identity is required.');
+      }
+      const folder = normalizeFolderPath(req.query.folder);
+      if (!folder) {
+        throw new FileStorageValidationError('The root folder cannot be deleted.');
+      }
+      const prefix = `${config.prefix}${folder}/`;
+      operation = await FileOperationModel.create({ type: 'folder_delete', sourceKey: prefix, actorUid });
+      const result = await storage.deleteFolder({ folder });
+      try {
+        await FileShareModel.updateMany(
+          { s3Key: { $regex: new RegExp(`^${escapeRegex(result.prefix)}`) }, status: 'active' },
+          { $set: { status: 'revoked', revokedAt: new Date(), revokedBy: actorUid } },
+        );
+      } catch (error) {
+        await recordOperationFailure(operation, error, 'needs_repair');
+        throw new FileStorageError({
+          code: 'FILE_FOLDER_DELETE_NEEDS_REPAIR',
+          message: 'The folder was deleted, but related share links require repair.',
+          status: 500,
+          cause: error,
+        });
+      }
+      await markOperation(operation, 'completed', { context: { deletedCount: result.deletedCount } });
+      await audit({ action: 'folder_deleted', result: 'success', actorUid, s3Key: result.prefix, operationId: operation._id, details: { deletedCount: result.deletedCount } });
+      return res.json({ folder: result.folder, deletedCount: result.deletedCount });
+    } catch (error) {
+      if (operation && operation.status === 'pending') {
+        await recordOperationFailure(operation, error);
+      }
+      await audit({ action: 'folder_deleted', result: 'failure', actorUid, operationId: operation?._id, details: { code: error.code || error.name } });
+      return sendError(res, error);
     }
   });
 

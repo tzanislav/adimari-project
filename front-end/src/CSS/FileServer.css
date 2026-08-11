@@ -77,7 +77,7 @@
 .file-server-message.success { background: #edf9f0; color: #166534; }
 
 .file-server-browser { margin-top: 18px; overflow: hidden; border: 1px solid #d7dfe8; border-radius: 8px; background: #fff; }
-.file-server-browser-heading, .file-server-row { display: grid; grid-template-columns: minmax(180px, 1fr) 100px 170px 220px; gap: 12px; align-items: center; }
+.file-server-browser-heading, .file-server-row { display: grid; grid-template-columns: minmax(180px, 1fr) 100px 170px minmax(310px, max-content); gap: 12px; align-items: center; }
 .file-server-browser-heading { padding: 10px 14px; background: #f3f6f9; color: #5d6b7b; font-size: 12px; font-weight: 700; }
 .file-server-row { min-height: 48px; padding: 8px 14px; border-top: 1px solid #edf0f4; }
 .file-server-row.folder { background: #fbfcfe; }
@@ -85,9 +85,11 @@
 .file-server-name-button { margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .file-server-name-button:hover { color: #1b5c9d; background: transparent; }
 .file-server-row > span { color: #617082; font-size: 12px; }
-.file-server-row-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-start; }
+.file-server-row-actions { display: flex; flex-wrap: nowrap; gap: 6px; justify-content: flex-start; }
+.file-server-row-actions .file-server-button { white-space: nowrap; }
 .file-server-empty { margin: 0; padding: 26px 14px; color: #6d7988; text-align: center; }
 .file-server-load-more { display: block; margin: 15px auto; }
+.file-server-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 16px 2px 0; color: #7a8490; font-size: 11px; }
 
 .file-server-modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(17, 26, 39, .55); }
 .file-server-modal { width: min(100%, 500px); max-height: min(720px, 90vh); overflow: auto; padding: 24px; border-radius: 9px; background: #fff; box-shadow: 0 22px 50px rgba(0, 0, 0, .24); }
@@ -115,6 +117,7 @@
   .file-server-row { grid-template-columns: 1fr; gap: 5px; padding: 14px; }
   .file-server-row > span { margin-left: 18px; }
   .file-server-row-actions { margin-top: 6px; }
+  .file-server-row-actions { flex-wrap: wrap; }
   .file-server-upload-status { grid-template-columns: 1fr; gap: 7px; }
   .file-server-new-link, .file-server-share-toolbar { align-items: stretch; flex-direction: column; }
 }

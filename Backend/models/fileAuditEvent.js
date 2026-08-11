@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const fileAuditEventSchema = new mongoose.Schema({
   action: {
     type: String,
-    enum: ['upload_started', 'upload_completed', 'upload_aborted', 'folder_created', 'file_moved', 'file_deleted', 'share_created', 'share_revoked', 'share_download_started'],
+    enum: ['upload_started', 'upload_completed', 'upload_aborted', 'folder_created', 'folder_deleted', 'file_moved', 'file_deleted', 'share_created', 'share_revoked', 'share_download_started'],
     required: true,
     index: true,
   },

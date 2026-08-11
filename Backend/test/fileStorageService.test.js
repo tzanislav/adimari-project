@@ -69,3 +69,53 @@ test('generates attachment disposition and maps S3 access failures without expos
   assert.equal(mapped.code, 'FILE_STORAGE_ACCESS_DENIED');
   assert.equal(mapped.message, 'File storage access was denied.');
 });
+
+test('calculates managed usage without counting hidden folder markers as files', async () => {
+  const service = createFileStorageService({
+    config,
+    client: {
+      send: async () => ({
+        Contents: [
+          { Key: 'files/Projects/.keep', Size: 0, LastModified: new Date('2026-01-01') },
+          { Key: 'files/Projects/Plans/floor-plan.pdf', Size: 2048, LastModified: new Date('2026-02-01') },
+        ],
+        IsTruncated: false,
+      }),
+    },
+  });
+
+  const result = await service.getUsageStats();
+  assert.deepEqual({ fileCount: result.fileCount, folderCount: result.folderCount, totalBytes: result.totalBytes }, {
+    fileCount: 1,
+    folderCount: 2,
+    totalBytes: 2048,
+  });
+  assert.equal(result.lastModified.toISOString(), '2026-02-01T00:00:00.000Z');
+});
+
+test('recursively deletes a folder in S3 delete batches', async () => {
+  const commands = [];
+  const service = createFileStorageService({
+    config,
+    client: {
+      send: async (command) => {
+        commands.push(command);
+        if (command.constructor.name === 'ListObjectsV2Command') {
+          return {
+            Contents: [{ Key: 'files/Projects/Plans/floor-plan.pdf' }, { Key: 'files/Projects/Plans/.keep' }],
+            IsTruncated: false,
+          };
+        }
+        return { Errors: [] };
+      },
+    },
+  });
+
+  const result = await service.deleteFolder({ folder: 'Projects' });
+  assert.equal(result.deletedCount, 2);
+  assert.equal(commands[1].constructor.name, 'DeleteObjectsCommand');
+  assert.deepEqual(commands[1].input.Delete.Objects, [
+    { Key: 'files/Projects/Plans/floor-plan.pdf' },
+    { Key: 'files/Projects/Plans/.keep' },
+  ]);
+});

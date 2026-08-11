@@ -3,7 +3,7 @@
 const mongoose = require('mongoose');
 
 const fileOperationSchema = new mongoose.Schema({
-  type: { type: String, enum: ['upload', 'replace', 'move', 'delete', 'folder_create'], required: true, index: true },
+  type: { type: String, enum: ['upload', 'replace', 'move', 'delete', 'folder_create', 'folder_delete'], required: true, index: true },
   status: {
     type: String,
     enum: ['pending', 'completed', 'failed', 'aborted', 'needs_repair'],
