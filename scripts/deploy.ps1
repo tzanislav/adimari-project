@@ -129,6 +129,10 @@ pm2 logs adimari-backend --lines 50 --nostream >&2 || true
 exit 1
 '@ -f $quotedRemoteDirectory, $quotedBranch
 
+# The here-string is created with Windows line endings. Bash receives the script
+# over stdin, so normalize it before sending it to the Linux host.
+$remoteScript = $remoteScript -replace "`r`n", "`n"
+
 Write-Host "Deploying to $RemoteUser@$RemoteHost..."
 $remoteScript | & $sshExecutable -i $KeyPath -o BatchMode=yes "$RemoteUser@$RemoteHost" 'bash -s'
 if ($LASTEXITCODE -ne 0) {
