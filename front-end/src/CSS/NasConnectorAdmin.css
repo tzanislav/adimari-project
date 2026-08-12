@@ -1,0 +1,184 @@
+.nas-connector-admin-page {
+  width: min(100% - 40px, 1120px);
+  margin: 34px auto 64px;
+  color: #263648;
+  font-family: 'DM Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+.nas-connector-admin-page button,
+.nas-connector-admin-page input {
+  font: inherit;
+}
+
+.nas-connector-admin-header,
+.nas-connector-list-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.nas-connector-admin-eyebrow {
+  margin: 0 0 6px;
+  color: #657487;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.nas-connector-admin-header h1,
+.nas-connector-enrollment h2,
+.nas-connector-list-section h2,
+.nas-connector-token h3 {
+  margin: 0;
+  color: #24364a;
+}
+
+.nas-connector-admin-header h1 { font-size: 32px; }
+.nas-connector-admin-header p:not(.nas-connector-admin-eyebrow),
+.nas-connector-enrollment > div > p,
+.nas-connector-token p,
+.nas-connector-list-heading p {
+  margin: 8px 0 0;
+  color: #607083;
+  line-height: 1.5;
+}
+
+.nas-connector-button {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #9faebd;
+  border-radius: 6px;
+  background: #fff;
+  color: #2d3b4d;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: none;
+}
+
+.nas-connector-button:hover:not(:disabled) { background: #eef2f7; border-color: #8291a3; }
+.nas-connector-button:disabled { cursor: wait; opacity: .6; }
+.nas-connector-button.primary { border-color: #1b5c9d; background: #1b5c9d; color: #fff; }
+.nas-connector-button.primary:hover:not(:disabled) { background: #124a82; }
+.nas-connector-button.danger { border-color: #bb3e45; color: #9e242d; }
+.nas-connector-button.danger:hover:not(:disabled) { background: #fff0f1; }
+.nas-connector-button.ghost { border-color: transparent; background: transparent; }
+.nas-connector-button.compact { padding: 6px 9px; font-size: 12px; }
+
+.nas-connector-enrollment,
+.nas-connector-list-section {
+  margin-top: 24px;
+  padding: 22px;
+  border: 1px solid #d7dfe8;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.nas-connector-enrollment-form {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.nas-connector-enrollment-form label,
+.nas-connector-token label {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  color: #415163;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nas-connector-enrollment-form input,
+.nas-connector-token input {
+  min-width: 0;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #aeb8c4;
+  border-radius: 6px;
+  background: #fff;
+  color: #20242a;
+  font-weight: 400;
+}
+
+.nas-connector-token {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #b8d2ed;
+  border-radius: 7px;
+  background: #f0f7ff;
+}
+
+.nas-connector-token h3 { font-size: 17px; }
+.nas-connector-token-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.nas-connector-message {
+  margin: 18px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.nas-connector-message.error { background: #fff0f1; color: #8d2028; }
+.nas-connector-message.success { background: #edf9f0; color: #166534; }
+
+.nas-connector-list-heading { align-items: center; }
+.nas-connector-list-heading h2,
+.nas-connector-enrollment h2 { font-size: 21px; }
+.nas-connector-list-heading > span { color: #657487; font-size: 12px; white-space: nowrap; }
+
+.nas-connector-table-wrap { margin: 18px -22px -22px; overflow-x: auto; }
+.nas-connector-table { width: 100%; border-spacing: 0; border-collapse: collapse; min-width: 760px; }
+.nas-connector-table th,
+.nas-connector-table td { padding: 12px 14px; border-top: 1px solid #e7ecf1; text-align: left; vertical-align: middle; }
+.nas-connector-table th { background: #f3f6f9; color: #5d6b7b; font-size: 11px; letter-spacing: .03em; text-transform: uppercase; }
+.nas-connector-table td { color: #455769; font-size: 13px; }
+.nas-connector-table td:first-child { min-width: 180px; color: #263648; }
+.nas-connector-installation-id { display: block; max-width: 215px; margin-top: 3px; overflow: hidden; color: #718093; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+
+.nas-connector-status {
+  display: inline-block;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #edf2f7;
+  color: #526274;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.nas-connector-status.active { background: #e8f7ee; color: #17663d; }
+.nas-connector-status.enrolling { background: #fff6dc; color: #855d00; }
+.nas-connector-status.offline { background: #edf2f7; color: #526274; }
+.nas-connector-status.revoked { background: #fff0f1; color: #9e242d; }
+.nas-connector-actions { text-align: right; }
+.nas-connector-action-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.nas-connector-revoked-note { color: #8d5257; font-size: 11px; }
+.nas-connector-empty { margin: 18px -22px -22px; padding: 28px 22px; border-top: 1px solid #e7ecf1; color: #687789; text-align: center; }
+.nas-connector-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
+
+@media (max-width: 700px) {
+  .nas-connector-admin-page { width: min(100% - 24px, 1120px); margin-top: 24px; }
+  .nas-connector-admin-header, .nas-connector-enrollment-form { align-items: stretch; flex-direction: column; }
+  .nas-connector-admin-header .nas-connector-button, .nas-connector-enrollment-form .nas-connector-button { align-self: flex-start; }
+  .nas-connector-list-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .nas-connector-table { min-width: 0; }
+  .nas-connector-table thead { display: none; }
+  .nas-connector-table, .nas-connector-table tbody, .nas-connector-table tr, .nas-connector-table td { display: block; }
+  .nas-connector-table tr { padding: 8px 0; border-top: 1px solid #e7ecf1; }
+  .nas-connector-table td { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 7px 14px; border: 0; }
+  .nas-connector-table td::before { content: attr(data-label); color: #718093; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .nas-connector-table td:first-child { min-width: 0; }
+  .nas-connector-table td:first-child::before { content: 'Connector'; }
+  .nas-connector-actions { align-items: center; text-align: left; }
+  .nas-connector-action-buttons { justify-content: flex-start; }
+  .nas-connector-actions .nas-connector-button { justify-self: start; }
+  .nas-connector-table-wrap { overflow: visible; }
+}

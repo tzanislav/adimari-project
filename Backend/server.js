@@ -1,8 +1,10 @@
 const express = require('express');
+const http = require('http');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const { getLicensePasswordCrypto } = require('./security/licensePasswordCrypto');
 const { getFileServerConfig } = require('./config/fileServerConfig');
+const { getNasConnectorConfig, isNasConnectorEnabled } = require('./config/nasConnectorConfig');
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const brandRoutes = require('./routes/brandRoutes'); // Import brand routes
 const uploadRoutes = require('./routes/upload'); // Import upload route
@@ -18,6 +20,10 @@ const activityRoutes = require('./routes/activityRoute'); // Import activity rou
 const adminRoutes = require('./routes/adminRoutes'); // Import admin maintenance routes
 const { createFileRoutes } = require('./routes/fileRoutes'); // Private S3 file-manager routes
 const { createPublicDownloadRoutes } = require('./routes/publicDownloadRoutes'); // Anonymous share downloads
+const { createNasConnectorRoutes } = require('./routes/nasConnectorRoutes'); // Windows NAS connector control plane
+const { createNasConnectorControlChannel } = require('./control/nasConnectorControlChannel'); // Persistent connector presence channel
+const NasConnector = require('./models/nasConnector');
+const NasStorageRoot = require('./models/nasStorageRoot');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -30,6 +36,16 @@ const { authenticate, authorizeRole } = require('./auth/authMiddleware');
 getLicensePasswordCrypto();
 // Fail closed before accepting requests if private file-server settings are incomplete or malformed.
 getFileServerConfig();
+// The NAS connector is introduced behind an explicit feature flag. When enabled,
+// validate all NAS storage settings before accepting requests.
+const nasConnectorConfig = isNasConnectorEnabled() ? getNasConnectorConfig() : null;
+const nasConnectorControlChannel = nasConnectorConfig
+  ? createNasConnectorControlChannel({
+    config: nasConnectorConfig,
+    NasConnectorModel: NasConnector,
+    NasStorageRootModel: NasStorageRoot,
+  })
+  : null;
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -141,6 +157,20 @@ const publicDownloadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const nasConnectorEnrollmentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDevelopmentMode ? 100 : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const nasConnectorHeartbeatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isDevelopmentMode ? 1_000 : 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const cspDirectives = {
   defaultSrc: ["'self'"],
   baseUri: ["'self'"],
@@ -221,6 +251,14 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/upload', authenticate, uploadLimiter, uploadRoutes); 
 app.use('/api/files', fileManagerLimiter, createFileRoutes());
 app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes());
+if (nasConnectorConfig) {
+  app.use('/api/nas-connectors', createNasConnectorRoutes({
+    config: nasConnectorConfig,
+    enrollmentLimiter: nasConnectorEnrollmentLimiter,
+    heartbeatLimiter: nasConnectorHeartbeatLimiter,
+    controlSessionRegistry: nasConnectorControlChannel.sessionRegistry,
+  }));
+}
 app.use('/api/models3d', modelRoutes); 
 app.use('/api/projects', projectRoutes); 
 app.use('/api/selections', selectRoutes); 
@@ -255,6 +293,10 @@ app.get('*', (req, res) => {
 
 // Start the server
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+if (nasConnectorControlChannel) {
+  nasConnectorControlChannel.attach(server);
+}
+server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

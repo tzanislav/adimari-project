@@ -20,6 +20,7 @@ import LogTest from './pages/Other/LogTest';
 import StairCalculator from './pages/StairCalculator';
 import FileServer from './pages/FileServer';
 import PublicFileDownload from './pages/PublicFileDownload';
+import NasConnectorAdmin from './pages/NasConnectorAdmin';
 
 import './App.css';
 
@@ -62,6 +63,10 @@ function AppContent() {
           <Route
             path="/projects/file-server"
             element={<ProtectedRoute element={<FileServer />} />}
+          />
+          <Route
+            path="/admin/nas-connectors"
+            element={<ProtectedRoute requiredRole="admin" element={<NasConnectorAdmin />} />}
           />
           <Route
             path="/projects/:id"

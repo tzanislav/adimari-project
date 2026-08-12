@@ -1,0 +1,16 @@
+# Install this file in Nginx's http {} context, not inside a server {} block.
+# For example, on a conventional Ubuntu installation it can be included from
+# /etc/nginx/conf.d/adimari-connection-upgrade.conf.
+#
+# Phase 2B uses this mapping for the outbound WSS presence channel. The rate
+# and connection zones protect the public TLS edge before Node allocates a
+# socket or touches MongoDB. Do not use an unreviewed CDN/load balancer ahead
+# of Nginx; if one is required, configure Nginx's trusted real_ip handling
+# before changing these keys.
+map $http_upgrade $adimari_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+limit_req_zone $binary_remote_addr zone=adimari_connector_upgrade:10m rate=10r/m;
+limit_conn_zone $binary_remote_addr zone=adimari_connector_connection:10m;

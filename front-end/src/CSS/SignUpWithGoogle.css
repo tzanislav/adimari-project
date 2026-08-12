@@ -8,6 +8,14 @@
 
 }
 
+.sign-in-error
+{
+    max-width: 360px;
+    margin: 16px 16px 0;
+    color: #b42318;
+    text-align: center;
+}
+
 .admin-panel
 {
     display: flex;

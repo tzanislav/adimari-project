@@ -10,12 +10,14 @@ const SignUpWithGoogle = () => {
     const [userId, setUserId] = useState('');
     const [_role, setRole] = useState('regular'); // Default to 'regular'
     const [message, setMessage] = useState('');
+    const [signInError, setSignInError] = useState('');
     const host = import.meta.env.VITE_SERVER_URL || '';
 
 
     const handleGoogleSignIn = async () => {
         const auth = getAuth();
         const provider = new GoogleAuthProvider();
+        setSignInError('');
 
         try {
             const result = await signInWithPopup(auth, provider);
@@ -37,8 +39,13 @@ const SignUpWithGoogle = () => {
 
             const data = await response.json();
 
+            if (!response.ok) {
+                throw new Error(data.error || data.message || 'Unable to finish signing in.');
+            }
+
         } catch (error) {
             console.error('Error signing in with Google:', error);
+            setSignInError(error.message || 'Unable to sign in with Google. Please try again.');
         }
     };
 
@@ -91,6 +98,11 @@ const SignUpWithGoogle = () => {
                             onClick={handleGoogleSignIn}
                             label="Sign In with Google"
                         />
+                        {signInError && (
+                            <p className="sign-in-error" role="alert">
+                                {signInError}
+                            </p>
+                        )}
                     </>
                 )}
 

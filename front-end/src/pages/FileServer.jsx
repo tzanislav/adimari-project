@@ -581,7 +581,7 @@ function FileServer() {
       {error && <p className="file-server-message error" role="alert">{error}</p>}
       {notice && <p className="file-server-message success" role="status">{notice}</p>}
 
-            <nav className="file-server-breadcrumbs" aria-label="File location">
+      <nav className="file-server-breadcrumbs" aria-label="File location">
         <button className="file-server-crumb" onClick={() => setFolder('')}>Files</button>
         {breadcrumbs.map((segment, index) => {
           const path = breadcrumbs.slice(0, index + 1).join('/');

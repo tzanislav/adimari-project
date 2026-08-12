@@ -1,0 +1,85 @@
+# Copy to an Nginx site configuration only after replacing every __...__ value.
+# Do not expose the Node/PM2 port publicly. This proxy must be the one trusted
+# hop immediately in front of Backend/server.js.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __ADIMARI_PUBLIC_HOST__;
+
+    # Keep or replace this location if the host obtains/renews certificates by
+    # HTTP-01. The directory is an operator-owned path.
+    location ^~ /.well-known/acme-challenge/ {
+        root __ACME_WEBROOT__;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name __ADIMARI_PUBLIC_HOST__;
+
+    ssl_certificate     __TLS_FULLCHAIN_PATH__;
+    ssl_certificate_key __TLS_PRIVATE_KEY_PATH__;
+
+    # Keep TLS policy/ciphers in the host's centrally managed include where
+    # possible. The certificate must chain to a CA trusted by the connector
+    # Windows machine; self-signed production certificates are not supported.
+    include __TLS_OPTIONS_INCLUDE_PATH__;
+
+    # The API accepts only small JSON control-plane payloads. Browser file
+    # bytes use S3 directly in later phases and must not be proxied through
+    # Express.
+    client_max_body_size 1m;
+
+    # Keep this exact endpoint ahead of the general proxy location. It limits
+    # unauthenticated WSS upgrade abuse before traffic reaches Node.
+    location = /api/nas-connectors/control/socket {
+        limit_req zone=adimari_connector_upgrade burst=10 nodelay;
+        limit_conn adimari_connector_connection 2;
+
+        proxy_pass http://127.0.0.1:__ADIMARI_BACKEND_PORT__;
+        proxy_http_version 1.1;
+
+        # Overwrite every client-controlled forwarding header. In particular,
+        # do not append `$http_x_forwarded_for`: the backend uses this value
+        # only after trusting this local proxy as its per-client rate-limit key.
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $adimari_connection_upgrade;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:__ADIMARI_BACKEND_PORT__;
+        proxy_http_version 1.1;
+
+        # Overwrite, rather than relay, client-supplied forwarding headers.
+        # Backend/server.js uses req.secure for NAS connector routes, so
+        # X-Forwarded-Proto must reach it as "https" after TLS termination.
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # Replace rather than append client-supplied X-Forwarded-For values.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # The exact connector socket location above needs these headers. They
+        # are harmless for ordinary HTTPS requests routed here.
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $adimari_connection_upgrade;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
+    }
+}

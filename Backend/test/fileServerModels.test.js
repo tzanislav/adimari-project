@@ -28,3 +28,18 @@ test('operation and audit schemas reject unsupported action values', () => {
   assert.equal(operation.validateSync().errors.type.kind, 'enum');
   assert.equal(auditEvent.validateSync().errors.action.kind, 'enum');
 });
+
+test('a NAS share can remain in preparation without an S3 object, while legacy S3 shares stay ready', () => {
+  const pendingNasShare = new FileShare({
+    sourceType: 'nas_file',
+    nasFileEntryId: '507f1f77bcf86cd799439011',
+    originalFileName: 'proposal.pdf',
+    tokenHash: 'b'.repeat(64),
+    createdBy: 'firebase-user-id',
+    deliveryStatus: 'preparing',
+  });
+
+  assert.equal(pendingNasShare.validateSync(), undefined);
+  assert.equal(pendingNasShare.s3Key, null);
+  assert.equal(pendingNasShare.deliveryStatus, 'preparing');
+});

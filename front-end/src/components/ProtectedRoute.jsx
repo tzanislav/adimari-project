@@ -1,27 +1,19 @@
 // ProtectedRoute.js
-import React from 'react';
+/* eslint-disable react/prop-types */
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const ProtectedRoute = ({ element }) => {
+const ProtectedRoute = ({ element, requiredRole = 'moderator' }) => {
   const { user, loading, role } = useAuth();
   const location = useLocation();
 
-  var roleLevel = 0;
-
-  switch (role) {
-    case 'admin':
-        roleLevel = 3;
-        break;
-    case 'moderator':
-        roleLevel = 2;
-        break;
-    case 'regular':
-        roleLevel = 1;
-        break;
-    default:
-        roleLevel = 0;
-}
+  const roleLevels = {
+    regular: 1,
+    moderator: 2,
+    admin: 3,
+  };
+  const roleLevel = roleLevels[role] || 0;
+  const requiredRoleLevel = roleLevels[requiredRole] || roleLevels.moderator;
 
   if (loading) {
     return <div>Loading...</div>; // Show a loading state while checking authentication
@@ -33,7 +25,7 @@ const ProtectedRoute = ({ element }) => {
   }
 
   // Signed-in users still need the required role for protected workspace pages.
-  if (roleLevel < 2) {
+  if (roleLevel < requiredRoleLevel) {
     return <Navigate to="/" replace />;
   }
 

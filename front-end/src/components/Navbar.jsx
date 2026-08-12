@@ -16,6 +16,7 @@ function Navbar() {
     { to: '/projects', label: 'Projects' },
     { to: '/team', label: 'Team' },
     { to: '/licenses', label: 'Licenses' },
+    ...(role === 'admin' ? [{ to: '/admin/nas-connectors', label: 'NAS Connectors' }] : []),
   ];
 
   return (
