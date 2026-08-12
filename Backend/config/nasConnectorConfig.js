@@ -26,6 +26,14 @@ const optionalString = (environment, key) => {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 };
 
+const optionalBoolean = (environment, key, defaultValue = false) => {
+  const raw = optionalString(environment, key);
+  if (raw === undefined) return defaultValue;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  throw new NasConnectorConfigurationError(`${key} must be true or false.`);
+};
+
 const requiredInteger = (environment, key, { min, max }) => {
   const value = Number(requiredString(environment, key));
   if (!Number.isSafeInteger(value) || value < min || value > max) {
@@ -143,6 +151,17 @@ const createNasConnectorConfig = (environment = process.env) => {
       max: 1_000,
       defaultValue: 30,
     }),
+    // The durable-delivery proof slice assigns a short DB-backed lease over
+    // WSS. It does not execute files yet; the lease only governs safe replay
+    // when an acknowledgement is lost or a connector reconnects.
+    jobLeaseSeconds: optionalInteger(environment, 'NAS_CONNECTOR_JOB_LEASE_SECONDS', {
+      min: 15,
+      max: 600,
+      defaultValue: 90,
+    }),
+    // HTTPS remains the normal deployment. This explicit switch exists for a
+    // small trusted/local installation that deliberately prefers plain HTTP.
+    allowInsecureHttp: optionalBoolean(environment, 'NAS_CONNECTOR_ALLOW_HTTP', false),
   };
 
   if (config.region !== fileServerConfig.region || config.bucketName !== fileServerConfig.bucketName) {

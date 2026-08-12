@@ -135,13 +135,24 @@
 .nas-connector-list-heading > span { color: #657487; font-size: 12px; white-space: nowrap; }
 
 .nas-connector-table-wrap { margin: 18px -22px -22px; overflow-x: auto; }
-.nas-connector-table { width: 100%; border-spacing: 0; border-collapse: collapse; min-width: 760px; }
+.nas-connector-table { width: 100%; border-spacing: 0; border-collapse: collapse; min-width: 900px; }
 .nas-connector-table th,
 .nas-connector-table td { padding: 12px 14px; border-top: 1px solid #e7ecf1; text-align: left; vertical-align: middle; }
 .nas-connector-table th { background: #f3f6f9; color: #5d6b7b; font-size: 11px; letter-spacing: .03em; text-transform: uppercase; }
 .nas-connector-table td { color: #455769; font-size: 13px; }
 .nas-connector-table td:first-child { min-width: 180px; color: #263648; }
 .nas-connector-installation-id { display: block; max-width: 215px; margin-top: 3px; overflow: hidden; color: #718093; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.nas-connector-index-status { display: block; max-width: 260px; color: #455769; font-size: 12px; line-height: 1.35; }
+.nas-connector-index-status.in_progress { color: #17663d; font-weight: 700; }
+.nas-connector-index-status.queued,
+.nas-connector-index-status.assigned,
+.nas-connector-index-status.accepted { color: #855d00; font-weight: 700; }
+.nas-connector-index-status.completed { color: #17663d; }
+.nas-connector-index-status.failed,
+.nas-connector-index-status.retryable_failure,
+.nas-connector-index-status.cancelled,
+.nas-connector-index-status.conflict { color: #9e242d; }
+.nas-connector-index-updated { display: block; margin-top: 3px; color: #718093; font-size: 11px; }
 
 .nas-connector-status {
   display: inline-block;

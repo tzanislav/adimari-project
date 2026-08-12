@@ -1,13 +1,34 @@
 'use strict';
 
+const crypto = require('crypto');
 const express = require('express');
 const { authenticate, authorizeRole } = require('../auth/authMiddleware');
 const { createConnectorAuthenticateMiddleware } = require('../auth/nasConnectorMiddleware');
+const { getFileServerConfig } = require('../config/fileServerConfig');
 const { getNasConnectorConfig } = require('../config/nasConnectorConfig');
 const NasAuditEvent = require('../models/nasAuditEvent');
 const NasConnector = require('../models/nasConnector');
 const NasEnrollmentToken = require('../models/nasEnrollmentToken');
+const NasFileEntry = require('../models/nasFileEntry');
+const FileShare = require('../models/fileShare');
 const NasStorageRoot = require('../models/nasStorageRoot');
+const NasTransferJob = require('../models/nasTransferJob');
+const {
+  CACHE_FOR_DOWNLOAD_JOB_TYPE,
+  GENERATE_THUMBNAIL_JOB_TYPE,
+  INDEX_ROOT_JOB_TYPE,
+  WRITE_UPLOAD_TO_NAS_JOB_TYPE,
+  NasConnectorJobQueue,
+  NasConnectorJobQueueError,
+  serializeTransferJob,
+} = require('../services/nasConnectorJobQueue');
+const { createFileStorageService, FileStorageError } = require('../services/fileStorageService');
+const {
+  normalizeCatalogueChangeBatch,
+  normalizeIndexBatch,
+  normalizeIndexCompletion,
+  normalizeIndexStart,
+} = require('../services/nasCatalogueValidation');
 const {
   NasConnectorSecretError,
   createEnrollmentToken,
@@ -21,6 +42,7 @@ const {
   assertObjectId,
   normalizeAgentVersion,
   normalizeConnectorRoot,
+  normalizeConnectorRootId,
   normalizeDisplayName,
   normalizeHeartbeatState,
   normalizeInstallationId,
@@ -70,6 +92,21 @@ const serializeConnector = (connector) => {
   };
 };
 
+const serializeStorageRoot = (root) => {
+  const value = toPlainObject(root);
+  return {
+    id: String(value._id || value.id || ''),
+    connectorId: String(value.connectorId || ''),
+    connectorRootId: value.connectorRootId,
+    name: value.displayName,
+    status: value.status,
+    uploadsEnabled: Boolean(value.uploadsEnabled),
+    lastIndexedAt: value.lastIndexedAt || null,
+    lastFullScanAt: value.lastFullScanAt || null,
+    lastScanError: value.lastScanError || null,
+  };
+};
+
 const serializeEnrollment = (enrollment) => {
   const value = toPlainObject(enrollment);
   return {
@@ -96,8 +133,8 @@ const CONNECTOR_CREDENTIAL_SELECTION = '+credentialHash';
 
 const sameCredentialHash = (left, right) => safelyCompareHashes(left, right);
 
-const defaultRequireHttps = (req, res, next) => {
-  if (req.secure) return next();
+const createTransportGuard = (allowInsecureHttp) => (req, res, next) => {
+  if (allowInsecureHttp || req.secure) return next();
   return res.status(400).json({
     code: 'NAS_CONNECTOR_HTTPS_REQUIRED',
     error: 'NAS connector requests require HTTPS.',
@@ -107,14 +144,17 @@ const defaultRequireHttps = (req, res, next) => {
 const passThrough = (req, res, next) => next();
 
 const sendError = (res, error) => {
-  if (error instanceof NasConnectorApiError || error instanceof NasConnectorValidationError || error instanceof NasConnectorSecretError) {
+  if (error instanceof NasConnectorApiError
+    || error instanceof NasConnectorValidationError
+    || error instanceof NasConnectorSecretError
+    || error instanceof NasConnectorJobQueueError) {
     return res.status(error.status || 400).json({ code: error.code, error: error.message });
   }
 
   if (error?.code === 11000) {
     return res.status(409).json({
       code: 'NAS_CONNECTOR_CONFLICT',
-      error: 'A connector with this installation ID already exists.',
+      error: 'A conflicting NAS connector record already exists.',
     });
   }
 
@@ -148,21 +188,128 @@ const normalizeHeartbeatRequest = (body = {}) => ({
   queueLength: normalizeQueueLength(body.queueLength),
 });
 
+const isPlainObject = (value) => value !== null
+  && typeof value === 'object'
+  && !Array.isArray(value)
+  && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+
+const normalizeEmptyRequest = (body) => {
+  if (!isPlainObject(body) || Object.keys(body).length !== 0) {
+    throw new NasConnectorValidationError('Connector cache request is invalid.');
+  }
+  return {};
+};
+
+const normalizeCacheCompletion = (body) => {
+  if (!isPlainObject(body)
+    || Object.keys(body).length !== 2
+    || typeof body.versionFingerprint !== 'string'
+    || !/^[A-Za-z0-9._:-]{1,512}$/.test(body.versionFingerprint)
+    || !Number.isSafeInteger(body.sizeBytes)
+    || body.sizeBytes < 0) {
+    throw new NasConnectorValidationError('Connector cache completion is invalid.');
+  }
+  return { versionFingerprint: body.versionFingerprint, sizeBytes: body.sizeBytes };
+};
+
+const normalizeWriteUploadCompletion = (body) => {
+  if (!isPlainObject(body)
+    || Object.keys(body).length !== 1
+    || !Number.isSafeInteger(body.sizeBytes)
+    || body.sizeBytes < 1) {
+    throw new NasConnectorValidationError('Connector NAS upload completion is invalid.');
+  }
+  return { sizeBytes: body.sizeBytes };
+};
+
+const normalizeWriteUploadFailure = (body) => {
+  const allowedCodes = new Set(['destination_exists', 'destination_unavailable', 'staging_unavailable', 'write_failed']);
+  if (!isPlainObject(body)
+    || Object.keys(body).length !== 1
+    || typeof body.code !== 'string'
+    || !allowedCodes.has(body.code)) {
+    throw new NasConnectorValidationError('Connector NAS upload failure is invalid.');
+  }
+  return { code: body.code };
+};
+
 const createNasConnectorRoutes = (dependencies = {}) => {
   const config = dependencies.config || getNasConnectorConfig();
   const NasConnectorModel = dependencies.NasConnectorModel || NasConnector;
   const NasEnrollmentTokenModel = dependencies.NasEnrollmentTokenModel || NasEnrollmentToken;
   const NasStorageRootModel = dependencies.NasStorageRootModel || NasStorageRoot;
+  const NasFileEntryModel = dependencies.NasFileEntryModel || NasFileEntry;
+  const FileShareModel = dependencies.FileShareModel || FileShare;
+  const NasTransferJobModel = dependencies.NasTransferJobModel || NasTransferJob;
   const NasAuditEventModel = dependencies.NasAuditEventModel || NasAuditEvent;
   const authenticateMiddleware = dependencies.authenticateMiddleware || authenticate;
   const authorizeAdminMiddleware = dependencies.authorizeAdminMiddleware || authorizeRole('admin');
-  const requireHttpsMiddleware = dependencies.requireHttpsMiddleware || defaultRequireHttps;
+  const requireHttpsMiddleware = dependencies.requireHttpsMiddleware
+    || createTransportGuard(config.allowInsecureHttp === true);
   const enrollmentLimiter = dependencies.enrollmentLimiter || passThrough;
   const heartbeatLimiter = dependencies.heartbeatLimiter || passThrough;
   const controlSessionRegistry = dependencies.controlSessionRegistry || null;
+  const jobQueue = dependencies.jobQueue || new NasConnectorJobQueue({
+    NasTransferJobModel,
+    leaseSeconds: Number.isSafeInteger(config.jobLeaseSeconds) ? config.jobLeaseSeconds : 90,
+    now: dependencies.now || (() => new Date()),
+  });
   const connectorAuthenticateMiddleware = dependencies.connectorAuthenticateMiddleware
     || createConnectorAuthenticateMiddleware({ NasConnectorModel, hmacSecret: config.authHmacSecret });
   const now = dependencies.now || (() => new Date());
+  const suppliedFileServerConfig = dependencies.fileServerConfig || null;
+  let cacheStorage = dependencies.cacheStorage || null;
+  let thumbnailStorage = dependencies.thumbnailStorage || null;
+  let stagingStorage = dependencies.stagingStorage || null;
+  // Create this only when a Phase-4 endpoint is used. It keeps the existing
+  // control-plane route unit tests independent of unrelated S3 environment.
+  const getCacheStorage = () => {
+    if (cacheStorage) return cacheStorage;
+    const fileServerConfig = suppliedFileServerConfig || getFileServerConfig();
+    cacheStorage = createFileStorageService({
+      config: {
+        ...fileServerConfig,
+        region: config.region,
+        bucketName: config.bucketName,
+        prefix: config.cachePrefix,
+        credentials: config.credentials || fileServerConfig.credentials,
+        uploadUrlTtlSeconds: config.connectorTransferUrlTtlSeconds,
+        downloadUrlTtlSeconds: config.connectorTransferUrlTtlSeconds,
+      },
+    });
+    return cacheStorage;
+  };
+  const getThumbnailStorage = () => {
+    if (thumbnailStorage) return thumbnailStorage;
+    const fileServerConfig = suppliedFileServerConfig || getFileServerConfig();
+    thumbnailStorage = createFileStorageService({
+      config: {
+        ...fileServerConfig,
+        region: config.region,
+        bucketName: config.bucketName,
+        prefix: config.thumbnailPrefix,
+        credentials: config.credentials || fileServerConfig.credentials,
+        uploadUrlTtlSeconds: config.connectorTransferUrlTtlSeconds,
+        downloadUrlTtlSeconds: config.connectorTransferUrlTtlSeconds,
+      },
+    });
+    return thumbnailStorage;
+  };
+  const getStagingStorage = () => {
+    if (stagingStorage) return stagingStorage;
+    const fileServerConfig = suppliedFileServerConfig || getFileServerConfig();
+    stagingStorage = createFileStorageService({
+      config: {
+        ...fileServerConfig,
+        region: config.region,
+        bucketName: config.bucketName,
+        prefix: config.uploadStagingPrefix,
+        credentials: config.credentials || fileServerConfig.credentials,
+        downloadUrlTtlSeconds: config.connectorTransferUrlTtlSeconds,
+      },
+    });
+    return stagingStorage;
+  };
   const router = express.Router();
 
   // Closing a persistent control session is a best-effort side effect after a
@@ -186,6 +333,12 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     } catch (error) {
       // Auditing must not undo a successful enrollment or revocation.
       console.error('Failed to record NAS connector audit event:', error?.code || error?.name || 'unknown');
+    }
+  };
+
+  const dispatchNextJob = (connectorId) => {
+    if (typeof jobQueue?.requestDispatch === 'function') {
+      void jobQueue.requestDispatch(connectorId);
     }
   };
 
@@ -687,6 +840,717 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     }
   });
 
+  // Phase 3A: an accepted logical index job becomes an authenticated scan
+  // session. The connector supplies only relative metadata in bounded batches;
+  // no native root path is ever sent to or stored by the backend.
+  router.post('/control/jobs/:jobId/index/start', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const request = normalizeIndexStart(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const startedAt = now();
+      let job = await NasTransferJobModel.findOneAndUpdate(
+        {
+          _id: jobId,
+          connectorId,
+          type: INDEX_ROOT_JOB_TYPE,
+          status: 'accepted',
+        },
+        {
+          $set: {
+            status: 'in_progress',
+            scanId: request.scanId,
+            scanStartedAt: startedAt,
+            progressStage: 'reading_nas',
+            progressBytes: 0,
+            progressTotalBytes: null,
+            progressUpdatedAt: startedAt,
+          },
+        },
+        { new: true },
+      );
+      if (!job) {
+        job = await NasTransferJobModel.findOne({
+          _id: jobId,
+          connectorId,
+          type: INDEX_ROOT_JOB_TYPE,
+          status: 'in_progress',
+          scanId: request.scanId,
+        });
+      }
+      if (!job) throw genericConnectorFailure();
+
+      const root = await NasStorageRootModel.findOne({
+        _id: job.storageRootId,
+        connectorId,
+        connectorRootId: job.connectorRootId,
+        status: { $in: ['active', 'offline'] },
+      });
+      if (!root) throw genericConnectorFailure();
+      return res.json({ scanId: request.scanId });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/control/jobs/:jobId/index/batches', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const request = normalizeIndexBatch(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: INDEX_ROOT_JOB_TYPE,
+        status: 'in_progress',
+        scanId: request.scanId,
+      });
+      if (!job) throw genericConnectorFailure();
+
+      const root = await NasStorageRootModel.findOne({
+        _id: job.storageRootId,
+        connectorId,
+        connectorRootId: job.connectorRootId,
+        status: { $in: ['active', 'offline'] },
+      });
+      if (!root) throw genericConnectorFailure();
+
+      const indexedAt = now();
+      await NasFileEntryModel.bulkWrite(request.entries.map((entry) => ({
+        updateOne: {
+          filter: { storageRootId: job.storageRootId, relativePath: entry.relativePath },
+          update: {
+            $set: {
+              ...entry,
+              lastIndexedAt: indexedAt,
+              lastSeenScanId: request.scanId,
+              deletedAt: null,
+            },
+            $setOnInsert: {
+              storageRootId: job.storageRootId,
+              availabilityStatus: 'offline',
+              thumbnailStatus: 'not_requested',
+            },
+          },
+          upsert: true,
+        },
+      })), { ordered: false });
+      await NasTransferJobModel.findOneAndUpdate(
+        { _id: jobId, connectorId, status: 'in_progress', scanId: request.scanId },
+        { $set: { progressBytes: (job.progressBytes || 0) + request.entries.length, progressUpdatedAt: indexedAt } },
+        { new: false },
+      );
+      return res.status(204).end();
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/control/jobs/:jobId/index/complete', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const request = normalizeIndexCompletion(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: INDEX_ROOT_JOB_TYPE,
+        status: 'in_progress',
+        scanId: request.scanId,
+      });
+      if (!job) {
+        // A successful completion response can be lost after Mongo commits.
+        // The service retains its local job until it sees a 2xx, so make the
+        // exact same completion report safely retryable.
+        const alreadyCompleted = await NasTransferJobModel.findOne({
+          _id: jobId,
+          connectorId,
+          type: INDEX_ROOT_JOB_TYPE,
+          status: 'completed',
+          scanId: request.scanId,
+        });
+        if (alreadyCompleted) return res.json({ job: serializeTransferJob(alreadyCompleted) });
+        throw genericConnectorFailure();
+      }
+
+      const completedAt = now();
+      const root = await NasStorageRootModel.findOneAndUpdate(
+        {
+          _id: job.storageRootId,
+          connectorId,
+          connectorRootId: job.connectorRootId,
+          status: { $in: ['active', 'offline'] },
+        },
+        { $set: { lastIndexedAt: completedAt, lastFullScanAt: completedAt, lastScanError: null } },
+        { new: true },
+      );
+      if (!root) throw genericConnectorFailure();
+
+      await NasFileEntryModel.updateMany(
+        {
+          storageRootId: job.storageRootId,
+          lastSeenScanId: { $ne: request.scanId },
+          // A watcher update can arrive while a reconciliation scan is in
+          // progress. Never let an older scan mark that newer observation as
+          // deleted merely because it was not part of its enumeration.
+          ...(job.scanStartedAt ? { lastIndexedAt: { $lte: job.scanStartedAt } } : {}),
+          deletedAt: null,
+        },
+        { $set: { deletedAt: completedAt, availabilityStatus: 'unavailable' } },
+      );
+      const completed = await NasTransferJobModel.findOneAndUpdate(
+        { _id: jobId, connectorId, type: INDEX_ROOT_JOB_TYPE, status: 'in_progress', scanId: request.scanId },
+        {
+          $set: {
+            status: 'completed',
+            completedAt,
+            progressStage: null,
+            progressBytes: request.entryCount,
+            progressUpdatedAt: completedAt,
+          },
+          $unset: { idempotencyKey: 1 },
+        },
+        { new: true },
+      );
+      if (!completed) throw genericConnectorFailure();
+      await audit({
+        action: 'scan_completed',
+        result: 'success',
+        connectorId,
+        storageRootId: job.storageRootId,
+        transferJobId: jobId,
+        details: { entryCount: request.entryCount },
+      });
+      dispatchNextJob(connectorId);
+      return res.json({ job: serializeTransferJob(completed) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  // Incremental change tracking. The connector coalesces local watcher events
+  // and sends only relative file metadata or relative removals. Full scans are
+  // still used as a safety net after watcher overflow/directory moves.
+  router.post('/control/catalogue/changes', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const request = normalizeCatalogueChangeBatch(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const root = await NasStorageRootModel.findOne({
+        connectorId,
+        connectorRootId: request.connectorRootId,
+        status: { $in: ['active', 'offline'] },
+      });
+      if (!root) throw genericConnectorFailure();
+
+      const observedAt = now();
+      for (const change of request.changes) {
+        if (change.operation === 'delete') {
+          const escaped = change.relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const filter = change.recursive
+            ? { storageRootId: root._id, relativePath: { $regex: `^${escaped}(?:/|$)` }, deletedAt: null }
+            : { storageRootId: root._id, relativePath: change.relativePath, deletedAt: null };
+          await NasFileEntryModel.updateMany(
+            filter,
+            { $set: { deletedAt: observedAt, availabilityStatus: 'unavailable', thumbnailStatus: 'stale', lastIndexedAt: observedAt } },
+          );
+          continue;
+        }
+
+        const existing = await NasFileEntryModel.findOne({
+          storageRootId: root._id,
+          relativePath: change.entry.relativePath,
+        });
+        const versionChanged = Boolean(existing && existing.versionFingerprint !== change.entry.versionFingerprint);
+        const update = {
+          $set: {
+            ...change.entry,
+            lastIndexedAt: observedAt,
+            deletedAt: null,
+            ...(versionChanged ? {
+              availabilityStatus: 'stale',
+              thumbnailStatus: 'stale',
+            } : {}),
+          },
+          $setOnInsert: {
+            storageRootId: root._id,
+            // MongoDB rejects an upsert that changes the same path through
+            // both $set and $setOnInsert. A changed existing version sets
+            // stale in $set, while a first observation receives its initial
+            // offline/not-requested state here.
+            ...(!versionChanged ? {
+              availabilityStatus: 'offline',
+              thumbnailStatus: 'not_requested',
+            } : {}),
+          },
+        };
+        await NasFileEntryModel.findOneAndUpdate(
+          { storageRootId: root._id, relativePath: change.entry.relativePath },
+          update,
+          { upsert: true, new: false },
+        );
+      }
+
+      await NasStorageRootModel.findOneAndUpdate(
+        { _id: root._id, connectorId, connectorRootId: request.connectorRootId },
+        { $set: { lastIndexedAt: observedAt, lastScanError: null } },
+        { new: false },
+      );
+      return res.status(204).end();
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  // Phase 4: the connector asks to begin a cache copy only after its durable
+  // WSS assignment was accepted. The response contains a relative path and a
+  // single temporary PUT URL; neither native NAS paths nor AWS credentials
+  // ever leave the connector/backend boundary.
+  router.post('/control/jobs/:jobId/cache/start', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      normalizeEmptyRequest(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: CACHE_FOR_DOWNLOAD_JOB_TYPE,
+        status: { $in: ['accepted', 'in_progress'] },
+      });
+      if (!job || !isPlainObject(job.payload)) throw genericConnectorFailure();
+      const fileEntryId = assertObjectId(job.payload.fileEntryId, 'File entry ID');
+      const fileShareId = assertObjectId(job.payload.fileShareId, 'File share ID');
+      const [entry, share, root] = await Promise.all([
+        NasFileEntryModel.findOne({ _id: fileEntryId, storageRootId: job.storageRootId, entryType: 'file', deletedAt: null }),
+        FileShareModel.findOne({ _id: fileShareId, sourceType: 'nas_file', nasFileEntryId: fileEntryId, status: 'active', deliveryStatus: 'preparing' }),
+        NasStorageRootModel.findOne({
+          _id: job.storageRootId,
+          connectorId,
+          connectorRootId: job.connectorRootId,
+          status: { $in: ['active', 'offline'] },
+        }),
+      ]);
+      if (!entry || !share || !root || (share.cacheExpiresAt && share.cacheExpiresAt <= now())) {
+        await NasTransferJobModel.findOneAndUpdate(
+          { _id: jobId, connectorId, type: CACHE_FOR_DOWNLOAD_JOB_TYPE, status: { $in: ['accepted', 'in_progress'] } },
+          { $set: { status: 'failed', completedAt: now(), errorCode: 'source_unavailable', errorMessage: 'The NAS file share is no longer available.' }, $unset: { idempotencyKey: 1 } },
+          { new: false },
+        );
+        if (share?.deliveryStatus === 'preparing') {
+          await FileShareModel.findOneAndUpdate({ _id: fileShareId, status: 'active' }, { $set: { deliveryStatus: 'failed' } }, { new: false });
+        }
+        throw new NasConnectorApiError({ code: 'NAS_CACHE_SOURCE_UNAVAILABLE', message: 'The requested NAS file is no longer available.', status: 409 });
+      }
+
+      const cacheKey = `${config.cachePrefix}shares/${fileShareId}/content`;
+      const startedAt = now();
+      await NasTransferJobModel.findOneAndUpdate(
+        { _id: jobId, connectorId, type: CACHE_FOR_DOWNLOAD_JOB_TYPE, status: { $in: ['accepted', 'in_progress'] } },
+        {
+          $set: {
+            status: 'in_progress',
+            progressStage: 'uploading_cache',
+            progressBytes: 0,
+            progressTotalBytes: entry.sizeBytes || 0,
+            progressUpdatedAt: startedAt,
+          },
+        },
+        { new: false },
+      );
+      const uploadUrl = await getCacheStorage().getUploadUrl({
+        key: cacheKey,
+        contentType: entry.contentType || 'application/octet-stream',
+        expiresIn: config.connectorTransferUrlTtlSeconds,
+      });
+      console.info('[NAS cache] upload_started', { connectorId, jobId, fileEntryId, fileShareId });
+      return res.json({
+        relativePath: entry.relativePath,
+        versionFingerprint: entry.versionFingerprint,
+        sizeBytes: entry.sizeBytes || 0,
+        contentType: entry.contentType || 'application/octet-stream',
+        uploadUrl,
+      });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/control/jobs/:jobId/cache/complete', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const completion = normalizeCacheCompletion(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: CACHE_FOR_DOWNLOAD_JOB_TYPE,
+        status: { $in: ['in_progress', 'completed'] },
+      });
+      if (!job || !isPlainObject(job.payload)) throw genericConnectorFailure();
+      const fileEntryId = assertObjectId(job.payload.fileEntryId, 'File entry ID');
+      const fileShareId = assertObjectId(job.payload.fileShareId, 'File share ID');
+      if (job.status === 'completed') return res.json({ job: serializeTransferJob(job) });
+
+      const [entry, share] = await Promise.all([
+        NasFileEntryModel.findOne({ _id: fileEntryId, storageRootId: job.storageRootId, entryType: 'file', deletedAt: null }),
+        FileShareModel.findOne({ _id: fileShareId, sourceType: 'nas_file', nasFileEntryId: fileEntryId, status: 'active', deliveryStatus: 'preparing' }),
+      ]);
+      if (!entry || !share || entry.versionFingerprint !== completion.versionFingerprint || entry.sizeBytes !== completion.sizeBytes
+        || (share.cacheExpiresAt && share.cacheExpiresAt <= now())) {
+        throw new NasConnectorApiError({ code: 'NAS_CACHE_SOURCE_CHANGED', message: 'The NAS file changed before cache delivery completed.', status: 409 });
+      }
+      const cacheKey = `${config.cachePrefix}shares/${fileShareId}/content`;
+      const object = await getCacheStorage().headFile({ key: cacheKey });
+      if (Number(object.ContentLength) !== completion.sizeBytes) {
+        throw new NasConnectorApiError({ code: 'NAS_CACHE_OBJECT_INVALID', message: 'The uploaded cache object does not match the indexed file.', status: 409 });
+      }
+
+      const completedAt = now();
+      const readyShare = await FileShareModel.findOneAndUpdate(
+        { _id: fileShareId, status: 'active', deliveryStatus: 'preparing', cacheExpiresAt: { $gt: completedAt } },
+        { $set: { s3Key: cacheKey, deliveryStatus: 'ready' } },
+        { new: true },
+      );
+      if (!readyShare) throw new NasConnectorApiError({ code: 'NAS_CACHE_SHARE_UNAVAILABLE', message: 'The NAS file share is no longer active.', status: 409 });
+      await NasFileEntryModel.findOneAndUpdate(
+        { _id: fileEntryId, versionFingerprint: completion.versionFingerprint, deletedAt: null },
+        {
+          $set: {
+            availabilityStatus: 'online',
+            cacheObjectKey: cacheKey,
+            cacheVersionFingerprint: completion.versionFingerprint,
+            cacheExpiresAt: share.cacheExpiresAt,
+          },
+        },
+        { new: false },
+      );
+      const completed = await NasTransferJobModel.findOneAndUpdate(
+        { _id: jobId, connectorId, type: CACHE_FOR_DOWNLOAD_JOB_TYPE, status: 'in_progress' },
+        {
+          $set: {
+            status: 'completed', completedAt, progressStage: null, progressBytes: completion.sizeBytes,
+            progressTotalBytes: completion.sizeBytes, progressUpdatedAt: completedAt,
+          },
+          $unset: { idempotencyKey: 1 },
+        },
+        { new: true },
+      );
+      if (!completed) throw genericConnectorFailure();
+      console.info('[NAS cache] upload_completed', { connectorId, jobId, fileEntryId, fileShareId });
+      dispatchNextJob(connectorId);
+      return res.json({ job: serializeTransferJob(completed) });
+    } catch (error) {
+      if (error instanceof FileStorageError) {
+        return res.status(503).json({ code: 'NAS_CACHE_STORAGE_UNAVAILABLE', error: 'Temporary file storage is unavailable.' });
+      }
+      return sendError(res, error);
+    }
+  });
+
+  // Phase 5: the browser first uploads into the private staging prefix. The
+  // connector receives only an authenticated one-time download URL and the
+  // relative destination path, then writes the file under its configured NAS
+  // root. No browser or backend request contains a Windows/UNC path.
+  router.post('/control/jobs/:jobId/upload/start', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      normalizeEmptyRequest(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: WRITE_UPLOAD_TO_NAS_JOB_TYPE,
+        status: { $in: ['accepted', 'in_progress', 'completed'] },
+      });
+      if (!job || !isPlainObject(job.payload)
+        || typeof job.payload.relativeDestinationPath !== 'string'
+        || typeof job.payload.stagingKey !== 'string'
+        || !Number.isSafeInteger(job.payload.expectedSize)
+        || job.payload.expectedSize < 1
+        || typeof job.payload.contentType !== 'string') {
+        throw genericConnectorFailure();
+      }
+      const root = await NasStorageRootModel.findOne({
+        _id: job.storageRootId,
+        connectorId,
+        connectorRootId: job.connectorRootId,
+        uploadsEnabled: true,
+        status: { $in: ['active', 'offline'] },
+      });
+      if (!root) throw genericConnectorFailure();
+      if (job.status === 'completed') {
+        return res.json({
+          relativePath: job.payload.relativeDestinationPath,
+          contentType: job.payload.contentType,
+          sizeBytes: job.payload.expectedSize,
+          completed: true,
+        });
+      }
+      const object = await getStagingStorage().headFile({ key: job.payload.stagingKey });
+      if (Number(object.ContentLength) !== job.payload.expectedSize) {
+        throw new NasConnectorApiError({ code: 'NAS_UPLOAD_STAGING_INVALID', message: 'The staged upload is unavailable.', status: 409 });
+      }
+      const startedAt = now();
+      await NasTransferJobModel.findOneAndUpdate(
+        { _id: jobId, connectorId, type: WRITE_UPLOAD_TO_NAS_JOB_TYPE, status: { $in: ['accepted', 'in_progress'] } },
+        {
+          $set: {
+            status: 'in_progress',
+            progressStage: 'writing_nas',
+            progressBytes: 0,
+            progressTotalBytes: job.payload.expectedSize,
+            progressUpdatedAt: startedAt,
+          },
+        },
+        { new: false },
+      );
+      const fileName = job.payload.relativeDestinationPath.split('/').pop();
+      const downloadUrl = await getStagingStorage().getDownloadUrl({
+        key: job.payload.stagingKey,
+        fileName,
+        disposition: 'attachment',
+        expiresIn: config.connectorTransferUrlTtlSeconds,
+      });
+      console.info('[NAS upload] connector_write_started', { connectorId, jobId });
+      return res.json({
+        relativePath: job.payload.relativeDestinationPath,
+        contentType: job.payload.contentType,
+        sizeBytes: job.payload.expectedSize,
+        downloadUrl,
+      });
+    } catch (error) {
+      if (error instanceof FileStorageError) {
+        return res.status(503).json({ code: 'NAS_UPLOAD_STAGING_UNAVAILABLE', error: 'Temporary upload storage is unavailable.' });
+      }
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/control/jobs/:jobId/upload/complete', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const completion = normalizeWriteUploadCompletion(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: WRITE_UPLOAD_TO_NAS_JOB_TYPE,
+        status: { $in: ['in_progress', 'completed'] },
+      });
+      if (!job || !isPlainObject(job.payload) || !Number.isSafeInteger(job.payload.expectedSize)) {
+        throw genericConnectorFailure();
+      }
+      if (job.status === 'completed') return res.json({ job: serializeTransferJob(job) });
+      if (completion.sizeBytes !== job.payload.expectedSize) {
+        throw new NasConnectorApiError({ code: 'NAS_UPLOAD_SIZE_MISMATCH', message: 'The NAS file does not match the staged upload.', status: 409 });
+      }
+      const completedAt = now();
+      const completed = await NasTransferJobModel.findOneAndUpdate(
+        { _id: jobId, connectorId, type: WRITE_UPLOAD_TO_NAS_JOB_TYPE, status: 'in_progress' },
+        {
+          $set: {
+            status: 'completed',
+            completedAt,
+            progressStage: null,
+            progressBytes: completion.sizeBytes,
+            progressTotalBytes: completion.sizeBytes,
+            progressUpdatedAt: completedAt,
+          },
+        },
+        { new: true },
+      );
+      if (!completed) throw genericConnectorFailure();
+      await getStagingStorage().deleteFile({ key: job.payload.stagingKey }).catch(() => {});
+      await audit({ action: 'upload_completed', result: 'success', connectorId, storageRootId: job.storageRootId, transferJobId: jobId, details: {} });
+      console.info('[NAS upload] connector_write_completed', { connectorId, jobId, sizeBytes: completion.sizeBytes });
+      dispatchNextJob(connectorId);
+      return res.json({ job: serializeTransferJob(completed) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/control/jobs/:jobId/upload/fail', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const failure = normalizeWriteUploadFailure(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOneAndUpdate(
+        {
+          _id: jobId,
+          connectorId,
+          type: WRITE_UPLOAD_TO_NAS_JOB_TYPE,
+          status: { $in: ['accepted', 'in_progress'] },
+        },
+        {
+          $set: {
+            status: 'failed',
+            completedAt: now(),
+            errorCode: failure.code,
+            errorMessage: 'The connector could not write the staged upload to the NAS.',
+          },
+        },
+        { new: true },
+      );
+      if (!job) throw genericConnectorFailure();
+      if (job.payload?.stagingKey) await getStagingStorage().deleteFile({ key: job.payload.stagingKey }).catch(() => {});
+      await audit({ action: 'upload_completed', result: 'failure', connectorId, storageRootId: job.storageRootId, transferJobId: jobId, details: { code: failure.code } });
+      console.info('[NAS upload] connector_write_failed', { connectorId, jobId, code: failure.code });
+      dispatchNextJob(connectorId);
+      return res.json({ job: serializeTransferJob(job) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/control/jobs/:jobId/thumbnail/start', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      normalizeEmptyRequest(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: GENERATE_THUMBNAIL_JOB_TYPE,
+        status: { $in: ['accepted', 'in_progress'] },
+      });
+      if (!job || !isPlainObject(job.payload)) throw genericConnectorFailure();
+      const fileEntryId = assertObjectId(job.payload.fileEntryId, 'File entry ID');
+      const [entry, root] = await Promise.all([
+        NasFileEntryModel.findOne({
+          _id: fileEntryId,
+          storageRootId: job.storageRootId,
+          entryType: 'file',
+          previewKind: 'image',
+          deletedAt: null,
+        }),
+        NasStorageRootModel.findOne({
+          _id: job.storageRootId,
+          connectorId,
+          connectorRootId: job.connectorRootId,
+          status: { $in: ['active', 'offline'] },
+        }),
+      ]);
+      if (!entry || !root) {
+        throw new NasConnectorApiError({ code: 'NAS_THUMBNAIL_SOURCE_UNAVAILABLE', message: 'The requested image is no longer available.', status: 409 });
+      }
+      const versionHash = crypto.createHash('sha256').update(entry.versionFingerprint).digest('hex');
+      const thumbnailKey = `${config.thumbnailPrefix}entries/${fileEntryId}/${versionHash}.jpg`;
+      const startedAt = now();
+      await NasTransferJobModel.findOneAndUpdate(
+        { _id: jobId, connectorId, type: GENERATE_THUMBNAIL_JOB_TYPE, status: { $in: ['accepted', 'in_progress'] } },
+        { $set: { status: 'in_progress', progressStage: 'generating_thumbnail', progressBytes: 0, progressTotalBytes: entry.sizeBytes || 0, progressUpdatedAt: startedAt } },
+        { new: false },
+      );
+      const uploadUrl = await getThumbnailStorage().getUploadUrl({
+        key: thumbnailKey,
+        contentType: 'image/jpeg',
+        expiresIn: config.connectorTransferUrlTtlSeconds,
+      });
+      console.info('[NAS thumbnail] started', { connectorId, jobId, fileEntryId });
+      return res.json({
+        relativePath: entry.relativePath,
+        versionFingerprint: entry.versionFingerprint,
+        contentType: entry.contentType,
+        maxDimension: config.thumbnailMaxDimension,
+        uploadUrl,
+      });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/control/jobs/:jobId/thumbnail/complete', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const completion = normalizeCacheCompletion(req.body);
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: GENERATE_THUMBNAIL_JOB_TYPE,
+        status: { $in: ['in_progress', 'completed'] },
+      });
+      if (!job || !isPlainObject(job.payload)) throw genericConnectorFailure();
+      if (job.status === 'completed') return res.json({ job: serializeTransferJob(job) });
+      const fileEntryId = assertObjectId(job.payload.fileEntryId, 'File entry ID');
+      const entry = await NasFileEntryModel.findOne({
+        _id: fileEntryId,
+        storageRootId: job.storageRootId,
+        entryType: 'file',
+        previewKind: 'image',
+        deletedAt: null,
+      });
+      if (!entry || entry.versionFingerprint !== completion.versionFingerprint) {
+        throw new NasConnectorApiError({ code: 'NAS_THUMBNAIL_SOURCE_CHANGED', message: 'The image changed before thumbnail creation completed.', status: 409 });
+      }
+      const versionHash = crypto.createHash('sha256').update(entry.versionFingerprint).digest('hex');
+      const thumbnailKey = `${config.thumbnailPrefix}entries/${fileEntryId}/${versionHash}.jpg`;
+      const object = await getThumbnailStorage().headFile({ key: thumbnailKey });
+      if (!Number.isSafeInteger(Number(object.ContentLength)) || Number(object.ContentLength) !== completion.sizeBytes || completion.sizeBytes < 1) {
+        throw new NasConnectorApiError({ code: 'NAS_THUMBNAIL_OBJECT_INVALID', message: 'The generated thumbnail is invalid.', status: 409 });
+      }
+      const completedAt = now();
+      const updatedEntry = await NasFileEntryModel.findOneAndUpdate(
+        { _id: fileEntryId, versionFingerprint: completion.versionFingerprint, deletedAt: null },
+        { $set: { thumbnailStatus: 'ready', thumbnailObjectKey: thumbnailKey, thumbnailVersionFingerprint: completion.versionFingerprint, thumbnailUpdatedAt: completedAt } },
+        { new: true },
+      );
+      if (!updatedEntry) throw new NasConnectorApiError({ code: 'NAS_THUMBNAIL_SOURCE_CHANGED', message: 'The image changed before thumbnail creation completed.', status: 409 });
+      const completed = await NasTransferJobModel.findOneAndUpdate(
+        { _id: jobId, connectorId, type: GENERATE_THUMBNAIL_JOB_TYPE, status: 'in_progress' },
+        { $set: { status: 'completed', completedAt, progressStage: null, progressBytes: completion.sizeBytes, progressTotalBytes: completion.sizeBytes, progressUpdatedAt: completedAt }, $unset: { idempotencyKey: 1 } },
+        { new: true },
+      );
+      if (!completed) throw genericConnectorFailure();
+      await audit({ action: 'thumbnail_completed', result: 'success', connectorId, storageRootId: job.storageRootId, fileEntryId, transferJobId: jobId, details: {} });
+      console.info('[NAS thumbnail] completed', { connectorId, jobId, fileEntryId, sizeBytes: completion.sizeBytes });
+      dispatchNextJob(connectorId);
+      return res.json({ job: serializeTransferJob(completed) });
+    } catch (error) {
+      if (error instanceof FileStorageError) {
+        return res.status(503).json({ code: 'NAS_THUMBNAIL_STORAGE_UNAVAILABLE', error: 'Thumbnail storage is unavailable.' });
+      }
+      return sendError(res, error);
+    }
+  });
+
+  // The local Windows Control Center can start a scan directly. This is not a
+  // browser-facing action: it is authenticated with the connector credential
+  // and gives the operator immediate local feedback even when a queued WSS
+  // assignment has not arrived yet.
+  router.post('/control/index-requests', requireHttpsMiddleware, connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const connectorRootId = normalizeConnectorRootId(req.body?.connectorRootId);
+      const connectorId = connectorIdOf(req.connector);
+      const root = await NasStorageRootModel.findOne({
+        connectorId,
+        connectorRootId,
+        status: { $in: ['active', 'offline'] },
+      });
+      if (!root) throw genericConnectorFailure();
+
+      const requested = await jobQueue.requestLocalIndexRoot({
+        connectorId,
+        storageRootId: root._id || root.id,
+        connectorRootId,
+      });
+      await audit({
+        action: 'scan_requested_locally',
+        result: 'success',
+        connectorId,
+        storageRootId: root._id || root.id,
+        transferJobId: requested.job._id || requested.job.id,
+        details: { connectorRootId, created: requested.created },
+      });
+      return res.status(requested.created ? 201 : 200).json({
+        created: requested.created,
+        job: serializeTransferJob(requested.job),
+      });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
   router.post('/control/heartbeat', heartbeatLimiter, connectorAuthenticateMiddleware, async (req, res) => {
     try {
       const request = normalizeHeartbeatRequest(req.body);
@@ -743,6 +1607,232 @@ const createNasConnectorRoutes = (dependencies = {}) => {
       await reconcileStaleConnectorLiveness(now());
       const connectors = await queryAsPlainArray(NasConnectorModel.find({}));
       return res.json({ connectors: connectors.map(serializeConnector) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  // The admin console needs the opaque connector-root identifier to request a
+  // scan. Keep this on the connector-admin API rather than exposing it to the
+  // normal catalogue browsing API.
+  router.get('/:id/roots', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    try {
+      const connectorId = assertObjectId(req.params.id, 'Connector ID');
+      const connector = await NasConnectorModel.findOne({ _id: connectorId });
+      if (!connector) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_NOT_FOUND',
+          message: 'Connector not found.',
+          status: 404,
+        });
+      }
+
+      const roots = await queryAsPlainArray(NasStorageRootModel.find({
+        connectorId,
+        status: { $in: ['active', 'offline'] },
+      }));
+      return res.json({ roots: roots.map(serializeStorageRoot) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  // A no-op live-channel check for setup/testing. It intentionally carries no
+  // filesystem or transfer data; the Connector displays a local activity item
+  // only after its active WSS session receives this message.
+  router.post('/:id/test-message', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    const actorUid = currentActorUid(req.user);
+    try {
+      if (!actorUid) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_ACTOR_REQUIRED',
+          message: 'Authenticated administrator identity is required.',
+          status: 401,
+        });
+      }
+
+      const connectorId = assertObjectId(req.params.id, 'Connector ID');
+      const connector = await NasConnectorModel.findOne({
+        _id: connectorId,
+        status: 'active',
+      });
+      if (!connector) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_NOT_LIVE',
+          message: 'The connector is not currently live.',
+          status: 409,
+        });
+      }
+
+      const sent = typeof controlSessionRegistry?.sendTestMessage === 'function'
+        && controlSessionRegistry.sendTestMessage(connectorId);
+      if (!sent) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_CONTROL_UNAVAILABLE',
+          message: 'The connector control channel is not currently available.',
+          status: 409,
+        });
+      }
+
+      await audit({
+        action: 'connector_test_sent',
+        result: 'success',
+        actorUid,
+        connectorId,
+        details: {},
+      });
+      return res.status(202).json({ sent: true });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  // An administrator can request a full metadata scan. The connector receives
+  // the opaque root identifier only, then resolves it to its configured root
+  // locally before sending metadata batches.
+  router.post('/:id/roots/:connectorRootId/index-jobs', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    const actorUid = currentActorUid(req.user);
+    try {
+      if (!actorUid) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_ACTOR_REQUIRED',
+          message: 'Authenticated administrator identity is required.',
+          status: 401,
+        });
+      }
+
+      const connectorId = assertObjectId(req.params.id, 'Connector ID');
+      const connectorRootId = normalizeConnectorRootId(req.params.connectorRootId);
+      console.info('[NAS index] web_queue_requested', { connectorId, connectorRootId });
+      const connector = await NasConnectorModel.findOne({
+        _id: connectorId,
+        status: { $in: ['active', 'offline'] },
+      });
+      if (!connector) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_NOT_FOUND',
+          message: 'Active connector not found.',
+          status: 404,
+        });
+      }
+
+      const root = await NasStorageRootModel.findOne({
+        connectorId,
+        connectorRootId,
+        status: { $in: ['active', 'offline'] },
+      });
+      if (!root) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_ROOT_NOT_FOUND',
+          message: 'Enabled connector root not found.',
+          status: 404,
+        });
+      }
+
+      const queued = await jobQueue.enqueueIndexRoot({
+        connectorId,
+        storageRootId: root._id || root.id,
+        connectorRootId,
+        requestedBy: actorUid,
+        // The browser must receive a response as soon as Mongo has the job.
+        // WSS delivery is intentionally asynchronous and reports progress via
+        // the job polling already shown in the admin screen.
+        waitForDelivery: false,
+      });
+      console.info('[NAS index] web_queue_result', {
+        connectorId,
+        connectorRootId,
+        jobId: String(queued.job._id || queued.job.id),
+        created: queued.created,
+        status: queued.job.status,
+        attemptCount: queued.job.attemptCount || 0,
+      });
+      await audit({
+        action: 'scan_queued',
+        result: 'success',
+        actorUid,
+        connectorId,
+        storageRootId: root._id || root.id,
+        transferJobId: queued.job._id || queued.job.id,
+        details: { jobType: INDEX_ROOT_JOB_TYPE, connectorRootId, created: queued.created },
+      });
+      return res.status(queued.created ? 201 : 200).json({
+        created: queued.created,
+        job: serializeTransferJob(queued.job),
+      });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.get('/:id/jobs', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    try {
+      const connectorId = assertObjectId(req.params.id, 'Connector ID');
+      const jobs = await jobQueue.listForConnector(connectorId);
+      return res.json({ jobs: jobs.map(serializeTransferJob) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  // A queued/assigned job has not been accepted into the connector's durable
+  // local queue. Allow an administrator to discard a stale delivery and then
+  // request a fresh scan. Accepted or running work deliberately cannot be
+  // cancelled by this lightweight control-plane action.
+  router.post('/:id/jobs/:jobId/cancel', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    const actorUid = currentActorUid(req.user);
+    try {
+      if (!actorUid) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_ACTOR_REQUIRED',
+          message: 'Authenticated administrator identity is required.',
+          status: 401,
+        });
+      }
+
+      const connectorId = assertObjectId(req.params.id, 'Connector ID');
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const cancelledAt = now();
+      const job = await NasTransferJobModel.findOneAndUpdate(
+        {
+          _id: jobId,
+          connectorId,
+          type: INDEX_ROOT_JOB_TYPE,
+          status: { $in: ['queued', 'assigned'] },
+        },
+        {
+          $set: {
+            status: 'cancelled',
+            deliveryId: null,
+            leaseExpiresAt: null,
+            assignedAt: null,
+            acceptedAt: null,
+            completedAt: cancelledAt,
+            errorCode: 'cancelled',
+            errorMessage: null,
+          },
+          $unset: { idempotencyKey: 1 },
+        },
+        { new: true },
+      );
+      if (!job) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_JOB_CANNOT_CANCEL',
+          message: 'Only a queued scan that the connector has not accepted can be cancelled.',
+          status: 409,
+        });
+      }
+
+      await audit({
+        action: 'scan_cancelled',
+        result: 'success',
+        actorUid,
+        connectorId,
+        storageRootId: job.storageRootId,
+        transferJobId: job._id || job.id,
+        details: { jobType: INDEX_ROOT_JOB_TYPE },
+      });
+      return res.json({ job: serializeTransferJob(job) });
     } catch (error) {
       return sendError(res, error);
     }
@@ -826,7 +1916,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
 
 module.exports = {
   NasConnectorApiError,
+  createTransportGuard,
   createNasConnectorRoutes,
-  defaultRequireHttps,
   serializeConnector,
 };

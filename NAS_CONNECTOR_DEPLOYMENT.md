@@ -1,10 +1,17 @@
-# NAS Connector Phase 2 deployment runbook
+# NAS Connector deployment runbook
 
 This is an operator runbook for deploying the Phase 2 control plane. It does
 not deploy anything by itself. Phase 2A consists of administrator enrollment,
 the Windows service's outbound HTTPS heartbeats, and the management UI. Phase
-2B adds a persistent, outbound WSS **presence** channel. It does not yet scan
-the NAS, transfer a file, create thumbnails, or process file-transfer jobs.
+2B adds a persistent, outbound WSS **presence** channel. Phase 2C adds a
+single durable `index_root` delivery request, and Phase 3A executes it as a
+metadata-only NAS scan. The initial Phase 4 slice adds `cache_for_download`:
+the connector copies one indexed file directly to the private `nas-cache/`
+prefix using a short-lived backend-issued PUT URL. Current releases also
+generate persistent thumbnails, show image lightboxes, track NAS changes, and
+support a browser-to-NAS upload path through the isolated staging prefix. The
+browser uploads multipart parts directly to temporary storage; the connector
+then makes the final atomic write into the configured NAS folder.
 
 Use this runbook only after reviewing the implementation and taking an
 application/database backup appropriate to the production environment.
@@ -27,13 +34,18 @@ The public URL entered in the Control Center must be an HTTPS origin only, for
 example `https://files.example.com`. It cannot include a path, query, fragment,
 username, or password.
 
-The Node port must not be reachable from the internet. `Backend/server.js` sets
-`trust proxy` when `NODE_ENV=production`, so it trusts the nearest proxy hop
-for `X-Forwarded-Proto`. If a client can connect straight to the Node port, it
-can forge that header and defeat the connector route's cleartext check. Use one
-local Nginx hop immediately in front of Node, bind/firewall the Node port to
-the host, and expose only TCP 443 (and TCP 80 only for redirect/certificate
-renewal) through the EC2 security group.
+For local/private testing only, `NAS_CONNECTOR_ALLOW_HTTP=true` permits an
+`http://` Control Center origin and `ws://` control channel without a reverse
+proxy. Do not use this setting for an internet-facing deployment.
+
+The Node port must not be reachable from the internet. `Backend/server.js`
+binds only to loopback by default (`127.0.0.1`) and refuses a LAN or wildcard
+`BACKEND_BIND_HOST` value at startup. It sets `trust proxy` when
+`NODE_ENV=production`, so it trusts the nearest proxy hop for
+`X-Forwarded-Proto`. Use one local Nginx hop immediately in front of Node and
+expose only TCP 443 (and TCP 80 only for redirect/certificate renewal) through
+the EC2 security group. Do not expose 5001, SMB, MongoDB, or the S3 bucket
+directly to users.
 
 Do not add an extra unreviewed CDN/load balancer hop between Nginx and Node. If
 one is required later, review the `trust proxy` setting and ensure each proxy
@@ -58,8 +70,8 @@ explicit operator task.
 
 4. Replace every `__...__` placeholder in the server template. For the current
    deployment, `__ADIMARI_BACKEND_PORT__` is normally the `PORT` value in
-   `Backend/.env` (default `5001`). Keep `proxy_pass` on `127.0.0.1`, not a
-   public IP.
+   `Backend/.env` (default `5001`). Keep `BACKEND_BIND_HOST=127.0.0.1` and
+   `proxy_pass` on `127.0.0.1`, not a public IP.
 5. Validate and reload the Nginx configuration using the host's normal change
    process, for example `nginx -t` followed by a reload. Do not overwrite a
    live configuration before its backup and review are complete.
@@ -72,8 +84,9 @@ every NAS connector route returns `400 NAS_CONNECTOR_HTTPS_REQUIRED`.
 
 It includes an exact, rate- and connection-limited WSS location for
 `/api/nas-connectors/control/socket`, plus the required `Upgrade`,
-`Connection`, HTTP/1.1, and long proxy-timeout headers. Phase 2B uses that
-endpoint only for authenticated connector presence; it does not deliver jobs.
+`Connection`, HTTP/1.1, and long proxy-timeout headers. Phase 2C uses that
+endpoint for authenticated presence and durable receipt of the one harmless
+`index_root` request; it still does not execute NAS work.
 
 The templates deliberately overwrite `X-Forwarded-For` with Nginx's own
 `$remote_addr`; do not change this to `$proxy_add_x_forwarded_for`. The backend
@@ -129,6 +142,8 @@ Use the following as a checklist, not as a file containing real secrets:
 NODE_ENV=production
 DEV_MODE=production
 PORT=5001
+# Backend/server.js rejects anything except 127.0.0.1, ::1, or localhost.
+BACKEND_BIND_HOST=127.0.0.1
 CORS_ALLOWED_ORIGINS=https://files.example.com
 
 # Existing File Server values must already be real production values.
@@ -156,6 +171,7 @@ NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS=30
 NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS=90
 NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS=30
 NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE=30
+NAS_CONNECTOR_JOB_LEASE_SECONDS=90
 ```
 
 The NAS region and bucket must exactly equal `FILE_SERVER_AWS_REGION` and
@@ -207,11 +223,11 @@ unique IDs with the existing File Server rules. Do not upload the supplied JSON
 as a blind replacement.
 
 The [backend policy template](Backend/deployment/aws/nas-connector-backend-policy.template.json)
-is a least-privilege starting point for future Phase 3 transfer work. Replace
+is a least-privilege starting point for the initial cache-transfer work. Replace
 the bucket placeholder and review it with the existing File Server policy
 before attachment. It deliberately grants no access to `files/` and no
-`s3:PutObjectAcl` permission. Phase 2A heartbeats do not transfer S3 objects,
-but provisioning this boundary now avoids an unsafe broad policy later.
+`s3:PutObjectAcl` permission. The backend creates a scoped pre-signed PUT URL
+for each cache object; the Windows connector needs no AWS IAM user or key.
 
 ## 4. MongoDB rollout check
 
@@ -277,6 +293,49 @@ guard passed and the fake token was safely rejected. `400
 NAS_CONNECTOR_HTTPS_REQUIRED` means `NODE_ENV`, proxy placement, or
 `X-Forwarded-Proto` is wrong. Do not repeat this test rapidly; the enrollment
 endpoint is intentionally rate-limited.
+
+## 5A. Lean release checklist and basic recovery
+
+For this small, trusted deployment, use the existing application screens as
+monitoring rather than adding a separate alerting stack. Before a release, run
+these checks from clean working copies:
+
+```powershell
+# Backend repository
+Set-Location C:\WebDev\adimari-project\Backend
+npm test
+
+# Frontend production bundle
+Set-Location C:\WebDev\adimari-project\front-end
+npm run build
+
+# Connector repository
+Set-Location C:\WebDev\adimari-nas-connector
+dotnet build .\Adimari.NasConnector.sln --no-restore -c Release
+dotnet test .\Adimari.NasConnector.sln --no-build -c Release
+```
+
+After deployment, use one small, non-critical folder for a practical check:
+
+1. Confirm the public HTTPS origin works and that the host does **not** expose
+   TCP 5001, SMB, MongoDB, or the S3 bucket.
+2. In the Control Center, confirm **Service**, **Web server**, **Enrollment**,
+   **Last heartbeat**, and **Live control channel** are healthy. In **NAS
+   Connectors**, confirm the installation is active and recently seen.
+3. Browse and search a folder; test one uncached Open/Download, an image
+   thumbnail/lightbox, one NAS file create/change/delete, and one browser
+   upload with a new filename.
+4. Restart the connector once in a planned window. It should return to a
+   healthy heartbeat and control channel without re-enrollment.
+
+If something fails, start with the visible activity/error message in the
+Control Center and the backend log. For a connector that is offline, verify
+the Windows service and the configured server/root tests, then restart the
+service. For a failed file job, cancel or retry it through the application;
+do not modify queue documents or stored credentials in MongoDB. For a bad
+application deployment, use the rollback procedure below. Re-enroll only
+after a credential was deliberately revoked/lost or the UI explicitly reports
+that recovery is required.
 
 ## 6. Publish the Windows connector package
 
@@ -417,7 +476,7 @@ service process.
    Create an enrollment code. It is returned once, expires after 15 minutes by
    default, and must not be put in email, logs, screenshots, or tickets.
 2. In the Control Center, set the exact public HTTPS origin, select the UNC
-   root, set a display name, and set browser uploads disabled for this phase.
+   root, set a display name, and enable browser uploads only when that root
    Run the web-server and root tests, then save.
 3. Paste the enrollment code into the UI and enroll. The Control Center checks
    that the pipe endpoint belongs to the SCM service before it sends the code.
@@ -431,6 +490,43 @@ service process.
    WSS reconnect by itself must not change enrollment status; REST heartbeat
    remains authoritative. Stop/start the service during a planned test and
    confirm the control channel reconnects after the heartbeat path is healthy.
+7. If testing the Phase 2C delivery slice, have an administrator call
+  `POST /api/nas-connectors/<connectorId>/roots/<connectorRootId>/index-jobs`
+   with an empty JSON body. Confirm it returns `201`, the Control Center queue
+   count becomes `1`, and `GET /api/nas-connectors/<connectorId>/jobs` shows
+   the job progress through `accepted` to `completed`. The connector performs
+   a metadata-only NAS scan.
+8. For the initial Phase 4 cache path, open **NAS Files** and click **Open**,
+   **Download**, or **Share** on a small indexed file. The Connector Control
+   Center should show “Preparing a shared file from the NAS” followed by
+   “The shared file is ready to download.” Open/Download should continue
+   automatically after preparation; the public share page should change from
+   **Preparing** to **Download**. Repeat an action before expiry and confirm it
+   reuses the existing cache without a second connector upload. Confirm the
+   private bucket contains its object only under `nas-cache/` and that its
+   lifecycle rule expires it after 10 days.
+9. Open a folder containing JPEG, PNG, or GIF files. It should initially show
+   compact image placeholders, then persistent thumbnails as the connector
+   completes its serial thumbnail jobs. Open one while its thumbnail exists:
+   the lightbox enlarges that thumbnail while the full image is prepared, then
+   replaces it with the full image. Confirm generated derivatives are only
+   under `nas-thumbnails/`; unlike full delivery cache objects, they are not
+   covered by the 10-day lifecycle rule.
+10. With the connector running, create a small file in the configured NAS
+    root. Within a few seconds the Control Center activity list should report
+    that a file change was sent to the catalogue; the NAS Files page refreshes
+    its visible folder automatically within 20 seconds (or use **Refresh**).
+    Edit the file and confirm a later Open/Download prepares the changed
+    version rather than using the old cache. Delete the file or a folder and
+    confirm it disappears from the listing. A folder rename or a watcher
+    overflow may instead show a reconciliation-scan request; that is expected.
+11. With browser uploads enabled, open a known indexed NAS folder, click
+    **Upload here**, and select a small new file. Confirm the progress panel
+    shows browser upload, waiting for connector, and completion. Confirm the
+    Control Center records the NAS upload activity, the file appears only
+    after completion, and the catalogue lists it after the watcher refresh.
+    Confirm a same-name file is rejected rather than overwritten. The staging
+    object should be removed after successful connector completion.
 
 If enrollment loses its successful HTTP response, the service can retry the
 same request with its pending secret for the bounded recovery window. Do not

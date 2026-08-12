@@ -54,6 +54,8 @@ test('creates NAS configuration in the existing File Server bucket with isolated
   assert.equal(config.heartbeatStaleAfterSeconds, 90);
   assert.equal(config.controlPingIntervalSeconds, 30);
   assert.equal(config.controlUpgradeRateLimitPerMinute, 30);
+  assert.equal(config.jobLeaseSeconds, 90);
+  assert.equal(config.allowInsecureHttp, false);
   assert.deepEqual(config.credentials, {
     accessKeyId: 'AKIANAS',
     secretAccessKey: 'nas-connector-secret',
@@ -142,6 +144,28 @@ test('uses bounded control-channel ping and upgrade limits', () => {
   );
   assert.throws(
     () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE: '0' })),
+    NasConnectorConfigurationError,
+  );
+});
+
+test('uses a short bounded lease for durable connector job delivery', () => {
+  assert.equal(
+    createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_JOB_LEASE_SECONDS: '45' })).jobLeaseSeconds,
+    45,
+  );
+  assert.throws(
+    () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_JOB_LEASE_SECONDS: '14' })),
+    NasConnectorConfigurationError,
+  );
+});
+
+test('allows an explicit HTTP transport setting for a private/local connector deployment', () => {
+  assert.equal(
+    createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_ALLOW_HTTP: 'true' })).allowInsecureHttp,
+    true,
+  );
+  assert.throws(
+    () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_ALLOW_HTTP: 'yes' })),
     NasConnectorConfigurationError,
   );
 });

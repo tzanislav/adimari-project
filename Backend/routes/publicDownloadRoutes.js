@@ -4,6 +4,7 @@ const express = require('express');
 const { getFileServerConfig } = require('../config/fileServerConfig');
 const FileAuditEvent = require('../models/fileAuditEvent');
 const FileShare = require('../models/fileShare');
+const NasFileEntry = require('../models/nasFileEntry');
 const { FileStorageError, createFileStorageService } = require('../services/fileStorageService');
 const { hashShareToken } = require('../services/fileShareToken');
 
@@ -12,9 +13,40 @@ const notFound = (res) => res.status(404).json({ error: 'Download link not found
 const createPublicDownloadRoutes = (dependencies = {}) => {
   const config = dependencies.config || getFileServerConfig();
   const storage = dependencies.storage || createFileStorageService({ config });
+  const nasConfig = dependencies.nasConfig || null;
+  let cacheStorage = dependencies.cacheStorage || null;
   const FileShareModel = dependencies.FileShareModel || FileShare;
+  const NasFileEntryModel = dependencies.NasFileEntryModel || NasFileEntry;
   const FileAuditEventModel = dependencies.FileAuditEventModel || FileAuditEvent;
   const router = express.Router();
+
+  // Existing File Server shares live under `files/`; connector-prepared
+  // shares live under the isolated `nas-cache/` prefix in the same bucket.
+  // The storage service deliberately validates each key against its prefix,
+  // so choose it from the trusted share source rather than weakening either
+  // prefix validation.
+  const storageForShare = (share) => {
+    if (share.sourceType !== 'nas_file') return storage;
+    if (cacheStorage) return cacheStorage;
+    if (!nasConfig) {
+      throw new FileStorageError({
+        code: 'FILE_STORAGE_UNAVAILABLE',
+        message: 'NAS cache storage is not configured.',
+        status: 503,
+      });
+    }
+    cacheStorage = createFileStorageService({
+      config: {
+        ...config,
+        region: nasConfig.region,
+        bucketName: nasConfig.bucketName,
+        prefix: nasConfig.cachePrefix,
+        credentials: nasConfig.credentials || config.credentials,
+        downloadUrlTtlSeconds: config.downloadUrlTtlSeconds,
+      },
+    });
+    return cacheStorage;
+  };
 
   const audit = async (event) => {
     try {
@@ -35,25 +67,62 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
   };
 
   const loadExistingShare = async (req, res) => {
-    const share = await findActiveShare(req.params.token);
+    let share = await findActiveShare(req.params.token);
     if (!share) {
       notFound(res);
       return null;
     }
+    // S3 lifecycle removes the temporary object after the configured cache
+    // lifetime. Mark the public link consistently before any caller attempts
+    // to request a URL for an object that no longer belongs to the share.
+    if (share.sourceType === 'nas_file'
+      && share.cacheExpiresAt
+      && new Date(share.cacheExpiresAt) <= new Date()
+      && share.deliveryStatus !== 'expired') {
+      const expired = await FileShareModel.findOneAndUpdate(
+        { _id: share._id, status: 'active' },
+        { $set: { deliveryStatus: 'expired' } },
+        { new: true },
+      );
+      if (expired) share = expired;
+    }
     return share;
+  };
+
+  const serializeNonReadyNasShare = async (share) => {
+    if (share.sourceType !== 'nas_file' || !share.nasFileEntryId) return null;
+    const entry = await NasFileEntryModel.findOne({ _id: share.nasFileEntryId, deletedAt: null });
+    // A deleted NAS source must never be represented as ready. Keep the public
+    // response opaque: it reveals no original folder or native path.
+    if (!entry) return null;
+    return {
+      file: {
+        name: share.originalFileName,
+        size: entry.sizeBytes || 0,
+        contentType: entry.contentType || 'application/octet-stream',
+      },
+      deliveryStatus: share.deliveryStatus,
+      retryAfterSeconds: share.deliveryStatus === 'preparing' ? 3 : null,
+    };
   };
 
   router.get('/:token/info', async (req, res) => {
     try {
       const share = await loadExistingShare(req, res);
       if (!share) return undefined;
-      const object = await storage.headFile({ key: share.s3Key });
+      if (share.sourceType === 'nas_file' && share.deliveryStatus !== 'ready') {
+        const pending = await serializeNonReadyNasShare(share);
+        return pending ? res.json(pending) : notFound(res);
+      }
+      if (!share.s3Key) return notFound(res);
+      const object = await storageForShare(share).headFile({ key: share.s3Key });
       return res.json({
         file: {
           name: share.originalFileName,
           size: object.ContentLength || 0,
           contentType: object.ContentType || 'application/octet-stream',
         },
+        deliveryStatus: 'ready',
       });
     } catch (error) {
       if (error instanceof FileStorageError && error.code === 'FILE_NOT_FOUND') {
@@ -71,8 +140,16 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
     try {
       const share = await loadExistingShare(req, res);
       if (!share) return undefined;
-      await storage.headFile({ key: share.s3Key });
-      const downloadUrl = await storage.getDownloadUrl({
+      if (share.sourceType === 'nas_file' && share.deliveryStatus === 'preparing') {
+        return res.status(202).json({ deliveryStatus: 'preparing', retryAfterSeconds: 3 });
+      }
+      if (share.sourceType === 'nas_file' && share.deliveryStatus !== 'ready') {
+        return res.status(503).json({ error: 'File preparation was not completed.' });
+      }
+      if (!share.s3Key) return notFound(res);
+      const shareStorage = storageForShare(share);
+      await shareStorage.headFile({ key: share.s3Key });
+      const downloadUrl = await shareStorage.getDownloadUrl({
         key: share.s3Key,
         fileName: share.originalFileName,
       });

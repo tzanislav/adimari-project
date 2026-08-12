@@ -12,6 +12,14 @@ const projectLinks = [
     requiresEditor: true,
   },
   {
+    title: 'NAS Files',
+    description: 'Browse the indexed company NAS. File delivery and sharing are prepared on demand.',
+    to: '/projects/nas-files',
+    thumbnail: '/file.png',
+    thumbnailPlaceholder: 'NAS',
+    requiresEditor: true,
+  },
+  {
     title: '3D Models',
     description: 'Browse and manage the library of 3D models.',
     to: '/items',

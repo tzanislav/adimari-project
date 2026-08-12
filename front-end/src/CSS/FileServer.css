@@ -32,6 +32,7 @@
 
 .file-server-header h1 { margin: 0; font-size: 32px; }
 .file-server-header p:not(.file-server-eyebrow) { margin: 8px 0 0; color: #596575; }
+.file-server-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .file-server-button {
   margin: 0;
@@ -71,6 +72,10 @@
 .file-server-upload-status strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-server-upload-status span { color: #52677d; font-size: 12px; }
 .file-server-upload-status progress { width: 100%; accent-color: #1b5c9d; }
+.file-server-upload-progress { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(130px, 2fr) minmax(140px, 1fr); gap: 12px; align-items: center; margin: 14px 0; padding: 12px; border: 1px solid #b8d2ed; border-radius: 7px; background: #f0f7ff; }
+.file-server-upload-progress strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-server-upload-progress span { color: #52677d; font-size: 12px; }
+.file-server-upload-progress progress { width: 100%; accent-color: #1b5c9d; }
 
 .file-server-message { margin: 14px 0; padding: 10px 12px; border-radius: 6px; }
 .file-server-message.error { background: #fff0f1; color: #8d2028; }
@@ -82,6 +87,10 @@
 .file-server-row { min-height: 48px; padding: 8px 14px; border-top: 1px solid #edf0f4; }
 .file-server-row.folder { background: #fbfcfe; }
 .file-server-file-name, .file-server-name-button { overflow: hidden; color: #263648; font-weight: 600; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.nas-file-name-cell { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.nas-file-name-cell .file-server-file-name { min-width: 0; }
+.nas-file-thumbnail { width: 42px; height: 32px; flex: 0 0 auto; border-radius: 4px; background: #e7edf4; object-fit: cover; }
+.nas-file-thumbnail.placeholder { display: grid; place-items: center; color: #718096; font-size: 9px; font-weight: 700; text-transform: uppercase; }
 .file-server-name-button { margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .file-server-name-button:hover { color: #1b5c9d; background: transparent; }
 .file-server-row > span { color: #617082; font-size: 12px; }
@@ -109,6 +118,27 @@
 .file-server-share-row div { display: grid; gap: 4px; }
 .file-server-share-row span { color: #657487; font-size: 12px; }
 .file-server-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
+
+.nas-image-lightbox { position: fixed; z-index: 100; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: rgba(8, 13, 22, .97); color: #f8fafc; }
+.nas-image-lightbox-header, .nas-image-lightbox-nav { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 18px; background: rgba(20, 29, 42, .92); }
+.nas-image-lightbox-title, .nas-image-lightbox-nav span { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.nas-image-lightbox-actions { display: flex; gap: 8px; }
+.nas-image-icon-button, .nas-image-lightbox-nav button { margin: 0; border: 1px solid #64748b; border-radius: 6px; background: #1e293b; color: #f8fafc; cursor: pointer; }
+.nas-image-icon-button { width: 34px; height: 34px; font-size: 21px; line-height: 1; }
+.nas-image-lightbox-nav button { min-width: 92px; padding: 9px 12px; }
+.nas-image-icon-button:hover, .nas-image-lightbox-nav button:hover:not(:disabled) { background: #334155; }
+.nas-image-icon-button:focus-visible, .nas-image-lightbox-nav button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+.nas-image-lightbox-nav button:disabled { cursor: not-allowed; opacity: .45; }
+.nas-image-lightbox-content { display: grid; min-height: 0; place-items: center; overflow: auto; padding: 20px; }
+.nas-image-lightbox-content img, .nas-image-lightbox-loading, .nas-image-lightbox-error { grid-area: 1 / 1; }
+.nas-image-lightbox-content img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.nas-image-lightbox-loading, .nas-image-lightbox-error { z-index: 1; margin: 0; padding: 14px 18px; border-radius: 8px; background: rgba(30, 41, 59, .88); }
+.nas-image-lightbox-error { background: #7f1d1d; }
+
+@media (max-width: 560px) {
+  .nas-image-lightbox-header, .nas-image-lightbox-nav { padding: 10px 12px; }
+  .nas-image-lightbox-nav button { min-width: 74px; padding: 8px; }
+}
 
 @media (max-width: 760px) {
   .file-server-page { width: min(100% - 24px, 1180px); margin-top: 24px; }

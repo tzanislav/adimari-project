@@ -10,12 +10,14 @@ const {
 const {
   NasConnectorValidationError,
   normalizeAgentVersion,
+  normalizeConnectorRootId,
   normalizeConnectorRoot,
   normalizeHeartbeatState,
   normalizeInstallationId,
   normalizeQueueLength,
 } = require('../services/nasConnectorValidation');
 const { safelyCompareHashes } = require('../services/nasConnectorSecrets');
+const { normalizeAcknowledgement } = require('../services/nasConnectorJobQueue');
 
 const CONTROL_CHANNEL_PATH = '/api/nas-connectors/control/socket';
 const CONTROL_SUBPROTOCOL = 'adimari.nas-control.v1';
@@ -44,6 +46,14 @@ const HELLO_PAYLOAD_KEYS = new Set([
   'capabilities',
 ]);
 const HELLO_ROOT_KEYS = new Set(['connectorRootId', 'displayName', 'uploadsEnabled']);
+const JOB_ASSIGNMENT_KEYS = new Set([
+  'jobId',
+  'deliveryId',
+  'jobType',
+  'connectorRootId',
+  'leaseExpiresAt',
+  'payload',
+]);
 
 class NasConnectorControlProtocolError extends Error {
   constructor() {
@@ -133,6 +143,39 @@ const normalizeHelloPayload = (payload) => {
     queueLength: normalizeQueueLength(payload.queueLength),
     capabilities: normalizeCapabilities(payload.capabilities),
   };
+};
+
+const normalizeJobAssignment = (assignment) => {
+  assertExactKeys(assignment, JOB_ASSIGNMENT_KEYS);
+  if (typeof assignment.jobId !== 'string'
+    || !/^[0-9a-f]{24}$/.test(assignment.jobId)
+    || typeof assignment.deliveryId !== 'string'
+    || !isUuid(assignment.deliveryId)
+    || !isUtcInstant(assignment.leaseExpiresAt)
+    || !isPlainObject(assignment.payload)) {
+    throw new NasConnectorControlProtocolError();
+  }
+  const isIndexJob = assignment.jobType === 'index_root'
+    && Object.keys(assignment.payload).length === 0;
+  const isCacheJob = assignment.jobType === 'cache_for_download'
+    && Object.keys(assignment.payload).length === 2
+    && /^[0-9a-f]{24}$/.test(assignment.payload.fileEntryId)
+    && /^[0-9a-f]{24}$/.test(assignment.payload.fileShareId);
+  const isThumbnailJob = assignment.jobType === 'generate_thumbnail'
+    && Object.keys(assignment.payload).length === 1
+    && /^[0-9a-f]{24}$/.test(assignment.payload.fileEntryId);
+  const isWriteUploadJob = assignment.jobType === 'write_upload_to_nas'
+    && Object.keys(assignment.payload).length === 0;
+  if (!isIndexJob && !isCacheJob && !isThumbnailJob && !isWriteUploadJob) throw new NasConnectorControlProtocolError();
+  try {
+    return {
+      ...assignment,
+      deliveryId: assignment.deliveryId.toLowerCase(),
+      connectorRootId: normalizeConnectorRootId(assignment.connectorRootId),
+    };
+  } catch {
+    throw new NasConnectorControlProtocolError();
+  }
 };
 
 const resolveSelectedQuery = async (query) => {
@@ -291,6 +334,31 @@ class NasConnectorSessionRegistry {
   has(connectorId) {
     return this.sessions.has(String(connectorId));
   }
+
+  // A deliberately tiny operator-visible round-trip used to prove that the
+  // browser, backend, and current Connector session are connected. It has no
+  // NAS path, job, credential, or transfer payload.
+  sendTestMessage(connectorId) {
+    const session = this.sessions.get(String(connectorId));
+    if (!session) return false;
+    return sendEnvelope(session.socket, { type: 'test.message', payload: {} });
+  }
+
+  // Jobs use the same current, authenticated session as the operator-visible
+  // test message. Keeping this lookup here avoids a reconnect leaving the
+  // durable queue with a callback that still references a replaced socket.
+  // The queue remains responsible for validating the assignment and recording
+  // the message ID before it accepts an acknowledgement.
+  sendJobAssignment(connectorId, payload) {
+    const session = this.sessions.get(String(connectorId));
+    if (!session) return null;
+    const messageId = crypto.randomUUID();
+    return sendEnvelope(session.socket, {
+      type: 'job.assign',
+      messageId,
+      payload,
+    }) ? messageId : null;
+  }
 }
 
 const writeUpgradeError = (socket, statusCode, statusText, headers = {}) => {
@@ -396,6 +464,7 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
     NasStorageRootModel,
   } = dependencies;
   const isSecureRequest = dependencies.isSecureRequest || defaultIsSecureRequest;
+  const jobQueue = dependencies.jobQueue || null;
   const now = dependencies.now || (() => new Date());
   const sessionRegistry = dependencies.sessionRegistry || new NasConnectorSessionRegistry();
   const heartbeatIntervalSeconds = Number.isSafeInteger(config.heartbeatIntervalSeconds)
@@ -485,7 +554,7 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
         writeUpgradeError(socket, 429, 'Too Many Requests', { 'Retry-After': '60' });
         return;
       }
-      if (!isSecureRequest(request)) {
+      if (config.allowInsecureHttp !== true && !isSecureRequest(request)) {
         writeUpgradeError(socket, 400, 'Bad Request');
         return;
       }
@@ -527,6 +596,7 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
     let pingCheckInFlight = false;
     const pendingPingIds = new Set();
     const receivedMessageIds = new Set();
+    let unregisterJobDelivery = null;
 
     sessionRegistry.trackPending(connectorId, socket, { credentialHash });
 
@@ -604,6 +674,8 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
     socket.on('close', () => {
       clearTimeout(helloTimer);
       clearInterval(pingTimer);
+      unregisterJobDelivery?.();
+      unregisterJobDelivery = null;
     });
 
     socket.on('error', () => {
@@ -702,6 +774,63 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
               serverTime: now().toISOString(),
             },
           });
+          if (jobQueue) {
+            unregisterJobDelivery = jobQueue.registerDeliveryTarget(connectorId, async (assignment) => {
+              let payload;
+              try {
+                payload = normalizeJobAssignment(assignment);
+              } catch {
+                return null;
+              }
+              const messageId = sessionRegistry.sendJobAssignment(connectorId, payload);
+              console.info('[NAS index] control_channel_assignment_write', {
+                connectorId,
+                jobId: payload.jobId,
+                deliveryId: payload.deliveryId,
+                messageId,
+              });
+              return messageId;
+            });
+          }
+          return;
+        }
+
+        if (envelope.type === 'job.ack') {
+          if (!jobQueue || !envelope.replyTo) {
+            failProtocol(envelope.messageId);
+            return;
+          }
+          let acknowledgement;
+          try {
+            acknowledgement = normalizeAcknowledgement(envelope.payload);
+          } catch {
+            failProtocol(envelope.messageId);
+            return;
+          }
+          try {
+            console.info('[NAS index] control_channel_ack_received', {
+              connectorId,
+              jobId: acknowledgement.jobId,
+              deliveryId: acknowledgement.deliveryId,
+              replyTo: envelope.replyTo,
+            });
+            const result = await jobQueue.acknowledge({
+              connectorId,
+              payload: acknowledgement,
+              replyTo: envelope.replyTo,
+            });
+            if (!result.accepted) {
+              failProtocol(envelope.messageId);
+            }
+          } catch {
+            closeSocket(socket, {
+              code: CLOSE_CODES.protocolInvalid,
+              reason: 'Control channel job acknowledgement failed.',
+              errorCode: 'JOB_ACK_REJECTED',
+              errorMessage: 'Control channel job acknowledgement was rejected.',
+              replyTo: envelope.messageId,
+            });
+          }
           return;
         }
 

@@ -3,6 +3,7 @@ const http = require('http');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const { getLicensePasswordCrypto } = require('./security/licensePasswordCrypto');
+const { getBackendBindHost } = require('./config/backendNetworkConfig');
 const { getFileServerConfig } = require('./config/fileServerConfig');
 const { getNasConnectorConfig, isNasConnectorEnabled } = require('./config/nasConnectorConfig');
 const userRoutes = require('./routes/userRoutes'); // Import user routes
@@ -21,9 +22,12 @@ const adminRoutes = require('./routes/adminRoutes'); // Import admin maintenance
 const { createFileRoutes } = require('./routes/fileRoutes'); // Private S3 file-manager routes
 const { createPublicDownloadRoutes } = require('./routes/publicDownloadRoutes'); // Anonymous share downloads
 const { createNasConnectorRoutes } = require('./routes/nasConnectorRoutes'); // Windows NAS connector control plane
+const { createNasCatalogueRoutes } = require('./routes/nasCatalogueRoutes'); // Indexed NAS browse API
 const { createNasConnectorControlChannel } = require('./control/nasConnectorControlChannel'); // Persistent connector presence channel
 const NasConnector = require('./models/nasConnector');
 const NasStorageRoot = require('./models/nasStorageRoot');
+const NasTransferJob = require('./models/nasTransferJob');
+const { NasConnectorJobQueue } = require('./services/nasConnectorJobQueue');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -39,13 +43,30 @@ getFileServerConfig();
 // The NAS connector is introduced behind an explicit feature flag. When enabled,
 // validate all NAS storage settings before accepting requests.
 const nasConnectorConfig = isNasConnectorEnabled() ? getNasConnectorConfig() : null;
+const nasConnectorJobQueue = nasConnectorConfig
+  ? new NasConnectorJobQueue({
+    NasTransferJobModel: NasTransferJob,
+    leaseSeconds: nasConnectorConfig.jobLeaseSeconds,
+  })
+  : null;
 const nasConnectorControlChannel = nasConnectorConfig
   ? createNasConnectorControlChannel({
     config: nasConnectorConfig,
     NasConnectorModel: NasConnector,
     NasStorageRootModel: NasStorageRoot,
+    jobQueue: nasConnectorJobQueue,
   })
   : null;
+if (nasConnectorJobQueue && nasConnectorControlChannel) {
+  // The queue normally registers this target as part of WSS hello. Resolving
+  // it again from the active-session registry lets a browser action dispatch
+  // immediately even if that registration races a short reconnect.
+  nasConnectorJobQueue.setDeliveryTargetResolver((connectorId) => (
+    nasConnectorControlChannel.sessionRegistry.has(connectorId)
+      ? (assignment) => nasConnectorControlChannel.sessionRegistry.sendJobAssignment(connectorId, assignment)
+      : null
+  ));
+}
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -250,13 +271,21 @@ app.use('/api/users', userRoutes);
 app.use('/api/brands', brandRoutes); 
 app.use('/api/upload', authenticate, uploadLimiter, uploadRoutes); 
 app.use('/api/files', fileManagerLimiter, createFileRoutes());
-app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes());
+app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes({
+  nasConfig: nasConnectorConfig,
+}));
 if (nasConnectorConfig) {
   app.use('/api/nas-connectors', createNasConnectorRoutes({
     config: nasConnectorConfig,
     enrollmentLimiter: nasConnectorEnrollmentLimiter,
     heartbeatLimiter: nasConnectorHeartbeatLimiter,
     controlSessionRegistry: nasConnectorControlChannel.sessionRegistry,
+    jobQueue: nasConnectorJobQueue,
+  }));
+  app.use('/api/nas-catalogue', fileManagerLimiter, createNasCatalogueRoutes({
+    nasConfig: nasConnectorConfig,
+    fileServerConfig: getFileServerConfig(),
+    jobQueue: nasConnectorJobQueue,
   }));
 }
 app.use('/api/models3d', modelRoutes); 
@@ -293,10 +322,11 @@ app.get('*', (req, res) => {
 
 // Start the server
 const PORT = process.env.PORT || 5001;
+const bindHost = getBackendBindHost();
 const server = http.createServer(app);
 if (nasConnectorControlChannel) {
   nasConnectorControlChannel.attach(server);
 }
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+server.listen(PORT, bindHost, () => {
+  console.log('Server listening on http://' + bindHost + ':' + PORT + ' (loopback only)');
 });

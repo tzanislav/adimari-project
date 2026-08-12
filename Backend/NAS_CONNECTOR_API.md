@@ -180,6 +180,15 @@ re-enrollment after an ordinary network or service interruption.
 - `POST /api/nas-connectors/:id/revoke` revokes the connector, disables its known
   roots, invalidates unused re-enrollment tokens for it, and returns
   `{ "connector": <redacted connector> }`.
+- `POST /api/nas-connectors/:id/roots/:connectorRootId/index-jobs` creates the
+  initial, administrator-only durable delivery test job. Its body is empty.
+  It accepts only an enabled root belonging to an active or offline connector,
+  returns `201 { "created": true, "job": <redacted job> }`, and returns the
+  same job with `200 { "created": false, ... }` when it is already queued,
+  assigned, or durably accepted.
+- `GET /api/nas-connectors/:id/jobs` returns the redacted jobs for that
+  connector. This is an operator diagnostic endpoint; it does not expose a
+  browser file API or a native NAS path.
 
 Revocation takes effect on the next request because authentication only accepts
 connectors whose status is `active` or `offline`.
@@ -195,15 +204,62 @@ Sec-WebSocket-Protocol: adimari.nas-control.v1
 Authorization: Connector <connectorId>.<deviceSecret>
 ```
 
-It is a presence/keepalive channel only in Phase 2B. The REST heartbeat remains
-the authoritative liveness and revocation path; there are no file-transfer or
-job messages on the socket yet. The backend accepts a maximum of one valid
-session per connector, closes active and pending sessions after revocation or
-credential rotation, and rejects a `hello` that names an unknown or disabled
-enrolled root. The socket records connector presence only; root display metadata
-and `uploadsEnabled` remain owned by enrollment and the REST heartbeat. The
-connector credential must be in the authorization header only—never in the URL
-or a WebSocket message.
+Phase 2B provides presence/keepalive. Durable delivery now covers `index_root`
+and the small Phase-4 `cache_for_download` receipt using `job.assign` and
+`job.ack`, documented in
+[`NAS_CONNECTOR_CONTROL_CHANNEL.md`](NAS_CONNECTOR_CONTROL_CHANNEL.md). The
+connector persists a job locally before acknowledging it. The REST heartbeat remains authoritative for
+liveness and revocation. The backend accepts a maximum of one valid session per
+connector, closes active and pending sessions after revocation or credential
+rotation, and rejects a `hello` that names an unknown or disabled enrolled root.
+The socket never creates or edits root metadata. The connector credential must
+be in the authorization header only—never in the URL or a WebSocket message.
+
+## Connector indexing reports (Phase 3A)
+
+After the service has durably accepted an `index_root` delivery, it executes
+the scan through authenticated HTTPS—not through the browser or a WebSocket
+payload. The connector sends only safe relative metadata in batches of at most
+250 entries; native/UNC paths are rejected.
+
+- `POST /api/nas-connectors/control/jobs/:jobId/index/start`
+  accepts `{ "scanId": "UUID" }` and moves the connector's accepted index job
+  to `in_progress`. Repeating the same request is safe.
+- `POST /api/nas-connectors/control/jobs/:jobId/index/batches`
+  accepts `{ "scanId": "UUID", "entries": [...] }`. Each entry contains a
+  normalized relative path, parent path, name, file/folder type, size (or null
+  for folders), UTC modified time, version fingerprint, content type, and
+  preview kind. The backend upserts it under the connector's enrolled root.
+- `POST /api/nas-connectors/control/jobs/:jobId/index/complete`
+  accepts `{ "scanId": "UUID", "entryCount": 123 }`, marks unseen catalogue
+  entries unavailable, records root scan health, and completes the job.
+  Repeating the exact completion request is safe if the original success
+  response was lost.
+
+## Incremental catalogue changes (Phase 3C)
+
+The running Windows connector also watches its configured root and sends a
+small authenticated batch shortly after a file is created, changed, deleted,
+or renamed. This is not a browser endpoint and never contains a native
+Windows/UNC path:
+
+- POST /api/nas-connectors/control/catalogue/changes accepts
+  { "connectorRootId": "opaque-id", "changes": [...] }.
+  An upsert is { "operation": "upsert", "entry": the same entry shape as an
+  index batch }; a deletion is
+  { "operation": "delete", "relativePath": "folder/file.txt",
+  "recursive": false }. A recursive deletion safely marks a deleted folder and
+  its descendants unavailable.
+
+Each request is bounded to 250 changes. A version change marks existing cache
+and thumbnail metadata stale, so a later Open, Download, Share, or thumbnail
+request obtains the new NAS version rather than reusing an old one. The
+connector requests the normal durable full scan after a watcher overflow,
+directory rename, or every 12 hours; notifications provide prompt updates but
+are not treated as a complete source of truth.
+
+There is intentionally no browser catalogue endpoint in this slice. The next
+Phase 3B slice will expose the indexed metadata to the existing File Server UI.
 
 This initial session registry is intentionally process-local. Run one Backend
 process/PM2 instance for this feature. Do not use Node cluster mode, multiple
@@ -223,6 +279,7 @@ NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS=30
 NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS=90
 NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS=30
 NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE=30
+NAS_CONNECTOR_JOB_LEASE_SECONDS=90
 ```
 
 `NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS` is optional and defaults to
@@ -240,6 +297,53 @@ is a bounded Node-side defense-in-depth limit per client address (default 30).
 The trusted HTTPS reverse proxy must also apply its own upgrade rate and
 connection limits before Node; its public listener is the enforcement boundary.
 
+`NAS_CONNECTOR_JOB_LEASE_SECONDS` is optional and defaults to 90. It controls
+only how long the backend waits for durable delivery acknowledgement before it
+may resend the same job; it is not a NAS scan or transfer timeout.
+
+## Connector cache-delivery reports (Phase 4 initial slice)
+
+After the connector accepts a `cache_for_download` assignment, it uses these
+authenticated endpoints. The job assignment contains only `fileEntryId` and
+`fileShareId`; the backend resolves the current indexed relative path and
+creates the single short-lived S3 PUT URL only at start time.
+
+- `POST /api/nas-connectors/control/jobs/:jobId/cache/start` accepts `{}` and
+  returns `{ relativePath, versionFingerprint, sizeBytes, contentType, uploadUrl }`.
+  `uploadUrl` is used directly for one private cache-object PUT and must never
+  be stored or logged by the connector.
+- `POST /api/nas-connectors/control/jobs/:jobId/cache/complete` accepts
+  `{ "versionFingerprint": "...", "sizeBytes": 123 }`. The backend verifies
+  the cached object length, verifies the indexed source is still the same
+  version, marks the File Server share `ready`, and clears the terminal job's
+  idempotency key.
+
+The connector resolves `relativePath` below the root captured when it received
+the job, rejects escapes/reparse points, and verifies local size/fingerprint
+before upload. This initial slice is one serial direct PUT; multipart/resume and
+byte-progress reports are the next Phase-4 increment.
+
+## Authenticated NAS File delivery (Phase 4)
+
+Moderator/admin users can request a normal browser file action without first
+opening a public share page:
+
+- `POST /api/nas-catalogue/entries/:entryId/deliveries` accepts exactly
+  `{ "disposition": "inline" | "attachment" }`. It returns `200` with a
+  short-lived `downloadUrl` when the indexed version already has a current
+  cache object, or `202` with `{ delivery, retryAfterSeconds }` after queuing
+  a cache job.
+- `GET /api/nas-catalogue/deliveries/:deliveryId?disposition=inline|attachment`
+  is restricted to the authenticated user that started the delivery. It returns
+  `202` while preparation continues and `200` with the short-lived URL when
+  ready. It returns `409` for a failed delivery and `410` after the temporary
+  cache has expired.
+
+The cache record is reused only when its version fingerprint still matches the
+currently indexed NAS file and its stored cache expiry has not passed. The
+browser never receives a NAS path, S3 key, AWS credential, or connector
+credential.
+
 The enrollment-token collection TTL index must be on `recoveryExpiresAt`, not
 `expiresAt`, so a consumed token survives only long enough for recovery. If an
 early Phase 2 deployment already created the old `expiresAt` TTL index, replace
@@ -249,3 +353,33 @@ recovery.
 Changing `NAS_CONNECTOR_AUTH_HMAC_SECRET` intentionally invalidates all existing
 enrollment tokens and connector device credentials; rotate it only through a
 planned re-enrollment procedure.
+
+## Browser-to-NAS upload (Phase 5 initial slice)
+
+Moderator/admin users start an upload only from an active root whose
+uploadsEnabled setting is true. The browser is never given a native NAS path,
+an S3 object key, an S3 multipart upload ID, or a connector credential.
+
+- POST /api/nas-catalogue/roots/:rootId/uploads accepts exactly
+  parentPath, fileName, sizeBytes, and contentType. It validates the indexed
+  destination folder and collision state, creates an opaque upload ID, and
+  returns uploadId, partSize, and maxParts.
+- POST /api/nas-catalogue/uploads/:uploadId/parts accepts partNumbers and
+  returns only short-lived part URLs.
+- POST /api/nas-catalogue/uploads/:uploadId/complete accepts parts, validates
+  the staged object length, queues the connector write, and returns the
+  redacted transfer-job status.
+- POST /api/nas-catalogue/uploads/:uploadId/abort cancels an unfinished
+  browser staging upload. GET /api/nas-catalogue/uploads/:uploadId returns the
+  requesting user's redacted job state for UI polling.
+
+After accepting the empty write-upload-to-NAS control assignment, the
+connector calls the start endpoint to receive relativePath, contentType,
+sizeBytes, and a short-lived download URL; then it calls the complete endpoint
+with sizeBytes after atomically moving the temporary file into the NAS folder.
+It can report destination_exists, destination_unavailable, staging_unavailable,
+or write_failed through the failure endpoint.
+
+The initial slice validates byte length and rejects overwrite. Checksums,
+malware scanning, resumable browser retries, and per-folder write permissions
+remain later refinements.

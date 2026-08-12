@@ -21,6 +21,7 @@ import StairCalculator from './pages/StairCalculator';
 import FileServer from './pages/FileServer';
 import PublicFileDownload from './pages/PublicFileDownload';
 import NasConnectorAdmin from './pages/NasConnectorAdmin';
+import NasFileBrowser from './pages/NasFileBrowser';
 
 import './App.css';
 
@@ -63,6 +64,10 @@ function AppContent() {
           <Route
             path="/projects/file-server"
             element={<ProtectedRoute element={<FileServer />} />}
+          />
+          <Route
+            path="/projects/nas-files"
+            element={<ProtectedRoute element={<NasFileBrowser />} />}
           />
           <Route
             path="/admin/nas-connectors"

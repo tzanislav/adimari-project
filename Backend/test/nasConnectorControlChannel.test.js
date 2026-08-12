@@ -90,7 +90,7 @@ const createModels = ({ onRootRead } = {}) => {
   };
 };
 
-const startChannel = async ({ controlPingIntervalSeconds = 60, onRootRead } = {}) => {
+const startChannel = async ({ controlPingIntervalSeconds = 60, onRootRead, jobQueue } = {}) => {
   const models = createModels({ onRootRead });
   const channel = createNasConnectorControlChannel({
     config: {
@@ -100,6 +100,7 @@ const startChannel = async ({ controlPingIntervalSeconds = 60, onRootRead } = {}
     },
     NasConnectorModel: models.ConnectorModel,
     NasStorageRootModel: models.StorageRootModel,
+    jobQueue,
     // Tests use plain ws://. Production accepts only direct TLS or a loopback
     // TLS-terminating reverse proxy that sets X-Forwarded-Proto itself.
     isSecureRequest: () => true,
@@ -113,6 +114,24 @@ const startChannel = async ({ controlPingIntervalSeconds = 60, onRootRead } = {}
     models,
     server,
     url: `ws://127.0.0.1:${port}/api/nas-connectors/control/socket`,
+  };
+};
+
+const createJobQueueSpy = ({ acknowledge = async () => ({ accepted: true }) } = {}) => {
+  const state = {
+    acknowledgements: [],
+    deliveryTargets: [],
+  };
+  return {
+    state,
+    registerDeliveryTarget(connectorId, sendAssignment) {
+      state.deliveryTargets.push({ connectorId, sendAssignment });
+      return () => {};
+    },
+    async acknowledge(details) {
+      state.acknowledgements.push(details);
+      return acknowledge(details);
+    },
   };
 };
 
@@ -200,6 +219,99 @@ test('accepts only the required authenticated protocol and records connector pre
     });
     socket.close();
     await once(socket, 'close');
+  } finally {
+    await closeServer(app);
+  }
+});
+
+test('registers a queue delivery target after hello and forwards a correlated job acknowledgement', async () => {
+  const jobQueue = createJobQueueSpy();
+  const app = await startChannel({ jobQueue });
+  const assignment = {
+    jobId: '200000000000000000000001',
+    deliveryId: 'b9d24d65-1a96-4f65-aa06-40c74c5934ac',
+    jobType: 'index_root',
+    connectorRootId: ROOT.connectorRootId,
+    leaseExpiresAt: '2030-01-02T03:04:05.678Z',
+    payload: {},
+  };
+  try {
+    const socket = await connect(app.url);
+    const helloFrame = hello();
+    const helloAcknowledgement = nextMessage(socket);
+    socket.send(JSON.stringify(helloFrame));
+    await helloAcknowledgement;
+
+    assert.equal(jobQueue.state.deliveryTargets.length, 1);
+    const [deliveryTarget] = jobQueue.state.deliveryTargets;
+    assert.equal(deliveryTarget.connectorId, CONNECTOR_ID);
+
+    const assignmentFrame = nextMessage(socket);
+    const assignmentMessageId = await deliveryTarget.sendAssignment(assignment);
+    const receivedAssignment = await assignmentFrame;
+    assert.equal(assignmentMessageId, receivedAssignment.messageId);
+    assert.equal(receivedAssignment.v, 1);
+    assert.equal(receivedAssignment.type, 'job.assign');
+    assert.equal(receivedAssignment.replyTo, null);
+    assert.deepEqual(receivedAssignment.payload, assignment);
+
+    const acknowledgementPayload = {
+      jobId: assignment.jobId,
+      deliveryId: assignment.deliveryId,
+      status: 'accepted',
+    };
+    const acknowledged = new Promise((resolve) => {
+      jobQueue.acknowledge = async (details) => {
+        jobQueue.state.acknowledgements.push(details);
+        resolve(details);
+        return { accepted: true };
+      };
+    });
+    socket.send(JSON.stringify(envelope({
+      type: 'job.ack',
+      replyTo: receivedAssignment.messageId,
+      payload: acknowledgementPayload,
+    })));
+    assert.deepEqual(await acknowledged, {
+      connectorId: CONNECTOR_ID,
+      replyTo: receivedAssignment.messageId,
+      payload: acknowledgementPayload,
+    });
+
+    socket.close();
+    await once(socket, 'close');
+  } finally {
+    await closeServer(app);
+  }
+});
+
+test('closes the protocol when the durable queue rejects a job acknowledgement', async () => {
+  const jobQueue = createJobQueueSpy({ acknowledge: async () => ({ accepted: false }) });
+  const app = await startChannel({ jobQueue });
+  try {
+    const socket = await connect(app.url);
+    const helloAcknowledgement = nextMessage(socket);
+    socket.send(JSON.stringify(hello()));
+    await helloAcknowledgement;
+
+    const rejectedAck = envelope({
+      type: 'job.ack',
+      replyTo: crypto.randomUUID(),
+      payload: {
+        jobId: '200000000000000000000001',
+        deliveryId: 'b9d24d65-1a96-4f65-aa06-40c74c5934ac',
+        status: 'accepted',
+      },
+    });
+    const closed = once(socket, 'close');
+    socket.send(JSON.stringify(rejectedAck));
+    const [code] = await closed;
+    assert.equal(code, CLOSE_CODES.protocolInvalid);
+    assert.deepEqual(jobQueue.state.acknowledgements, [{
+      connectorId: CONNECTOR_ID,
+      replyTo: rejectedAck.replyTo,
+      payload: rejectedAck.payload,
+    }]);
   } finally {
     await closeServer(app);
   }
@@ -392,6 +504,39 @@ test('the session registry actively closes a connector without exposing its cred
   assert.equal(registry.closeConnector(CONNECTOR_ID, { expectedCredentialHash: hash }), true);
   assert.equal(calls[0].code, CLOSE_CODES.credentialInvalid);
   assert.equal(calls[0].errorCode, 'CREDENTIAL_REVOKED_OR_ROTATED');
+});
+
+test('the session registry sends a queued job through the current connector session', () => {
+  const sent = [];
+  const socket = {
+    once() {},
+    readyState: WebSocket.OPEN,
+    send: (frame) => sent.push(JSON.parse(frame)),
+  };
+  const registry = new NasConnectorSessionRegistry();
+  registry.register(CONNECTOR_ID, socket);
+
+  const messageId = registry.sendJobAssignment(CONNECTOR_ID, {
+    jobId: '64b64c0e5e0123456789abcd',
+    deliveryId: 'b9d24d65-1a96-4f65-aa06-40c74c5934ac',
+    jobType: 'index_root',
+    connectorRootId: ROOT.connectorRootId,
+    leaseExpiresAt: '2026-08-12T12:05:00.000Z',
+    payload: {},
+  });
+
+  assert.match(messageId, /^[0-9a-f-]{36}$/);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].type, 'job.assign');
+  assert.equal(sent[0].messageId, messageId);
+  assert.deepEqual(sent[0].payload, {
+    jobId: '64b64c0e5e0123456789abcd',
+    deliveryId: 'b9d24d65-1a96-4f65-aa06-40c74c5934ac',
+    jobType: 'index_root',
+    connectorRootId: ROOT.connectorRootId,
+    leaseExpiresAt: '2026-08-12T12:05:00.000Z',
+    payload: {},
+  });
 });
 
 test('only direct TLS or a loopback HTTPS reverse proxy qualifies as secure upgrade transport', () => {

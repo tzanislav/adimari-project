@@ -1,15 +1,17 @@
-# NAS Connector Control Channel — Phase 2B Contract
+# NAS Connector Control Channel — Phase 2B/2C Contract
 
 ## Purpose and boundary
 
-This contract defines the persistent **outbound** connector-presence channel.
+This contract defines the persistent **outbound** connector control channel.
 It lets the backend know that an already-enrolled Windows connector is online
-without opening an inbound port on the NAS network.
+without opening an inbound port on the NAS network, and carries one small
+durable delivery request.
 
-It is deliberately **not** a file-transfer or job-execution protocol yet. The
-REST heartbeat remains the authoritative liveness/revocation path during this
-slice. Job assignment starts only after the connector has a durable local job
-store and safe root resolver.
+It is deliberately **not** a file-transfer protocol. The REST heartbeat remains
+the authoritative liveness/revocation path. It delivers compact `index_root`
+and `cache_for_download` receipts after the connector records them in its local
+service-owned queue. Indexing and cache uploads use separate authenticated HTTPS
+endpoints; a cache job never carries a native path, S3 key, or signed URL.
 
 ## Transport and upgrade authentication
 
@@ -58,7 +60,7 @@ Rules:
   invalid JSON cause the server to send a redacted `error` if practical and
   close with application code `4003`.
 
-## Phase 2B messages
+## Presence messages
 
 ### Connector → backend: `hello`
 
@@ -155,9 +157,68 @@ private; only the HTTPS proxy is exposed. The proxy must overwrite
 `X-Forwarded-For` with its observed client address (or use an equivalently safe
 `real_ip` configuration); it must not append a public client-supplied value.
 
-## Deferred job delivery
+## Phase 2C durable delivery
 
-Future `job.assign`, `job.ack`, `job.progress`, `job.complete`, and `job.fail`
-messages will use this envelope. The database remains the job queue; the socket
-only delivers a lease. A connector will acknowledge a job only after recording
-it durably, and duplicate `jobId`/`deliveryId` messages must be idempotent.
+The database remains the job queue; the socket only delivers a short lease.
+`index_root` contains no native path, URL, credential, or executable
+parameters. `cache_for_download` contains only the file-entry and file-share
+database IDs. The Windows Service obtains the current relative path and a
+single short-lived upload URL from its authenticated HTTPS endpoint only after
+durable receipt.
+
+### Backend → connector: `job.assign`
+
+```json
+{
+  "v": 1,
+  "type": "job.assign",
+  "messageId": "a UUID",
+  "replyTo": null,
+  "sentAt": "2026-08-12T12:00:01.000Z",
+  "payload": {
+    "jobId": "24 lowercase hexadecimal characters",
+    "deliveryId": "a UUID",
+    "jobType": "index_root",
+    "connectorRootId": "office-projects",
+    "leaseExpiresAt": "2026-08-12T12:01:31.000Z",
+    "payload": {}
+  }
+}
+```
+
+For `cache_for_download`, `payload` is exactly:
+
+```json
+{
+  "fileEntryId": "24 lowercase hexadecimal characters",
+  "fileShareId": "24 lowercase hexadecimal characters"
+}
+```
+
+The connector verifies that `connectorRootId` exactly matches its configured
+logical root, then atomically writes the assignment to its local queue before
+replying. It accepts one queued job in this initial slice.
+
+### Connector → backend: `job.ack`
+
+```json
+{
+  "v": 1,
+  "type": "job.ack",
+  "messageId": "a UUID",
+  "replyTo": "the job.assign message ID",
+  "sentAt": "2026-08-12T12:00:02.000Z",
+  "payload": {
+    "jobId": "the assigned job ID",
+    "deliveryId": "the assigned delivery ID",
+    "status": "accepted"
+  }
+}
+```
+
+`status` is `accepted` for a newly persisted local record or `duplicate` for a
+safe redelivery. The backend conditionally records the acknowledgement only
+for the current, unexpired lease. If an acknowledgement is lost, the connector
+can retry it; if the lease expires first, the backend redelivers the same job
+with a new `deliveryId`. This phase ends at durable receipt—there is no
+`job.progress`, completion, transfer, or filesystem execution yet.
