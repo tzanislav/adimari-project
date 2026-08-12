@@ -17,7 +17,7 @@ The NAS remains the canonical copy. A locally installed connector is the only co
 ## Implementation status
 
 - **Phase 1:** backend configuration validation, NAS metadata schemas, isolated S3-prefix configuration, and the 10-day cache/thumbnail retention design are in place. Applying the actual S3 lifecycle/IAM policy remains a deployment task.
-- **Phase 2A:** complete. The separate Windows Service/WPF solution supports ACL-protected local setup, root and HTTPS checks, one-time enrollment, revocation/re-enrollment, DPAPI-protected connector credentials, authenticated HTTPS heartbeats, and an administrator-only web management page.
+- **Phase 2A:** complete. The separate Windows Service/WPF solution supports ACL-protected local setup, root and HTTPS checks, a manually distributed shared connector key held in DPAPI-protected service storage, authenticated HTTPS heartbeats, and an administrator-only web management page. The legacy token schemas remain only for compatibility and are no longer used operationally.
 - **Phase 2B:** complete. The service and backend maintain a secure persistent, outbound WSS **presence** channel with strict `hello`/ack/ping/pong protocol, credential-rotation session invalidation, and redacted Control Center status. That subphase carried no file or job commands.
 - **Phase 2C:** complete. The backend can queue one administrator-requested `index_root` delivery per logical root; the service validates and durably records it before acknowledging over WSS. It intentionally does not read, scan, or transfer NAS files yet.
 - **Phase 3A:** complete. The service executes an accepted `index_root` request against the same locally captured root, skips reparse points, and reports bounded relative-metadata batches to the backend. The backend upserts the catalogue and marks entries absent from a completed scan unavailable.
@@ -77,7 +77,7 @@ A Windows Service must not attempt to show an interactive desktop window. The Co
 | Area | Required capability |
 | --- | --- |
 | Status | Connector name/ID, service state, backend connection state, last successful heartbeat, current software version, queue length, active job, progress, and latest redacted error. |
-| Setup | Select the allowed NAS root with a folder picker; set its display name and whether browser uploads are enabled; set the HTTPS backend base URL; test connectivity; enroll or revoke/re-enroll the connector. |
+| Setup | Select the allowed NAS root with a folder picker; set its display name and whether browser uploads are enabled; set the HTTPS backend base URL; test connectivity; enter the shared connector access key and connect the connector. |
 | Roots | Show configured roots, connector-side access test result, last scan, and indexing health. The initial UI may configure one root, but the service data model supports more than one. |
 | Activity | Show recent scans, cache transfers, thumbnail jobs, and browser-to-NAS writes with queued/running/completed/failed state and accurate byte progress where available. |
 | Diagnostics | Copy redacted logs and start a safe re-scan or reconnect action. No raw credentials, signed URLs, or full NAS paths appear in copied diagnostics. |
@@ -86,9 +86,9 @@ A Windows Service must not attempt to show an interactive desktop window. The Co
 
 - The normal target server is an `https://` backend origin with a valid certificate. For a deliberately private/local deployment, the backend operator may set `NAS_CONNECTOR_ALLOW_HTTP=true`; the Control Center can then use an `http://` origin and derives `ws://` for its control channel. This disables transport encryption, so never expose that endpoint beyond the trusted local network. The Control Center never disables TLS validation when HTTPS is used.
 - The Control Center sends configuration commands to the service through its local named pipe. It never opens an inbound network listener and never contacts S3 or the production backend directly.
-- The pipe uses a bounded, length-prefixed, versioned request/response protocol with correlation IDs and timeouts. It is created with an explicit Windows `PipeSecurity` ACL; do **not** use `PipeOptions.CurrentUserOnly`, because it would prevent an authorized WPF user from connecting to a service running under another Windows identity. The service explicitly rejects non-local pipe clients. Before the Control Center sends an enrollment code, it verifies the pipe server PID against the running `AdimariNasConnector` SCM service; a Debug build accepts only the exact local Debug service executable as an F5-development fallback.
-- The service stores non-secret configuration in its service-owned `C:\ProgramData\Adimari\NasConnector` directory with restrictive ACLs. Its revocable enrollment credential is encrypted using Windows-protected storage; the UI receives only redacted status.
-- Only local Administrators or an explicitly configured `Adimari NAS Connector Operators` Windows group may change backend settings, enroll/revoke, or add/change a root. Read-only monitoring can be granted separately later.
+- The pipe uses a bounded, length-prefixed, versioned request/response protocol with correlation IDs and timeouts. It is created with an explicit Windows `PipeSecurity` ACL; do **not** use `PipeOptions.CurrentUserOnly`, because it would prevent an authorized WPF user from connecting to a service running under another Windows identity. The service explicitly rejects non-local pipe clients. Before the Control Center sends the shared connector key, it verifies the pipe server PID against the running `AdimariNasConnector` SCM service; a Debug build accepts only the exact local Debug service executable as an F5-development fallback.
+- The service stores non-secret configuration in its service-owned `C:\ProgramData\Adimari\NasConnector` directory with restrictive ACLs. Its shared connector access key is encrypted using Windows-protected storage; the UI receives only redacted status.
+- Only local Administrators or an explicitly configured `Adimari NAS Connector Operators` Windows group may change backend settings, connect/disable a connector, or add/change a root. Read-only monitoring can be granted separately later.
 - After selecting a root, the service canonicalizes it, rejects traversal/reparse-point escape, and tests access using the **service account**. For SMB shares, use a UNC path such as `\\nas\projects`, never a mapped drive such as `Z:\projects`.
 - The backend receives a root ID and relative paths only. It never receives the root's Windows/UNC path.
 
@@ -171,14 +171,14 @@ Acceptance criteria: the bucket cannot be listed or read publicly; the backend c
 
 1. Create a separate Visual Studio solution with `Adimari.NasConnector.Service` (C#/.NET Windows Worker Service), `Adimari.NasConnector.ControlCenter` (C#/WPF desktop UI), and a small shared contracts project for local IPC messages. Publish the service as a compiled Windows executable which runs automatically as a Windows Service, restarts safely, and uses service-owned machine-level configuration.
 2. Implement a local named-pipe IPC server in the service and an authenticated WPF Control Center client. Use a bounded, length-prefixed, versioned request/response protocol with correlation IDs, timeouts, and idempotent configuration commands. Create the pipe with an explicit ACL (never `PipeOptions.CurrentUserOnly`), reject remote/session-untrusted clients, and enforce that only Administrators or the configured operator group can change settings. Expose redacted status and activity to authorized users; do not expose credentials, signed URLs, or raw filesystem paths.
-3. Implement Control Center setup/monitoring: backend HTTPS URL, root-folder picker, upload-enabled toggle, service-account access test, connector enrollment/re-enrollment, connection test, health view, queue/activity list, reconnect, and safe re-scan.
-4. Implement connector enrollment: an administrator creates a one-time enrollment token; the service exchanges it for a revocable device credential stored using the OS secret store where possible. The Control Center displays enrollment status but never stores or reads the credential. A consumed token may be retried only by the exact same installation/device-secret request within a short recovery window, so a lost successful response does not strand the connector. Re-enrollment requires an administrator-issued connector-bound token that rotates the credential.
+3. Implement Control Center setup/monitoring: backend HTTPS URL, root-folder picker, upload-enabled toggle, service-account access test, shared connector-key connection, connection test, health view, queue/activity list, reconnect, and safe re-scan.
+4. Implement connector connection: the server and service share a single environment-managed 32-byte key. The operator enters it through the Control Center; the service stores it using the OS secret store and identifies itself with its stable installation ID. The backend creates or reuses that installation's connector/root record. The Control Center displays connection status but never reads the stored key after setup. Legacy token schemas/endpoints may remain temporarily for migration compatibility but are not part of the operational flow.
 5. Phase 2A: establish an authenticated outbound HTTPS heartbeat owned by the service, with server-supplied interval, retry/backoff, connector version reporting, and explicit offline status. Phase 2B: add the persistent outbound TLS WebSocket **presence** channel beside that heartbeat. It is limited to authenticated hello/ack/ping/pong; REST remains authoritative for credentials and the Control Center observes both only through local IPC.
 6. Phase 2C: implement a durable local job queue/state store and safe, idempotent WSS delivery. The initial `index_root` job is bound to the logical root only, has no payload, and stops after durable receipt; an interrupted connector can reconnect and acknowledge it without duplicate local work.
 7. Add an allow-listed root resolver which converts a backend root/folder ID to a canonical NAS path and rejects traversal, symlinks/reparse points that leave the root, and inaccessible paths.
 8. Run the service under a dedicated least-privilege account; grant only the approved NAS permissions.
 
-Acceptance criteria: an authorized operator can configure the HTTPS backend and an allowed root through the Control Center, receives a service-account access result, sees connection/job health without seeing secrets, and cannot configure the service outside the local authorization rules. The connector enrolls once, recovers safely from a lost enrollment response, reconnects after a backend/network restart, cannot be impersonated with a stale/revoked credential, and cannot resolve a job outside its assigned root.
+Acceptance criteria: an authorized operator can configure the HTTPS backend and an allowed root through the Control Center, receives a service-account access result, sees connection/job health without seeing secrets, and cannot configure the service outside the local authorization rules. The connector connects with the shared key, reuses its stable record after a backend/network restart, cannot connect after being disabled, and cannot resolve a job outside its assigned root.
 
 ### Phase 3 — NAS indexing and browse API
 
@@ -245,7 +245,7 @@ NAS Connectors administration page are the day-to-day operational view.
    active/offline status and scan state. Treat a stale heartbeat, failed job,
    or repeated activity error as an operator action item rather than adding an
    external alerting product at this scale.
-4. Use the deployment runbook for installation, upgrade, revoke/re-enroll,
+4. Use the deployment runbook for installation, upgrade, connector disable,
    rollback, and S3 lifecycle setup. Do not edit queued jobs directly in
    MongoDB; cancel/retry from the application controls or requeue through the
    supported connector flow.
@@ -293,7 +293,7 @@ queued -> assigned -> readingNas -> generatingThumbnail -> uploadingThumbnail ->
 
 - Do not open inbound ports, publish SMB/NFS/WebDAV, or expose the NAS directly to the internet.
 - Do not put an interactive window inside the Windows Service. Keep the Control Center as a separate user-session process using ACL-protected local IPC.
-- Do not let the Control Center bypass service-account access checks, TLS validation, root canonicalization, or connector enrollment controls.
+- Do not let the Control Center bypass service-account access checks, TLS validation, root canonicalization, or shared-key connection controls.
 - Do not let the browser provide raw NAS paths, object keys, connector commands, or cloud credentials.
 - Do not proxy large file bodies through the web API.
 - Do not claim that a browser can launch arbitrary native programs. Use inline responses where supported and explicit downloads otherwise.

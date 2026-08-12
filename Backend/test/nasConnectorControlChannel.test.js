@@ -95,6 +95,7 @@ const startChannel = async ({ controlPingIntervalSeconds = 60, onRootRead, jobQu
   const channel = createNasConnectorControlChannel({
     config: {
       authHmacSecret: HMAC_SECRET,
+      sharedSecret: DEVICE_SECRET,
       heartbeatIntervalSeconds: 30,
       controlPingIntervalSeconds,
     },

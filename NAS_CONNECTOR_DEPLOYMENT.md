@@ -1,7 +1,7 @@
 # NAS Connector deployment runbook
 
 This is an operator runbook for deploying the Phase 2 control plane. It does
-not deploy anything by itself. Phase 2A consists of administrator enrollment,
+not deploy anything by itself. Phase 2A consists of shared-key connector setup,
 the Windows service's outbound HTTPS heartbeats, and the management UI. Phase
 2B adds a persistent, outbound WSS **presence** channel. Phase 2C adds a
 single durable `index_root` delivery request, and Phase 3A executes it as a
@@ -165,8 +165,12 @@ NAS_CONNECTOR_MAX_UPLOAD_BYTES=50000000000000
 NAS_CONNECTOR_BROWSER_UPLOAD_URL_TTL_SECONDS=900
 NAS_CONNECTOR_TRANSFER_URL_TTL_SECONDS=3600
 NAS_CONNECTOR_AUTH_HMAC_SECRET=<backend-only random secret, at least 32 bytes>
-NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS=900
-NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS=3600
+# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+# Enter this same value once in each trusted Connector Control Center.
+NAS_CONNECTOR_SHARED_SECRET=<43-character base64url shared connector key>
+# Optional legacy-token compatibility only; the shared-key connector does not use them.
+# NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS=900
+# NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS=3600
 NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS=30
 NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS=90
 NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS=30
@@ -181,9 +185,9 @@ retention setting is also intentionally fixed to the S3 lifecycle rule below.
 
 Use a secret manager or a locally generated secret; do not put a generated
 value in source control, the Vite frontend, a publish package, or an operator
-ticket. Preserve `NAS_CONNECTOR_AUTH_HMAC_SECRET` across ordinary releases. A
-rotation invalidates every enrollment token and connector device credential and
-requires a coordinated re-enrollment plan.
+ticket. Preserve `NAS_CONNECTOR_AUTH_HMAC_SECRET` across ordinary releases.
+If `NAS_CONNECTOR_SHARED_SECRET` is rotated, update the server first, then enter
+the new value in each trusted Control Center and click **Connect connector**.
 
 The code accepts either a dedicated NAS backend IAM role or a pair of
 `NAS_CONNECTOR_AWS_ACCESS_KEY_ID` and `NAS_CONNECTOR_AWS_SECRET_ACCESS_KEY`.
@@ -271,28 +275,19 @@ succeeds, separately test the public HTTPS origin with `curl.exe` as shown in
 section 1. Then set `NAS_CONNECTOR_ENABLED=true` only when all NAS configuration
 values are present and deploy/restart again through the approved workflow.
 
-With the flag enabled, the following synthetic request verifies that Nginx
-forwards HTTPS correctly without consuming an actual enrollment code. Replace
-the hostname only; all credential-looking values here are intentionally fake:
+With the flag enabled, the following request verifies that Nginx forwards HTTPS
+correctly without connecting a real connector. Replace the hostname only; the
+key below is intentionally invalid:
 
 ```powershell
-$payload = @{
-  enrollmentToken = 'nce1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
-  installationId = 'a9d24d65-1a96-4f65-aa06-40c74c5934ac'
-  deviceSecret = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
-  agentVersion = '0.1.0'
-  root = @{ connectorRootId = 'proxy-check'; displayName = 'Proxy check'; uploadsEnabled = $false }
-} | ConvertTo-Json -Compress
-
-curl.exe -i -X POST https://files.example.com/api/nas-connectors/enroll `
-  -H 'Content-Type: application/json' --data $payload
+curl.exe -i -X POST https://files.example.com/api/nas-connectors/connect `
+  -H 'Authorization: ConnectorKey AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 ```
 
-Expected result: `401 NAS_CONNECTOR_ENROLLMENT_INVALID`. That proves the HTTPS
-guard passed and the fake token was safely rejected. `400
+Expected result: `401 NAS_CONNECTOR_SHARED_KEY_INVALID`. That proves the HTTPS
+guard passed and the fake key was safely rejected. `400
 NAS_CONNECTOR_HTTPS_REQUIRED` means `NODE_ENV`, proxy placement, or
-`X-Forwarded-Proto` is wrong. Do not repeat this test rapidly; the enrollment
-endpoint is intentionally rate-limited.
+`X-Forwarded-Proto` is wrong.
 
 ## 5A. Lean release checklist and basic recovery
 
@@ -319,23 +314,23 @@ After deployment, use one small, non-critical folder for a practical check:
 
 1. Confirm the public HTTPS origin works and that the host does **not** expose
    TCP 5001, SMB, MongoDB, or the S3 bucket.
-2. In the Control Center, confirm **Service**, **Web server**, **Enrollment**,
+2. In the Control Center, confirm **Service**, **Web server**, **Connector access**,
    **Last heartbeat**, and **Live control channel** are healthy. In **NAS
    Connectors**, confirm the installation is active and recently seen.
 3. Browse and search a folder; test one uncached Open/Download, an image
    thumbnail/lightbox, one NAS file create/change/delete, and one browser
    upload with a new filename.
 4. Restart the connector once in a planned window. It should return to a
-   healthy heartbeat and control channel without re-enrollment.
+   healthy heartbeat and control channel without entering the shared key again.
 
 If something fails, start with the visible activity/error message in the
 Control Center and the backend log. For a connector that is offline, verify
 the Windows service and the configured server/root tests, then restart the
 service. For a failed file job, cancel or retry it through the application;
 do not modify queue documents or stored credentials in MongoDB. For a bad
-application deployment, use the rollback procedure below. Re-enroll only
-after a credential was deliberately revoked/lost or the UI explicitly reports
-that recovery is required.
+application deployment, use the rollback procedure below. If connector access
+is rejected, first confirm that the server and Control Center use the same
+shared key, then click **Connect connector** again.
 
 ## 6. Publish the Windows connector package
 
@@ -393,9 +388,10 @@ Before installation, an authorized Windows/NAS administrator must:
 3. Ensure the account can resolve/reach the NAS and that the host clock is
    correct. Use a UNC path in the Control Center, never `Z:\` or another mapped
    drive. Windows services do not share an interactive user's drive mappings.
-4. Keep the same service account identity after enrollment. Connector state is
-   protected with DPAPI for that Windows identity. A change of account/SID is a
-   credential-loss event and requires administrator-issued re-enrollment.
+4. Keep the same service account identity after connection. Connector state is
+   protected with DPAPI for that Windows identity. A change of account/SID
+   means the protected shared key must be entered again through the Control
+   Center.
 
 The Control Center's root test is the final access check: it asks the service,
 so it validates the configured UNC path under the actual service identity.
@@ -470,25 +466,30 @@ Only the Service project is registered with SCM. Start the Control Center from
 as an authorized local user; never attempt to display WPF from the Windows
 service process.
 
-## 9. First connector enrollment and acceptance checks
+## 9. First connector connection and acceptance checks
 
-1. In the web app, sign in as an administrator and open **NAS Connectors**.
-   Create an enrollment code. It is returned once, expires after 15 minutes by
-   default, and must not be put in email, logs, screenshots, or tickets.
+1. Generate one 32-byte base64url key and set it as
+   `NAS_CONNECTOR_SHARED_SECRET` in the backend environment. Keep it out of
+   source control, tickets, screenshots, and browser code. Restart the backend
+   after changing its environment.
 2. In the Control Center, set the exact public HTTPS origin, select the UNC
    root, set a display name, and enable browser uploads only when that root
-   Run the web-server and root tests, then save.
-3. Paste the enrollment code into the UI and enroll. The Control Center checks
-   that the pipe endpoint belongs to the SCM service before it sends the code.
-4. Confirm the Control Center shows **Enrolled** and an authenticated last
+   needs them. Run the web-server and root tests, then save.
+3. Paste the same shared key into **Shared access key** and click **Connect
+   connector**. The Control Center checks that the pipe endpoint belongs to the
+   SCM service before it sends the key. The service stores the key in its own
+   Windows-protected credential store; it is not stored in the WPF settings.
+4. Confirm the Control Center shows **Connected** and an authenticated last
    heartbeat. Refresh the web admin page and confirm the matching connector is
-   `active` with a recent `lastSeenAt`.
+   `active` with a recent `lastSeenAt`. The backend creates the connector/root
+   record on this first connection and reuses it for later connections from the
+   same installation.
 5. Wait longer than `NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS` with the
    service stopped only in a planned test; the admin list should show it as
    `offline`. Start it again and confirm a valid heartbeat restores `active`.
 6. Confirm the Control Center shows the control channel as **Connected**. A
-   WSS reconnect by itself must not change enrollment status; REST heartbeat
-   remains authoritative. Stop/start the service during a planned test and
+   WSS reconnect by itself must not change connector access status; REST
+   heartbeat remains authoritative. Stop/start the service during a planned test and
    confirm the control channel reconnects after the heartbeat path is healthy.
 7. If testing the Phase 2C delivery slice, have an administrator call
   `POST /api/nas-connectors/<connectorId>/roots/<connectorRootId>/index-jobs`
@@ -528,23 +529,24 @@ service process.
     Confirm a same-name file is rejected rather than overwritten. The staging
     object should be removed after successful connector completion.
 
-If enrollment loses its successful HTTP response, the service can retry the
-same request with its pending secret for the bounded recovery window. Do not
-create a second initial enrollment code until that recovery has been allowed to
-complete. If a credential is revoked or lost, an administrator must issue a
-re-enrollment code for that specific connector.
+If the key is changed, update `NAS_CONNECTOR_SHARED_SECRET` on the backend,
+restart it, then enter the new key and click **Connect connector** in every
+Control Center. If the local protected credential becomes unreadable, use
+**Reset unreadable credential**, then enter the current shared key again.
+Do not put the shared key in the web application or a browser request.
 
 ## Rollback boundaries
 
 - Turn `NAS_CONNECTOR_ENABLED=false` and deploy/restart the backend to remove
-  the connector routes. Existing connector credentials remain in MongoDB but
+  the connector routes. Existing connector records remain in MongoDB but
   cannot reach a mounted API until the flag is enabled again.
-- Revoke a connector from the admin page before decommissioning a host. This
-  invalidates its credential on the next request and disables known roots.
+- Disable a connector from the admin page before decommissioning a host. This
+  blocks its shared-key connections and disables known roots. Use **Enable**
+  there if it was disabled accidentally; its next valid heartbeat restores it.
 - For a failed program update, stop the service, inspect the retained
   `NasConnector.previous-*` directory, and use the normal approved change
   process to restore it. Do not delete `C:\ProgramData\Adimari\NasConnector`
   unless intentionally retiring the connector and accepting that its DPAPI
   credential and stable installation identity are lost.
-- Deleting the Windows service does not revoke the backend connector. Revoke
+- Deleting the Windows service does not disable the backend connector. Disable
   it in the web admin page first, then uninstall it during a planned retirement.

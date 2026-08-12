@@ -452,7 +452,7 @@ const defaultIsSecureRequest = (request) => {
 
 const createNasConnectorControlChannel = (dependencies = {}) => {
   const config = dependencies.config;
-  if (!config?.authHmacSecret) {
+  if (!config?.sharedSecret) {
     throw new Error('NAS connector control channel requires a validated connector configuration.');
   }
   if (!dependencies.NasConnectorModel || !dependencies.NasStorageRootModel) {
@@ -568,7 +568,7 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
       const connector = await authenticateConnectorAuthorization({
         authorization: request.headers.authorization,
         NasConnectorModel,
-        hmacSecret: config.authHmacSecret,
+        sharedSecret: config.sharedSecret,
       });
       if (!connector || socket.destroyed) {
         writeUpgradeError(socket, 401, 'Unauthorized');

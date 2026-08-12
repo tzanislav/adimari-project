@@ -60,6 +60,14 @@ const requiredSecret = (environment, key) => {
   return value;
 };
 
+const requiredSharedSecret = (environment, key) => {
+  const value = requiredString(environment, key);
+  if (!/^[A-Za-z0-9_-]{43}$/.test(value)) {
+    throw new NasConnectorConfigurationError(`${key} must be a 32-byte base64url key.`);
+  }
+  return value;
+};
+
 const validateBucketName = (value) => {
   if (!/^(?!\d+\.\d+\.\d+\.\d+$)(?!xn--)[a-z0-9](?:[a-z0-9.-]{1,61})[a-z0-9]$/.test(value)
     || value.includes('..')) {
@@ -121,9 +129,15 @@ const createNasConnectorConfig = (environment = process.env) => {
       max: MAX_PRESIGNED_URL_TTL_SECONDS,
     }),
     authHmacSecret: requiredSecret(environment, 'NAS_CONNECTOR_AUTH_HMAC_SECRET'),
-    enrollmentTokenTtlSeconds: requiredInteger(environment, 'NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS', {
+    // A small trusted deployment intentionally uses one manually distributed
+    // connector key instead of enrollment tokens and per-device rotation.
+    sharedSecret: requiredSharedSecret(environment, 'NAS_CONNECTOR_SHARED_SECRET'),
+    // Legacy token routes remain available only for an older connector during
+    // migration. The shared-key flow does not require either token setting.
+    enrollmentTokenTtlSeconds: optionalInteger(environment, 'NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS', {
       min: 60,
       max: 24 * 60 * 60,
+      defaultValue: 900,
     }),
     // A consumed token is retained briefly only to let the same Service recover
     // after a lost 2xx response. This never extends the token's redemption

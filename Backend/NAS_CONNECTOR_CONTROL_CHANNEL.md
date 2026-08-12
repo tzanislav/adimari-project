@@ -3,7 +3,7 @@
 ## Purpose and boundary
 
 This contract defines the persistent **outbound** connector control channel.
-It lets the backend know that an already-enrolled Windows connector is online
+It lets the backend know that an already-connected Windows connector is online
 without opening an inbound port on the NAS network, and carries one small
 durable delivery request.
 
@@ -19,20 +19,20 @@ endpoints; a cache job never carries a native path, S3 key, or signed URL.
 - Required WebSocket subprotocol: `adimari.nas-control.v1`
 - The HTTPS origin is validated by the Windows Service before converting it to
   `wss`. Normal certificate validation is mandatory; there is no TLS bypass.
-- The upgrade request uses the existing connector credential only in:
-  `Authorization: Connector <connectorId>.<deviceSecret>`.
+- The upgrade request uses the configured shared connector key only in:
+  `Authorization: Connector <connectorId>.<NAS_CONNECTOR_SHARED_SECRET>`.
 - A credential must never appear in a URL, query string, WebSocket JSON frame,
   log message, close reason, browser payload, or diagnostics export.
-- The backend accepts only an active or offline connector whose credential is
+- The backend accepts only an active or offline connector whose shared key is
   valid. It limits incoming messages to 64 KiB and disables per-message
   compression for this private control protocol.
 - `hello.payload` and `hello.payload.root` use exact allowlists. In particular,
   native Windows/UNC paths, URLs, credentials, and arbitrary extra fields are
   rejected rather than ignored. The root must already exist and be enabled from
-  enrollment; the socket cannot create or reactivate a root.
+  the initial HTTPS connection; the socket cannot create or reactivate a root.
 - The backend registers at most one live session per connector. A newer valid
-  session replaces an older one. Revocation and successful credential rotation
-  close any old live session immediately.
+  session replaces an older one. Disabling a connector closes any old live
+  session immediately.
 
 ## Envelope
 
@@ -92,7 +92,7 @@ a successful upgrade.
 The backend verifies that `installationId` matches the authenticated connector
 and that the logical root is already enabled for it. It records connector
 presence only; root display metadata and upload permission remain owned by
-enrollment and the REST heartbeat. It never receives a Windows path, UNC path,
+the initial HTTPS connection and the REST heartbeat. It never receives a Windows path, UNC path,
 S3 credential, signed URL, or browser credential.
 
 ### Backend → connector: `hello_ack`
@@ -128,17 +128,17 @@ contains secrets or native paths.
 
 | Code | Meaning |
 | --- | --- |
-| `4001` | Credential revoked or rotated; connector must confirm through REST before deciding whether re-enrollment is required. |
+| `4001` | Connector disabled or key rejected; an operator must confirm the server key and use **Connect connector** again. |
 | `4002` | Replaced by another valid session for the same connector. |
 | `4003` | Protocol/schema violation. |
 | `4004` | Hello timeout or missed liveness replies. |
 
 ## Reconnect behavior
 
-The connector retries only while it has a valid local credential and valid
+The connector retries only while it has a valid local shared key and valid
 HTTPS/root configuration. It uses exponential full-jitter backoff from roughly
 one second to sixty seconds, reset only after a stable session. A failed or
-rejected WebSocket alone does not mark the credential revoked: the service
+rejected WebSocket alone does not mark the shared key rejected: the service
 first relies on/attempts the normal REST heartbeat so a reverse-proxy error is
 not misrepresented as credential loss.
 
@@ -146,8 +146,8 @@ not misrepresented as credential loss.
 
 The current session registry is intentionally in one Backend process. Deploy
 one Node/PM2 instance only—do not use cluster mode or multiple hosts until
-session invalidation is distributed. Otherwise an administrative revocation or
-credential rotation cannot immediately close a socket owned by another process.
+session invalidation is distributed. Otherwise an administrative disable cannot
+immediately close a socket owned by another process.
 
 The public HTTPS reverse proxy must rate-limit and connection-limit this exact
 upgrade endpoint before forwarding it to Node. Node additionally applies a

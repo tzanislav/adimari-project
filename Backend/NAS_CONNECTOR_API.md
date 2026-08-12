@@ -4,19 +4,58 @@ These endpoints are mounted only when `NAS_CONNECTOR_ENABLED=true`. They require
 HTTPS; the backend returns `NAS_CONNECTOR_HTTPS_REQUIRED` for cleartext requests.
 The connector never sends a NAS path, S3 credential, or browser-user credential.
 
+## Current connector authentication: shared access key
+
+This small trusted deployment uses one manually distributed 32-byte base64url
+key: `NAS_CONNECTOR_SHARED_SECRET`. It replaces the previous operational need
+for browser-issued enrollment and re-enrollment tokens. The Windows service
+stores the entered key only in its service-owned DPAPI credential store.
+
+`POST /api/nas-connectors/connect` is the first connector request. It uses:
+
+```text
+Authorization: ConnectorKey <NAS_CONNECTOR_SHARED_SECRET>
+```
+
+and the following body:
+
+```json
+{
+  "installationId": "a9d24d65-1a96-4f65-aa06-40c74c5934ac",
+  "agentVersion": "1.0.0",
+  "root": {
+    "connectorRootId": "office-projects",
+    "displayName": "Office Projects",
+    "uploadsEnabled": true
+  }
+}
+```
+
+The backend creates or reuses the record for that stable installation ID,
+activates its root, and returns the connector ID plus the heartbeat interval.
+Subsequent HTTP and WSS requests use:
+
+```text
+Authorization: Connector <connectorId>.<NAS_CONNECTOR_SHARED_SECRET>
+```
+
+The browser never receives this key. A wrong key receives the generic
+`401 NAS_CONNECTOR_UNAUTHORIZED` response. The token endpoints documented
+below remain only for compatibility with old installations; the current
+Control Center and admin page do not use them.
+
 ## Authentication types
 
 - **Administrator calls** use a Firebase ID token: `Authorization: Bearer <token>`.
   The Firebase user must have role `admin`.
-- **Connector calls** use its device credential:
-  `Authorization: Connector <connectorId>.<deviceSecret>`.
+- **Connector calls** use the configured shared access key:
+  `Authorization: Connector <connectorId>.<NAS_CONNECTOR_SHARED_SECRET>`.
 
-`deviceSecret` is generated once by the Windows Service as 32 cryptographically
-random bytes, encoded as unpadded base64url (43 characters). It is stored by the
-Service in its OS-protected secret storage and never displayed by the Control
-Center. The backend stores only an HMAC-SHA-256 hash of it.
+The shared key is 32 cryptographically random bytes encoded as unpadded
+base64url (43 characters). It is stored by the Service in OS-protected storage
+and never displayed by the Control Center after entry.
 
-## Create an enrollment token
+## Legacy token endpoint: create an enrollment token
 
 `POST /api/nas-connectors/enrollment-tokens`
 
@@ -44,7 +83,7 @@ The token is 256 bits of random material, expires after
 only in this response, and is never stored or logged in raw form. The response is
 marked `Cache-Control: no-store, private`.
 
-## Create a re-enrollment token
+## Legacy token endpoint: create a re-enrollment token
 
 `POST /api/nas-connectors/:id/re-enrollment-tokens`
 
@@ -66,7 +105,7 @@ An administrator revoking a connector invalidates all of that connector's
 unused re-enrollment tokens. To restore a revoked connector, revoke it first if
 needed, then explicitly create a new re-enrollment token for it.
 
-## Enroll a connector
+## Legacy token endpoint: enroll a connector
 
 `POST /api/nas-connectors/enroll`
 
@@ -167,9 +206,9 @@ Before `GET /api/nas-connectors` returns its administrator list, the backend
 atomically persists every stale active connector as `offline`; the list is
 therefore accurate at the time it is read. This update checks the old
 `lastSeenAt` in the database, so a concurrent fresh heartbeat is never marked
-offline. An `offline` connector retains its device credential solely so its next
-authenticated heartbeat can set it back to `active`; it does not require
-re-enrollment after an ordinary network or service interruption.
+offline. An `offline` connector retains its protected local shared key, so its
+next authenticated heartbeat can set it back to `active`; it does not require
+any browser or token action after an ordinary network or service interruption.
 
 ## Administrator management
 
@@ -177,9 +216,13 @@ re-enrollment after an ordinary network or service interruption.
 - `POST /api/nas-connectors/:id/re-enrollment-tokens` issues a one-time token
   bound to that existing connector. Redeem it through the ordinary `/enroll`
   endpoint; no separate connector-side API contract is required.
-- `POST /api/nas-connectors/:id/revoke` revokes the connector, disables its known
-  roots, invalidates unused re-enrollment tokens for it, and returns
+- `POST /api/nas-connectors/:id/revoke` disables the connector and its known
+  roots, and returns
   `{ "connector": <redacted connector> }`.
+- `POST /api/nas-connectors/:id/enable` restores a disabled connector as
+  `offline` and re-enables its roots. Its existing Windows Service will return
+  to `active` after the next valid shared-key heartbeat; no enrollment token is
+  needed.
 - `POST /api/nas-connectors/:id/roots/:connectorRootId/index-jobs` creates the
   initial, administrator-only durable delivery test job. Its body is empty.
   It accepts only an enabled root belonging to an active or offline connector,
@@ -190,7 +233,7 @@ re-enrollment after an ordinary network or service interruption.
   connector. This is an operator diagnostic endpoint; it does not expose a
   browser file API or a native NAS path.
 
-Revocation takes effect on the next request because authentication only accepts
+Disabling takes effect on the next request because authentication only accepts
 connectors whose status is `active` or `offline`.
 
 ## Persistent control-channel presence
@@ -201,7 +244,7 @@ The Windows Service may also open the outbound secure WebSocket described in
 ```text
 wss://<public HTTPS origin>/api/nas-connectors/control/socket
 Sec-WebSocket-Protocol: adimari.nas-control.v1
-Authorization: Connector <connectorId>.<deviceSecret>
+Authorization: Connector <connectorId>.<NAS_CONNECTOR_SHARED_SECRET>
 ```
 
 Phase 2B provides presence/keepalive. Durable delivery now covers `index_root`
@@ -209,9 +252,9 @@ and the small Phase-4 `cache_for_download` receipt using `job.assign` and
 `job.ack`, documented in
 [`NAS_CONNECTOR_CONTROL_CHANNEL.md`](NAS_CONNECTOR_CONTROL_CHANNEL.md). The
 connector persists a job locally before acknowledging it. The REST heartbeat remains authoritative for
-liveness and revocation. The backend accepts a maximum of one valid session per
-connector, closes active and pending sessions after revocation or credential
-rotation, and rejects a `hello` that names an unknown or disabled enrolled root.
+liveness and connector disable. The backend accepts a maximum of one valid
+session per connector, closes active and pending sessions after disable, and
+rejects a `hello` that names an unknown or disabled configured root.
 The socket never creates or edits root metadata. The connector credential must
 be in the authorization header only—never in the URL or a WebSocket message.
 
@@ -273,8 +316,10 @@ In addition to the existing NAS bucket/prefix variables, configure:
 
 ```ini
 NAS_CONNECTOR_AUTH_HMAC_SECRET=<at least 32 random bytes; backend secret only>
-NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS=900
-NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS=3600
+NAS_CONNECTOR_SHARED_SECRET=<32-byte base64url key; enter the same value once in each trusted Control Center>
+# Optional legacy-token compatibility only:
+# NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS=900
+# NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS=3600
 NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS=30
 NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS=90
 NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS=30
@@ -282,10 +327,9 @@ NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE=30
 NAS_CONNECTOR_JOB_LEASE_SECONDS=90
 ```
 
-`NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS` is optional and defaults to
-3600. It is the bounded retention interval after `expiresAt` for an already
-consumed token's HMAC-only recovery record; it does not make raw tokens valid
-for longer.
+The commented enrollment settings are optional compatibility settings for an
+older token-based connector. They default to 900 and 3600 seconds respectively
+and are not used by the shared-key connector.
 
 `NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS` is optional and defaults to three
 times `NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS`. It must be at least twice the
@@ -344,15 +388,11 @@ currently indexed NAS file and its stored cache expiry has not passed. The
 browser never receives a NAS path, S3 key, AWS credential, or connector
 credential.
 
-The enrollment-token collection TTL index must be on `recoveryExpiresAt`, not
-`expiresAt`, so a consumed token survives only long enough for recovery. If an
-early Phase 2 deployment already created the old `expiresAt` TTL index, replace
-that index as part of the deployment migration before relying on lost-response
-recovery.
-
-Changing `NAS_CONNECTOR_AUTH_HMAC_SECRET` intentionally invalidates all existing
-enrollment tokens and connector device credentials; rotate it only through a
-planned re-enrollment procedure.
+The enrollment-token collection and its TTL index are legacy compatibility
+data. They are not needed by the shared-key connector. Leave
+`NAS_CONNECTOR_AUTH_HMAC_SECRET` stable for existing records; changing the
+operational shared key is done with `NAS_CONNECTOR_SHARED_SECRET`, followed by
+**Connect connector** on each trusted connector.
 
 ## Browser-to-NAS upload (Phase 5 initial slice)
 

@@ -37,6 +37,16 @@ const normalizeDeviceSecret = (value) => {
   return value;
 };
 
+// The intentionally simple connector mode uses one manually distributed
+// 256-bit base64url key. Keeping the same compact alphabet as the previous
+// device secret makes it safe to carry in a standard Authorization header.
+const normalizeSharedSecret = (value) => {
+  if (typeof value !== 'string' || !BASE64URL_256_BIT_PATTERN.test(value)) {
+    throw new NasConnectorSecretError('Connector shared access key is invalid.');
+  }
+  return value;
+};
+
 const hashSecret = ({ value, purpose, hmacSecret }) => crypto
   .createHmac('sha256', assertHmacSecret(hmacSecret))
   .update(`${purpose}\u0000${value}`, 'utf8')
@@ -71,6 +81,24 @@ const safelyCompareHashes = (left, right) => {
     && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 };
 
+const safelyCompareSecrets = (left, right) => {
+  if (typeof left !== 'string' || typeof right !== 'string') return false;
+  const leftBuffer = Buffer.from(left, 'utf8');
+  const rightBuffer = Buffer.from(right, 'utf8');
+  return leftBuffer.length === rightBuffer.length
+    && leftBuffer.length > 0
+    && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+};
+
+const verifySharedSecret = ({ sharedSecret, expectedSecret }) => {
+  try {
+    return safelyCompareSecrets(normalizeSharedSecret(sharedSecret), normalizeSharedSecret(expectedSecret));
+  } catch (error) {
+    if (error instanceof NasConnectorSecretError) return false;
+    throw error;
+  }
+};
+
 const verifyDeviceSecret = ({ deviceSecret, expectedHash, hmacSecret }) => {
   try {
     return safelyCompareHashes(expectedHash, hashDeviceSecret(deviceSecret, hmacSecret));
@@ -93,6 +121,9 @@ module.exports = {
   hashEnrollmentToken,
   normalizeDeviceSecret,
   normalizeEnrollmentToken,
+  normalizeSharedSecret,
   safelyCompareHashes,
+  safelyCompareSecrets,
   verifyDeviceSecret,
+  verifySharedSecret,
 };

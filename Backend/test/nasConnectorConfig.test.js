@@ -34,6 +34,7 @@ const createEnvironment = (overrides = {}) => ({
   NAS_CONNECTOR_BROWSER_UPLOAD_URL_TTL_SECONDS: '900',
   NAS_CONNECTOR_TRANSFER_URL_TTL_SECONDS: '3600',
   NAS_CONNECTOR_AUTH_HMAC_SECRET: 'this-is-a-long-test-only-connector-hmac-secret',
+  NAS_CONNECTOR_SHARED_SECRET: 'Z2VuZXJhdGVkLWRldmljZS1zZWNyZXQtMzItYnl0ZXM',
   NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS: '900',
   NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS: '30',
   ...overrides,
@@ -49,6 +50,7 @@ test('creates NAS configuration in the existing File Server bucket with isolated
   assert.equal(config.cacheRetentionDays, 10);
   assert.equal(config.thumbnailMaxDimension, 320);
   assert.equal(config.enrollmentTokenTtlSeconds, 900);
+  assert.equal(config.sharedSecret, 'Z2VuZXJhdGVkLWRldmljZS1zZWNyZXQtMzItYnl0ZXM');
   assert.equal(config.enrollmentRecoveryTtlSeconds, 3_600);
   assert.equal(config.heartbeatIntervalSeconds, 30);
   assert.equal(config.heartbeatStaleAfterSeconds, 90);
@@ -101,6 +103,22 @@ test('requires a backend-only HMAC secret when the NAS connector is enabled', ()
     () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_AUTH_HMAC_SECRET: 'too-short' })),
     NasConnectorConfigurationError,
   );
+});
+
+test('requires a 32-byte base64url shared connector key', () => {
+  assert.throws(
+    () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_SHARED_SECRET: 'too-short' })),
+    NasConnectorConfigurationError,
+  );
+});
+
+test('does not require legacy enrollment-token settings for the shared-key connector', () => {
+  const config = createNasConnectorConfig(createEnvironment({
+    NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS: undefined,
+    NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS: undefined,
+  }));
+  assert.equal(config.enrollmentTokenTtlSeconds, 900);
+  assert.equal(config.enrollmentRecoveryTtlSeconds, 3_600);
 });
 
 test('uses a bounded enrollment recovery window without extending token redemption', () => {

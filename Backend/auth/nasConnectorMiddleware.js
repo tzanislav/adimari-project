@@ -1,19 +1,15 @@
 'use strict';
 
 const NasConnector = require('../models/nasConnector');
-const { verifyDeviceSecret } = require('../services/nasConnectorSecrets');
+const { verifySharedSecret } = require('../services/nasConnectorSecrets');
 
 const CONNECTOR_AUTHORIZATION_PATTERN = /^Connector ([0-9a-fA-F]{24})\.([A-Za-z0-9_-]{43})$/;
+const CONNECTOR_KEY_AUTHORIZATION_PATTERN = /^ConnectorKey ([A-Za-z0-9_-]{43})$/;
 
 const unauthorized = (res) => res.status(401).json({
   code: 'NAS_CONNECTOR_UNAUTHORIZED',
   error: 'Connector authentication failed.',
 });
-
-const resolveSelectedQuery = async (query) => {
-  if (!query) return query;
-  return typeof query.select === 'function' ? query.select('+credentialHash') : query;
-};
 
 const parseConnectorAuthorization = (authorization) => {
   const matched = typeof authorization === 'string'
@@ -21,33 +17,36 @@ const parseConnectorAuthorization = (authorization) => {
     : null;
   if (!matched) return null;
 
-  const [, connectorId, deviceSecret] = matched;
-  return { connectorId, deviceSecret };
+  const [, connectorId, sharedSecret] = matched;
+  return { connectorId, sharedSecret };
+};
+
+const parseConnectorKeyAuthorization = (authorization) => {
+  const matched = typeof authorization === 'string'
+    ? CONNECTOR_KEY_AUTHORIZATION_PATTERN.exec(authorization)
+    : null;
+  return matched ? { sharedSecret: matched[1] } : null;
 };
 
 // This authentication primitive is shared by the Express heartbeat route and
 // the HTTP upgrade handler. It deliberately returns only the selected connector
-// document (which includes the stored HMAC) or null. It never returns or logs a
-// supplied raw device credential.
+// document or null. The supplied shared key is compared only to the server
+// configuration; it is never logged or stored in MongoDB.
 const authenticateConnectorAuthorization = async ({
   authorization,
   NasConnectorModel = NasConnector,
-  hmacSecret,
+  sharedSecret,
 } = {}) => {
   const parsed = parseConnectorAuthorization(authorization);
-  if (!parsed) return null;
+  if (!parsed || !verifySharedSecret({ sharedSecret: parsed.sharedSecret, expectedSecret: sharedSecret })) return null;
 
   try {
-    const connector = await resolveSelectedQuery(NasConnectorModel.findOne({
+    const connector = await NasConnectorModel.findOne({
       _id: parsed.connectorId,
       status: { $in: ['active', 'offline'] },
-    }));
+    });
 
-    if (!connector || !verifyDeviceSecret({
-      deviceSecret: parsed.deviceSecret,
-      expectedHash: connector.credentialHash,
-      hmacSecret,
-    })) {
+    if (!connector) {
       return null;
     }
 
@@ -59,15 +58,20 @@ const authenticateConnectorAuthorization = async ({
   }
 };
 
+const authenticateConnectorKeyAuthorization = ({ authorization, sharedSecret } = {}) => {
+  const parsed = parseConnectorKeyAuthorization(authorization);
+  return Boolean(parsed && verifySharedSecret({ sharedSecret: parsed.sharedSecret, expectedSecret: sharedSecret }));
+};
+
 const createConnectorAuthenticateMiddleware = ({
   NasConnectorModel = NasConnector,
-  hmacSecret,
+  sharedSecret,
 } = {}) => async (req, res, next) => {
   const authorization = req.header('authorization');
   const connector = await authenticateConnectorAuthorization({
     authorization,
     NasConnectorModel,
-    hmacSecret,
+    sharedSecret,
   });
   if (!connector) return unauthorized(res);
 
@@ -77,7 +81,10 @@ const createConnectorAuthenticateMiddleware = ({
 
 module.exports = {
   CONNECTOR_AUTHORIZATION_PATTERN,
+  CONNECTOR_KEY_AUTHORIZATION_PATTERN,
+  authenticateConnectorKeyAuthorization,
   authenticateConnectorAuthorization,
   createConnectorAuthenticateMiddleware,
   parseConnectorAuthorization,
+  parseConnectorKeyAuthorization,
 };

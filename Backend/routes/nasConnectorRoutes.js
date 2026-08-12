@@ -3,7 +3,10 @@
 const crypto = require('crypto');
 const express = require('express');
 const { authenticate, authorizeRole } = require('../auth/authMiddleware');
-const { createConnectorAuthenticateMiddleware } = require('../auth/nasConnectorMiddleware');
+const {
+  authenticateConnectorKeyAuthorization,
+  createConnectorAuthenticateMiddleware,
+} = require('../auth/nasConnectorMiddleware');
 const { getFileServerConfig } = require('../config/fileServerConfig');
 const { getNasConnectorConfig } = require('../config/nasConnectorConfig');
 const NasAuditEvent = require('../models/nasAuditEvent');
@@ -180,6 +183,12 @@ const normalizeEnrollmentRequest = (body = {}) => ({
   root: normalizeConnectorRoot(body.root),
 });
 
+const normalizeSharedConnectionRequest = (body = {}) => ({
+  installationId: normalizeInstallationId(body.installationId),
+  agentVersion: normalizeAgentVersion(body.agentVersion),
+  root: normalizeConnectorRoot(body.root),
+});
+
 const normalizeHeartbeatRequest = (body = {}) => ({
   installationId: normalizeInstallationId(body.installationId),
   agentVersion: normalizeAgentVersion(body.agentVersion),
@@ -255,7 +264,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     now: dependencies.now || (() => new Date()),
   });
   const connectorAuthenticateMiddleware = dependencies.connectorAuthenticateMiddleware
-    || createConnectorAuthenticateMiddleware({ NasConnectorModel, hmacSecret: config.authHmacSecret });
+    || createConnectorAuthenticateMiddleware({ NasConnectorModel, sharedSecret: config.sharedSecret });
   const now = dependencies.now || (() => new Date());
   const suppliedFileServerConfig = dependencies.fileServerConfig || null;
   let cacheStorage = dependencies.cacheStorage || null;
@@ -499,6 +508,19 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     });
   };
 
+  const requireSharedConnectorKey = (req, res, next) => {
+    if (!authenticateConnectorKeyAuthorization({
+      authorization: req.header('authorization'),
+      sharedSecret: config.sharedSecret,
+    })) {
+      return res.status(401).json({
+        code: 'NAS_CONNECTOR_UNAUTHORIZED',
+        error: 'Connector authentication failed.',
+      });
+    }
+    return next();
+  };
+
   const activateInitialConnector = async ({ connector, enrollment, request, deviceSecretHash, redeemedAt }) => {
     const activated = await queryWithSelection(NasConnectorModel.findOneAndUpdate(
       {
@@ -695,6 +717,73 @@ const createNasConnectorRoutes = (dependencies = {}) => {
 
   // Enrollment tokens and connector credentials are never accepted over cleartext HTTP.
   router.use(requireHttpsMiddleware);
+
+  // Trusted small-installation connection flow. It creates or reuses the
+  // connector record identified by the local installation ID, while all later
+  // heartbeat/job requests are bound to the returned connector ID plus the
+  // same shared key. No token or per-device credential rotation is involved.
+  router.post('/connect', requireSharedConnectorKey, async (req, res) => {
+    try {
+      const request = normalizeSharedConnectionRequest(req.body);
+      const connectedAt = now();
+      const sharedKeyHash = hashDeviceSecret(config.sharedSecret, config.authHmacSecret);
+      let connector = await findConnectorWithCredential({ installationId: request.installationId });
+
+      if (connector?.status === 'revoked') {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_DISABLED',
+          message: 'This connector has been disabled by an administrator.',
+          status: 403,
+        });
+      }
+
+      if (!connector) {
+        try {
+          connector = await NasConnectorModel.create({
+            name: request.root.displayName,
+            installationId: request.installationId,
+            credentialHash: sharedKeyHash,
+            status: 'active',
+            agentVersion: request.agentVersion,
+            lastSeenAt: connectedAt,
+          });
+        } catch (error) {
+          if (error?.code !== 11000) throw error;
+          connector = await findConnectorWithCredential({ installationId: request.installationId });
+        }
+      }
+
+      if (!connector || connector.status === 'revoked') throw genericConnectorFailure();
+
+      connector = await queryWithSelection(NasConnectorModel.findOneAndUpdate(
+        { _id: connector._id, installationId: request.installationId, status: { $in: ['enrolling', 'active', 'offline'] } },
+        {
+          $set: {
+            name: request.root.displayName,
+            credentialHash: sharedKeyHash,
+            status: 'active',
+            agentVersion: request.agentVersion,
+            lastSeenAt: connectedAt,
+            lastErrorCode: null,
+            lastErrorMessage: null,
+          },
+        },
+        { new: true },
+      ), CONNECTOR_CREDENTIAL_SELECTION);
+      if (!connector) throw genericConnectorFailure();
+
+      await ensureStorageRoot({ connector, root: request.root });
+      await audit({
+        action: 'connector_connected_with_shared_key',
+        result: 'success',
+        connectorId: connector._id,
+        details: { installationId: request.installationId },
+      });
+      return res.json({ connector: serializeConnector(connector), heartbeatIntervalSeconds: config.heartbeatIntervalSeconds });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
 
   router.post('/enrollment-tokens', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
     const actorUid = currentActorUid(req.user);
@@ -1834,6 +1923,64 @@ const createNasConnectorRoutes = (dependencies = {}) => {
       });
       return res.json({ job: serializeTransferJob(job) });
     } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  // In the shared-key setup an administrator can bring back a connector that
+  // was disabled accidentally. It resumes as offline until its existing local
+  // service proves it still has the configured shared key with a heartbeat.
+  router.post('/:id/enable', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    const actorUid = currentActorUid(req.user);
+    try {
+      if (!actorUid) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_ACTOR_REQUIRED',
+          message: 'Authenticated administrator identity is required.',
+          status: 401,
+        });
+      }
+      const connectorId = assertObjectId(req.params.id, 'Connector ID');
+      const connector = await NasConnectorModel.findOneAndUpdate(
+        { _id: connectorId, status: 'revoked' },
+        {
+          $set: {
+            status: 'offline',
+            revokedAt: null,
+            revokedBy: null,
+            lastErrorCode: null,
+            lastErrorMessage: null,
+          },
+        },
+        { new: true },
+      );
+      if (!connector) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_NOT_FOUND',
+          message: 'Disabled connector not found.',
+          status: 404,
+        });
+      }
+
+      await NasStorageRootModel.updateMany(
+        { connectorId, status: 'disabled' },
+        { $set: { status: 'active' } },
+      );
+
+      await audit({
+        action: 'connector_enabled',
+        result: 'success',
+        actorUid,
+        connectorId,
+      });
+      return res.json({ connector: serializeConnector(connector) });
+    } catch (error) {
+      await audit({
+        action: 'connector_enabled',
+        result: 'failure',
+        actorUid,
+        details: { code: error?.code || error?.name || 'unknown' },
+      });
       return sendError(res, error);
     }
   });

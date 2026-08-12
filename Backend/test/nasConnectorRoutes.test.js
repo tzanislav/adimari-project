@@ -305,6 +305,7 @@ const startApp = async ({
   const dependencies = {
     config: {
       authHmacSecret: HMAC_SECRET,
+      sharedSecret: DEVICE_SECRET,
       enrollmentTokenTtlSeconds: 900,
       heartbeatIntervalSeconds: 30,
       ...configOverrides,
@@ -415,6 +416,96 @@ test('admin-issued enrollment token is stored only as a hash and can be redeemed
     });
     assert.equal(wrongInstallation.response.status, 401);
     assert.equal(wrongInstallation.body.code, 'NAS_CONNECTOR_ENROLLMENT_INVALID');
+  } finally {
+    await close(app.server);
+  }
+});
+
+test('a shared connector key creates or reconnects an installation without an enrollment token', async () => {
+  const models = createInMemoryModels();
+  const app = await startApp({
+    models,
+    requireHttpsMiddleware: (req, res, next) => next(),
+  });
+  try {
+    const payload = {
+      installationId: INSTALLATION_ID,
+      agentVersion: '1.0.0',
+      root: ROOT,
+    };
+    const denied = await json(`${app.url}/api/nas-connectors/connect`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    assert.equal(denied.response.status, 401);
+
+    const connected = await json(`${app.url}/api/nas-connectors/connect`, {
+      method: 'POST',
+      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      body: JSON.stringify(payload),
+    });
+    assert.equal(connected.response.status, 200);
+    assert.equal(connected.body.connector.status, 'active');
+    assert.equal(models.state.connectors.length, 1);
+    assert.equal(models.state.roots.length, 1);
+    assert.equal(models.state.enrollments.length, 0);
+
+    const connectorId = connected.body.connector.id;
+    const heartbeat = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
+      method: 'POST',
+      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      body: JSON.stringify({ ...payload, state: 'ready', queueLength: 0 }),
+    });
+    assert.equal(heartbeat.response.status, 200);
+
+    const reconnected = await json(`${app.url}/api/nas-connectors/connect`, {
+      method: 'POST',
+      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      body: JSON.stringify({ ...payload, root: { ...ROOT, displayName: 'Updated Office Projects' } }),
+    });
+    assert.equal(reconnected.response.status, 200);
+    assert.equal(reconnected.body.connector.id, connectorId);
+    assert.equal(models.state.connectors.length, 1);
+    assert.equal(models.state.roots[0].displayName, 'Updated Office Projects');
+  } finally {
+    await close(app.server);
+  }
+});
+
+test('an administrator can re-enable a disabled shared-key connector without issuing a token', async () => {
+  const models = createInMemoryModels();
+  const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
+  try {
+    const payload = { installationId: INSTALLATION_ID, agentVersion: '1.0.0', root: ROOT };
+    const connected = await json(`${app.url}/api/nas-connectors/connect`, {
+      method: 'POST',
+      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      body: JSON.stringify(payload),
+    });
+    const connectorId = connected.body.connector.id;
+
+    const disabled = await json(`${app.url}/api/nas-connectors/${connectorId}/revoke`, {
+      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
+    });
+    assert.equal(disabled.response.status, 200);
+    assert.equal(models.state.connectors[0].status, 'revoked');
+    assert.equal(models.state.roots[0].status, 'disabled');
+
+    const enabled = await json(`${app.url}/api/nas-connectors/${connectorId}/enable`, {
+      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
+    });
+    assert.equal(enabled.response.status, 200);
+    assert.equal(enabled.body.connector.status, 'offline');
+    assert.equal(models.state.roots[0].status, 'active');
+    assert.equal(models.state.enrollments.length, 0);
+
+    const heartbeat = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
+      method: 'POST',
+      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      body: JSON.stringify({ ...payload, state: 'ready', queueLength: 0 }),
+    });
+    assert.equal(heartbeat.response.status, 200);
+    assert.equal(models.state.connectors[0].status, 'active');
   } finally {
     await close(app.server);
   }
@@ -940,19 +1031,21 @@ test('admin re-enrollment tokens rotate a revoked or offline connector credentia
       options: { expectedCredentialHash: originalCredentialHash },
     });
 
-    const oldCredential = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
+    // Connector transport now uses the configured shared key, independently
+    // of this retained legacy-token migration test.
+    const invalidSharedKey = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
+      method: 'POST',
+      headers: { authorization: `Connector ${connectorId}.${'d'.repeat(43)}` },
+      body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '0.1.1', root: ROOT, state: 'ready', queueLength: 0 }),
+    });
+    assert.equal(invalidSharedKey.response.status, 401);
+
+    const configuredSharedKey = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
       headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
       body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '0.1.1', root: ROOT, state: 'ready', queueLength: 0 }),
     });
-    assert.equal(oldCredential.response.status, 401);
-
-    const newCredential = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
-      method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${rotatedSecret}` },
-      body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '0.1.1', root: ROOT, state: 'ready', queueLength: 0 }),
-    });
-    assert.equal(newCredential.response.status, 200);
+    assert.equal(configuredSharedKey.response.status, 200);
 
     // An offline connector uses the same re-enrollment flow and returns active.
     models.state.connectors[0].status = 'offline';
