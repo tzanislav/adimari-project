@@ -52,8 +52,9 @@ Control Center and admin page do not use them.
   `Authorization: Connector <connectorId>.<NAS_CONNECTOR_SHARED_SECRET>`.
 
 The shared key is 32 cryptographically random bytes encoded as unpadded
-base64url (43 characters). It is stored by the Service in OS-protected storage
-and never displayed by the Control Center after entry.
+base64url (43 characters). It is stored by the Service in OS-protected storage.
+For operator convenience, the open Control Center window keeps the masked value
+after a successful connection; closing that window clears the field.
 
 ## Legacy token endpoint: create an enrollment token
 
@@ -229,6 +230,10 @@ any browser or token action after an ordinary network or service interruption.
   returns `201 { "created": true, "job": <redacted job> }`, and returns the
   same job with `200 { "created": false, ... }` when it is already queued,
   assigned, or durably accepted.
+- `POST /api/nas-connectors/:id/jobs/:jobId/cancel` cancels an active index
+  scan at any queue stage (`queued`, `assigned`, `accepted`, or `in_progress`).
+  The browser and Control Center both use this normal application control; do
+  not edit queue documents directly in MongoDB.
 - `GET /api/nas-connectors/:id/jobs` returns the redacted jobs for that
   connector. This is an operator diagnostic endpoint; it does not expose a
   browser file API or a native NAS path.
@@ -278,6 +283,10 @@ payload. The connector sends only safe relative metadata in batches of at most
   entries unavailable, records root scan health, and completes the job.
   Repeating the exact completion request is safe if the original success
   response was lost.
+- `POST /api/nas-connectors/control/jobs/:jobId/index/cancel` accepts `{}` and
+  cancels an accepted or in-progress scan for that connector. It is idempotent
+  for an already-cancelled job. The Control Center calls this after clearing a
+  local index job.
 
 ## Incremental catalogue changes (Phase 3C)
 

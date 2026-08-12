@@ -730,9 +730,9 @@ test('admin can queue one idempotent index-root delivery job for an enabled conn
     assert.equal(listed.body.jobs.length, 1);
     assert.equal(listed.body.jobs[0].id, created.body.job.id);
 
-    // A stale WSS delivery can be discarded before the connector has accepted
-    // it, after which an administrator can request a fresh scan.
-    models.state.jobs[0].status = 'assigned';
+    // An administrator can stop a scan even after the connector has accepted
+    // and started it, after which a fresh scan can be requested.
+    models.state.jobs[0].status = 'in_progress';
     const cancelled = await json(`${app.url}/api/nas-connectors/${connectorId}/jobs/${created.body.job.id}/cancel`, {
       method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
     });

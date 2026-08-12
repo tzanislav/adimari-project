@@ -131,6 +131,22 @@ const genericConnectorFailure = () => new NasConnectorApiError({
   status: 401,
 });
 
+// Once connector authentication has already succeeded, an absent/cancelled
+// index job is an operational state—not an authentication failure. Returning
+// 409 lets the service discard its stale local queue record without marking a
+// valid shared key as rejected.
+const indexJobUnavailable = () => new NasConnectorApiError({
+  code: 'NAS_CONNECTOR_JOB_UNAVAILABLE',
+  message: 'The index job is no longer active.',
+  status: 409,
+});
+
+const connectorRootUnavailable = () => new NasConnectorApiError({
+  code: 'NAS_CONNECTOR_ROOT_UNAVAILABLE',
+  message: 'The configured connector root is no longer active.',
+  status: 409,
+});
+
 const ENROLLMENT_SECRET_SELECTION = '+tokenHash +targetCredentialHash +consumedDeviceSecretHash';
 const CONNECTOR_CREDENTIAL_SELECTION = '+credentialHash';
 
@@ -932,6 +948,54 @@ const createNasConnectorRoutes = (dependencies = {}) => {
   // Phase 3A: an accepted logical index job becomes an authenticated scan
   // session. The connector supplies only relative metadata in bounded batches;
   // no native root path is ever sent to or stored by the backend.
+  router.post('/control/jobs/:jobId/index/cancel', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const connectorId = connectorIdOf(req.connector);
+      const cancelledAt = now();
+      let job = await NasTransferJobModel.findOneAndUpdate(
+        {
+          _id: jobId,
+          connectorId,
+          type: INDEX_ROOT_JOB_TYPE,
+          status: { $in: ['accepted', 'in_progress'] },
+        },
+        {
+          $set: {
+            status: 'cancelled',
+            completedAt: cancelledAt,
+            progressStage: null,
+            errorCode: 'cancelled',
+            errorMessage: null,
+          },
+          $unset: { idempotencyKey: 1 },
+        },
+        { new: true },
+      );
+      if (!job) {
+        job = await NasTransferJobModel.findOne({
+          _id: jobId,
+          connectorId,
+          type: INDEX_ROOT_JOB_TYPE,
+          status: 'cancelled',
+        });
+      }
+      if (!job) throw indexJobUnavailable();
+
+      await audit({
+        action: 'scan_cancelled',
+        result: 'success',
+        connectorId,
+        storageRootId: job.storageRootId,
+        transferJobId: jobId,
+        details: { source: 'connector_control_center' },
+      });
+      return res.json({ job: serializeTransferJob(job) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
   router.post('/control/jobs/:jobId/index/start', connectorAuthenticateMiddleware, async (req, res) => {
     try {
       const jobId = assertObjectId(req.params.jobId, 'Job ID');
@@ -967,7 +1031,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
           scanId: request.scanId,
         });
       }
-      if (!job) throw genericConnectorFailure();
+      if (!job) throw indexJobUnavailable();
 
       const root = await NasStorageRootModel.findOne({
         _id: job.storageRootId,
@@ -975,7 +1039,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         connectorRootId: job.connectorRootId,
         status: { $in: ['active', 'offline'] },
       });
-      if (!root) throw genericConnectorFailure();
+      if (!root) throw connectorRootUnavailable();
       return res.json({ scanId: request.scanId });
     } catch (error) {
       return sendError(res, error);
@@ -994,7 +1058,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         status: 'in_progress',
         scanId: request.scanId,
       });
-      if (!job) throw genericConnectorFailure();
+      if (!job) throw indexJobUnavailable();
 
       const root = await NasStorageRootModel.findOne({
         _id: job.storageRootId,
@@ -1002,7 +1066,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         connectorRootId: job.connectorRootId,
         status: { $in: ['active', 'offline'] },
       });
-      if (!root) throw genericConnectorFailure();
+      if (!root) throw connectorRootUnavailable();
 
       const indexedAt = now();
       await NasFileEntryModel.bulkWrite(request.entries.map((entry) => ({
@@ -1059,7 +1123,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
           scanId: request.scanId,
         });
         if (alreadyCompleted) return res.json({ job: serializeTransferJob(alreadyCompleted) });
-        throw genericConnectorFailure();
+        throw indexJobUnavailable();
       }
 
       const completedAt = now();
@@ -1073,7 +1137,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         { $set: { lastIndexedAt: completedAt, lastFullScanAt: completedAt, lastScanError: null } },
         { new: true },
       );
-      if (!root) throw genericConnectorFailure();
+      if (!root) throw connectorRootUnavailable();
 
       await NasFileEntryModel.updateMany(
         {
@@ -1101,7 +1165,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         },
         { new: true },
       );
-      if (!completed) throw genericConnectorFailure();
+      if (!completed) throw indexJobUnavailable();
       await audit({
         action: 'scan_completed',
         result: 'success',
@@ -1864,10 +1928,9 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     }
   });
 
-  // A queued/assigned job has not been accepted into the connector's durable
-  // local queue. Allow an administrator to discard a stale delivery and then
-  // request a fresh scan. Accepted or running work deliberately cannot be
-  // cancelled by this lightweight control-plane action.
+  // An administrator can stop an index scan at any active queue stage. The
+  // connector sees the cancelled state on its next bounded API call and clears
+  // its matching local job before it can send further metadata.
   router.post('/:id/jobs/:jobId/cancel', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
     const actorUid = currentActorUid(req.user);
     try {
@@ -1887,7 +1950,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
           _id: jobId,
           connectorId,
           type: INDEX_ROOT_JOB_TYPE,
-          status: { $in: ['queued', 'assigned'] },
+          status: { $in: ['queued', 'assigned', 'accepted', 'in_progress'] },
         },
         {
           $set: {
@@ -1907,7 +1970,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
       if (!job) {
         throw new NasConnectorApiError({
           code: 'NAS_CONNECTOR_JOB_CANNOT_CANCEL',
-          message: 'Only a queued scan that the connector has not accepted can be cancelled.',
+          message: 'The index scan is no longer active and cannot be cancelled.',
           status: 409,
         });
       }

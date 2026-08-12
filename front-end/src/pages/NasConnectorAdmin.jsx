@@ -264,7 +264,7 @@ function NasConnectorAdmin() {
     if (!job) return;
 
     const confirmed = window.confirm(
-      'Cancel this queued scan? It has not been accepted by the connector, and you can immediately queue a fresh scan afterwards.',
+      'Cancel this index scan? This stops queued, accepted, or currently running scans. You can queue a fresh scan afterwards.',
     );
     if (!confirmed) return;
 
@@ -279,7 +279,7 @@ function NasConnectorAdmin() {
       if (cancelled?.job) {
         setIndexJobsByConnector((current) => ({ ...current, [connector.id]: cancelled.job }));
       }
-      setNotice('The stale queued scan was cancelled. You can now queue a fresh scan.');
+      setNotice('The index scan was cancelled. You can now queue a fresh scan.');
     } catch (requestError) {
       setError(describeError(requestError));
     } finally {
@@ -363,7 +363,7 @@ function NasConnectorAdmin() {
                   const isTesting = testingConnectorId === connector.id;
                   const canQueueIndex = connector.status === 'active' || connector.status === 'offline';
                   const indexJob = indexJobsByConnector[connector.id];
-                  const canCancelIndex = indexJob && ['queued', 'assigned'].includes(indexJob.status);
+                  const canCancelIndex = indexJob && ['queued', 'assigned', 'accepted', 'in_progress'].includes(indexJob.status);
                   return (
                     <tr key={connector.id}>
                       <td data-label="Name">
@@ -392,7 +392,7 @@ function NasConnectorAdmin() {
                           )}
                           {canCancelIndex && (
                             <button className="nas-connector-button danger compact" type="button" onClick={() => void cancelIndexScan(connector)} disabled={isCancellingIndex}>
-                              {isCancellingIndex ? 'Cancelling scan…' : 'Cancel queued scan'}
+                              {isCancellingIndex ? 'Cancelling scan…' : 'Cancel index scan'}
                             </button>
                           )}
                           {isRevoked ? (
