@@ -575,6 +575,8 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
         return;
       }
 
+      console.info('[NAS control] upgrade_accepted', { connectorId: connectorIdOf(connector) });
+
       websocketServer.handleUpgrade(request, socket, head, (websocket) => {
         websocketServer.emit('connection', websocket, request, connector);
       });
@@ -671,7 +673,12 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
       }
     }, controlPingIntervalSeconds * 1000);
 
-    socket.on('close', () => {
+    socket.on('close', (closeCode) => {
+      console.info('[NAS control] socket_closed', {
+        connectorId,
+        helloAccepted,
+        closeCode,
+      });
       clearTimeout(helloTimer);
       clearInterval(pingTimer);
       unregisterJobDelivery?.();
@@ -694,6 +701,7 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
         try {
           envelope = parseEnvelope(data);
         } catch {
+          console.info('[NAS control] hello_rejected', { connectorId, reason: 'invalid_envelope' });
           failProtocol();
           return;
         }
@@ -716,11 +724,13 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
           try {
             hello = normalizeHelloPayload(envelope.payload);
           } catch {
+            console.info('[NAS control] hello_rejected', { connectorId, reason: 'invalid_payload' });
             failProtocol(envelope.messageId);
             return;
           }
 
           if (hello.installationId !== connector.installationId) {
+            console.info('[NAS control] hello_rejected', { connectorId, reason: 'installation_mismatch' });
             closeSocket(socket, {
               code: CLOSE_CODES.credentialInvalid,
               reason: 'Connector installation is not authorized.',
@@ -734,6 +744,7 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
           try {
             const persisted = await updateHelloPresence({ connector, credentialHash, hello });
             if (!persisted) {
+              console.info('[NAS control] hello_rejected', { connectorId, reason: 'root_or_credential_unavailable' });
               closeSocket(socket, {
                 code: CLOSE_CODES.credentialInvalid,
                 reason: 'Connector credential is no longer active.',
@@ -744,6 +755,7 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
               return;
             }
           } catch {
+            console.info('[NAS control] hello_rejected', { connectorId, reason: 'presence_write_failed' });
             closeSocket(socket, {
               code: CLOSE_CODES.credentialInvalid,
               reason: 'Connector presence could not be recorded.',
@@ -760,6 +772,7 @@ const createNasConnectorControlChannel = (dependencies = {}) => {
           if (socket.readyState !== WebSocket.OPEN) return;
           helloAccepted = true;
           clearTimeout(helloTimer);
+          console.info('[NAS control] hello_accepted', { connectorId });
           // A connection becomes the single active session only after it has
           // proved it can send a valid hello and its presence write committed.
           // This prevents an idle authenticated upgrade from displacing a
