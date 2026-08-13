@@ -121,6 +121,8 @@ function NasFileBrowser() {
   const fileInputRef = useRef(null);
   const imageViewportRef = useRef(null);
   const imageDragRef = useRef(null);
+  const imagePointersRef = useRef(new Map());
+  const imageViewRef = useRef({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
   const [imageView, setImageView] = useState({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
 
   const activeRoot = useMemo(
@@ -602,8 +604,48 @@ function NasFileBrowser() {
 
   useEffect(() => {
     imageDragRef.current = null;
-    setImageView({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
+    imagePointersRef.current.clear();
+    const initialImageView = { scale: MIN_IMAGE_ZOOM, x: 0, y: 0 };
+    imageViewRef.current = initialImageView;
+    setImageView(initialImageView);
   }, [lightbox?.entry.id]);
+
+  const createImageGesture = () => {
+    const viewport = imageViewportRef.current?.getBoundingClientRect();
+    const pointers = Array.from(imagePointersRef.current, ([pointerId, point]) => ({ pointerId, ...point }));
+    const imageViewAtStart = imageViewRef.current;
+    if (!viewport || !pointers.length) {
+      imageDragRef.current = null;
+      return;
+    }
+    if (pointers.length === 1) {
+      imageDragRef.current = {
+        type: 'pan',
+        pointerId: pointers[0].pointerId,
+        startX: pointers[0].clientX,
+        startY: pointers[0].clientY,
+        originX: imageViewAtStart.x,
+        originY: imageViewAtStart.y,
+      };
+      return;
+    }
+    const [firstPointer, secondPointer] = pointers;
+    const firstX = firstPointer.clientX - viewport.left;
+    const firstY = firstPointer.clientY - viewport.top;
+    const secondX = secondPointer.clientX - viewport.left;
+    const secondY = secondPointer.clientY - viewport.top;
+    imageDragRef.current = {
+      type: 'pinch',
+      firstPointerId: firstPointer.pointerId,
+      secondPointerId: secondPointer.pointerId,
+      startDistance: Math.hypot(secondX - firstX, secondY - firstY),
+      startCenterX: (firstX + secondX) / 2,
+      startCenterY: (firstY + secondY) / 2,
+      originX: imageViewAtStart.x,
+      originY: imageViewAtStart.y,
+      originScale: imageViewAtStart.scale,
+    };
+  };
 
   const zoomImageAtPointer = (event) => {
     event.stopPropagation();
@@ -616,46 +658,74 @@ function NasFileBrowser() {
     setImageView((current) => {
       const scale = clamp(current.scale * zoomFactor, MIN_IMAGE_ZOOM, MAX_IMAGE_ZOOM);
       const scaleChange = scale / current.scale;
-      return clampImagePosition({
+      const nextImageView = clampImagePosition({
         x: pointerX - ((pointerX - current.x) * scaleChange),
         y: pointerY - ((pointerY - current.y) * scaleChange),
         scale,
       }, viewport);
+      imageViewRef.current = nextImageView;
+      return nextImageView;
     });
   };
 
-  const beginImagePan = (event) => {
+  const beginImageGesture = (event) => {
     event.stopPropagation();
-    if (imageView.scale <= MIN_IMAGE_ZOOM) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    imageDragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: imageView.x,
-      originY: imageView.y,
-    };
+    imagePointersRef.current.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+    createImageGesture();
   };
 
-  const panImage = (event) => {
-    const drag = imageDragRef.current;
+  const moveImageGesture = (event) => {
+    if (!imagePointersRef.current.has(event.pointerId)) return;
+    imagePointersRef.current.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+    const gesture = imageDragRef.current;
     const viewport = imageViewportRef.current?.getBoundingClientRect();
-    if (!drag || drag.pointerId !== event.pointerId || !viewport) return;
+    if (!gesture || !viewport) return;
     event.preventDefault();
-    setImageView((current) => clampImagePosition({
-      x: drag.originX + event.clientX - drag.startX,
-      y: drag.originY + event.clientY - drag.startY,
-      scale: current.scale,
-    }, viewport));
+    if (gesture.type === 'pinch') {
+      const firstPointer = imagePointersRef.current.get(gesture.firstPointerId);
+      const secondPointer = imagePointersRef.current.get(gesture.secondPointerId);
+      if (!firstPointer || !secondPointer || gesture.startDistance === 0) return;
+      const firstX = firstPointer.clientX - viewport.left;
+      const firstY = firstPointer.clientY - viewport.top;
+      const secondX = secondPointer.clientX - viewport.left;
+      const secondY = secondPointer.clientY - viewport.top;
+      const distance = Math.hypot(secondX - firstX, secondY - firstY);
+      const centerX = (firstX + secondX) / 2;
+      const centerY = (firstY + secondY) / 2;
+      setImageView(() => {
+        const scale = clamp(gesture.originScale * (distance / gesture.startDistance), MIN_IMAGE_ZOOM, MAX_IMAGE_ZOOM);
+        const scaleChange = scale / gesture.originScale;
+        const nextImageView = clampImagePosition({
+          x: centerX - ((gesture.startCenterX - gesture.originX) * scaleChange),
+          y: centerY - ((gesture.startCenterY - gesture.originY) * scaleChange),
+          scale,
+        }, viewport);
+        imageViewRef.current = nextImageView;
+        return nextImageView;
+      });
+      return;
+    }
+    if (gesture.pointerId !== event.pointerId || imageViewRef.current.scale <= MIN_IMAGE_ZOOM) return;
+    setImageView((current) => {
+      const nextImageView = clampImagePosition({
+        x: gesture.originX + event.clientX - gesture.startX,
+        y: gesture.originY + event.clientY - gesture.startY,
+        scale: current.scale,
+      }, viewport);
+      imageViewRef.current = nextImageView;
+      return nextImageView;
+    });
   };
 
-  const endImagePan = (event) => {
-    if (imageDragRef.current?.pointerId !== event.pointerId) return;
-    imageDragRef.current = null;
+  const endImageGesture = (event) => {
+    if (!imagePointersRef.current.has(event.pointerId)) return;
+    imagePointersRef.current.delete(event.pointerId);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    createImageGesture();
   };
 
   const breadcrumbs = folder ? folder.split('/') : [];
@@ -867,10 +937,10 @@ function NasFileBrowser() {
                 alt={lightbox.entry.name}
                 style={{ transform: `translate3d(${imageView.x}px, ${imageView.y}px, 0) scale(${imageView.scale})` }}
                 onWheel={zoomImageAtPointer}
-                onPointerDown={beginImagePan}
-                onPointerMove={panImage}
-                onPointerUp={endImagePan}
-                onPointerCancel={endImagePan}
+                onPointerDown={beginImageGesture}
+                onPointerMove={moveImageGesture}
+                onPointerUp={endImageGesture}
+                onPointerCancel={endImageGesture}
                 onClick={(event) => event.stopPropagation()}
               />
             )}
