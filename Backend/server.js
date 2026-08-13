@@ -30,7 +30,7 @@ const NasFileEntry = require('./models/nasFileEntry');
 const NasAuditEvent = require('./models/nasAuditEvent');
 const { NasConnectorJobQueue } = require('./services/nasConnectorJobQueue');
 const { NasRetentionService } = require('./services/nasRetentionService');
-const { createNasStorageService } = require('./services/nasStorageService');
+const { createNasStorageSet } = require('./services/nasStorageSet');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -46,6 +46,12 @@ getFileServerConfig();
 // The NAS connector is introduced behind an explicit feature flag. When enabled,
 // validate all NAS storage settings before accepting requests.
 const nasConnectorConfig = isNasConnectorEnabled() ? getNasConnectorConfig() : null;
+const nasStorageSet = nasConnectorConfig
+  ? createNasStorageSet({
+    nasConfig: nasConnectorConfig,
+    fileServerConfig: getFileServerConfig(),
+  })
+  : null;
 const nasConnectorJobQueue = nasConnectorConfig
   ? new NasConnectorJobQueue({
     NasTransferJobModel: NasTransferJob,
@@ -57,11 +63,7 @@ const nasRetentionService = nasConnectorConfig
     NasTransferJobModel: NasTransferJob,
     NasAuditEventModel: NasAuditEvent,
     NasFileEntryModel: NasFileEntry,
-    thumbnailStorage: createNasStorageService({
-      nasConfig: nasConnectorConfig,
-      fileServerConfig: getFileServerConfig(),
-      prefix: nasConnectorConfig.thumbnailPrefix,
-    }),
+    thumbnailStorage: nasStorageSet.thumbnails,
     config: nasConnectorConfig,
   })
   : null;
@@ -176,13 +178,6 @@ const publicDownloadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const nasConnectorEnrollmentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isDevelopmentMode ? 100 : 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 const nasConnectorHeartbeatLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: isDevelopmentMode ? 1_000 : 120,
@@ -279,18 +274,20 @@ app.use('/api/upload', authenticate, uploadLimiter, uploadRoutes);
 app.use('/api/files', fileManagerLimiter, createFileRoutes());
 app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes({
   nasConfig: nasConnectorConfig,
+  storageSet: nasStorageSet,
 }));
 if (nasConnectorConfig) {
   app.use('/api/nas-connectors', createNasConnectorRoutes({
     config: nasConnectorConfig,
-    enrollmentLimiter: nasConnectorEnrollmentLimiter,
     heartbeatLimiter: nasConnectorHeartbeatLimiter,
     jobQueue: nasConnectorJobQueue,
+    storageSet: nasStorageSet,
   }));
   app.use('/api/nas-catalogue', fileManagerLimiter, createNasCatalogueRoutes({
     nasConfig: nasConnectorConfig,
     fileServerConfig: getFileServerConfig(),
     jobQueue: nasConnectorJobQueue,
+    storageSet: nasStorageSet,
   }));
 }
 app.use('/api/models3d', modelRoutes); 

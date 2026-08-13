@@ -5,35 +5,25 @@ const test = require('node:test');
 
 const NasAuditEvent = require('../models/nasAuditEvent');
 const NasConnector = require('../models/nasConnector');
-const NasEnrollmentToken = require('../models/nasEnrollmentToken');
 const NasFileEntry = require('../models/nasFileEntry');
 const NasStorageRoot = require('../models/nasStorageRoot');
 const NasTransferJob = require('../models/nasTransferJob');
 
-test('NAS connector keeps its credential hash hidden and validates its state', () => {
-  assert.equal(NasConnector.schema.path('credentialHash').options.select, false);
+test('NAS connectors use only their installation identity and runtime state', () => {
+  assert.equal(NasConnector.schema.path('credentialHash'), undefined);
+  assert.equal(NasConnector.schema.path('enrollmentId'), undefined);
   const connector = new NasConnector({
     name: 'Office NAS connector',
     installationId: 'a9d24d65-1a96-4f65-aa06-40c74c5934ac',
-    credentialHash: 'a'.repeat(64),
   });
 
   assert.equal(connector.validateSync(), undefined);
-  assert.equal(connector.status, 'enrolling');
-});
-
-test('NAS enrollment tokens keep secret hashes hidden and expire after their bounded recovery window', () => {
-  assert.equal(NasEnrollmentToken.schema.path('tokenHash').options.select, false);
-  assert.equal(NasEnrollmentToken.schema.path('targetCredentialHash').options.select, false);
-  assert.equal(NasEnrollmentToken.schema.path('consumedDeviceSecretHash').options.select, false);
-  const ttlIndex = NasEnrollmentToken.schema.indexes()
-    .find(([keys, options]) => keys.recoveryExpiresAt === 1 && options.expireAfterSeconds === 0);
-  assert.ok(ttlIndex);
+  assert.equal(connector.status, 'offline');
 });
 
 test('NAS metadata models support indexed files and bounded transfer jobs', () => {
   const connectorId = new NasConnector({
-    name: 'Office NAS connector', installationId: 'unique-installation', credentialHash: 'b'.repeat(64),
+    name: 'Office NAS connector', installationId: 'unique-installation',
   })._id;
   const root = new NasStorageRoot({ connectorId, connectorRootId: 'projects-root', displayName: 'Projects' });
   assert.equal(root.validateSync(), undefined);

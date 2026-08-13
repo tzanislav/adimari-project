@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const nasAuditEventSchema = new mongoose.Schema({
   action: {
     type: String,
-    enum: ['enrollment_token_created', 'connector_enrolled', 'connector_reenrollment_token_created', 'connector_reenrolled', 'connector_connected_with_shared_key', 'connector_enabled', 'connector_revoked', 'scan_queued', 'scan_requested_locally', 'scan_cancelled', 'scan_started', 'scan_completed', 'scan_failed', 'job_recovery_stopped', 'download_requested', 'cache_completed', 'cache_failed', 'image_preview_requested', 'thumbnail_requested', 'thumbnail_completed', 'thumbnail_failed', 'upload_started', 'upload_completed', 'upload_failed'],
+    enum: ['connector_connected_with_shared_key', 'connector_enabled', 'connector_revoked', 'scan_queued', 'scan_requested_locally', 'scan_cancelled', 'scan_started', 'scan_completed', 'scan_failed', 'job_recovery_stopped', 'download_requested', 'cache_completed', 'cache_failed', 'image_preview_requested', 'thumbnail_requested', 'thumbnail_completed', 'thumbnail_failed', 'upload_started', 'upload_completed', 'upload_failed'],
     required: true,
     index: true,
   },

@@ -55,6 +55,32 @@ const normalizeDisplayName = (value) => {
   return name;
 };
 
+// The connector is the final authority for its filesystem, but rejecting
+// impossible Windows destination names before the browser begins a multipart
+// upload gives people an immediate, actionable error.  This deliberately
+// validates a single filename only; existing catalogue parent paths keep
+// their normal relative-path validation.
+const normalizeWindowsDestinationFileName = (value) => {
+  const fileName = requireString(value, 'File name').trim();
+  if (!fileName
+    || fileName.length > 255
+    || fileName === '.'
+    || fileName === '..'
+    || /[<>:"/\\|?*]/.test(fileName)
+    || /[. ]$/.test(fileName)
+    || hasControlCharacters(fileName)) {
+    throw new NasConnectorValidationError('File name is not valid for a Windows NAS destination.');
+  }
+
+  // Windows reserves these names even when an extension is supplied.
+  const stem = fileName.split('.')[0].toUpperCase();
+  if (stem === 'CON' || stem === 'PRN' || stem === 'AUX' || stem === 'NUL'
+    || /^(COM|LPT)[1-9]$/.test(stem)) {
+    throw new NasConnectorValidationError('File name is reserved by Windows and cannot be used on the NAS.');
+  }
+  return fileName;
+};
+
 const normalizeInstallationId = (value) => {
   const installationId = requireString(value, 'Installation ID').trim().toLowerCase();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(installationId)) {
@@ -118,6 +144,7 @@ module.exports = {
   normalizeConnectorRootId,
   normalizeConnectorRoot,
   normalizeDisplayName,
+  normalizeWindowsDestinationFileName,
   normalizeHeartbeatState,
   normalizeInstallationId,
   normalizeQueueLength,

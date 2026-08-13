@@ -20,6 +20,7 @@ const {
   NasConnectorValidationError,
   assertObjectId,
   normalizeRelativePath,
+  normalizeWindowsDestinationFileName,
 } = require('../services/nasConnectorValidation');
 
 const DEFAULT_PAGE_SIZE = 100;
@@ -90,10 +91,20 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const serializeRoot = (root) => {
   const value = toPlainObject(root);
+  const connector = value.connectorId && typeof value.connectorId === 'object'
+    ? toPlainObject(value.connectorId)
+    : null;
   return {
     id: objectIdOf(value),
     name: value.displayName,
-    status: value.status,
+    // Storage roots retain only administrative status. Availability is
+    // derived from the connector's heartbeat-owned observation.
+    status: value.status === 'disabled' ? 'disabled' : 'active',
+    availability: connector?.status === 'active'
+      ? 'online'
+      : connector?.status === 'revoked' || value.status === 'disabled'
+        ? 'disabled'
+        : 'offline',
     uploadsEnabled: Boolean(value.uploadsEnabled),
     lastIndexedAt: value.lastIndexedAt || null,
     lastFullScanAt: value.lastFullScanAt || null,
@@ -185,9 +196,10 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
   const jobQueue = dependencies.jobQueue || null;
   const nasConfig = dependencies.nasConfig || null;
   const fileServerConfig = dependencies.fileServerConfig || null;
-  let cacheStorage = dependencies.cacheStorage || null;
-  let thumbnailStorage = dependencies.thumbnailStorage || null;
-  let stagingStorage = dependencies.stagingStorage || null;
+  const storageSet = dependencies.storageSet || null;
+  let cacheStorage = dependencies.cacheStorage || storageSet?.cache || null;
+  let thumbnailStorage = dependencies.thumbnailStorage || storageSet?.thumbnails || null;
+  let stagingStorage = dependencies.stagingStorage || storageSet?.staging || null;
   const authenticateMiddleware = dependencies.authenticateMiddleware || authenticate;
   const authorizeMiddleware = dependencies.authorizeMiddleware || authorizeRole(['admin', 'moderator']);
   const router = express.Router();
@@ -372,12 +384,20 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
       || body.sizeBytes > nasConfig.maxUploadBytes) {
       throw new NasCatalogueApiError('NAS_UPLOAD_REQUEST_INVALID', 'Choose a valid file within the configured upload limit.');
     }
-    return {
-      parentPath: normalizeRelativePath(body.parentPath, { allowEmpty: true }),
-      fileName: normalizeFileName(body.fileName),
-      sizeBytes: body.sizeBytes,
-      contentType: normalizeContentType(body.contentType),
-    };
+    const fileName = normalizeFileName(body.fileName);
+    try {
+      return {
+        parentPath: normalizeRelativePath(body.parentPath, { allowEmpty: true }),
+        fileName: normalizeWindowsDestinationFileName(fileName),
+        sizeBytes: body.sizeBytes,
+        contentType: normalizeContentType(body.contentType),
+      };
+    } catch (error) {
+      if (error instanceof NasConnectorValidationError) {
+        throw new NasCatalogueApiError('NAS_UPLOAD_FILE_NAME_INVALID', error.message);
+      }
+      throw error;
+    }
   };
 
   const findOwnedUploadJob = async ({ jobId, actorUid, statuses }) => resolveOneQuery(
@@ -393,10 +413,9 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
 
   router.get('/roots', async (req, res) => {
     try {
-      const roots = await resolveArrayQuery(
-        NasStorageRootModel.find({ status: { $in: ['active', 'offline'] } }),
-        { sort: { displayName: 1, _id: 1 } },
-      );
+      let rootQuery = NasStorageRootModel.find({ status: { $in: ['active', 'offline'] } });
+      if (typeof rootQuery?.populate === 'function') rootQuery = rootQuery.populate('connectorId', 'status');
+      const roots = await resolveArrayQuery(rootQuery, { sort: { displayName: 1, _id: 1 } });
       return res.json({ roots: roots.map(serializeRoot) });
     } catch (error) {
       return sendError(res, error);

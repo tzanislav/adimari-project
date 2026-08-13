@@ -7,10 +7,9 @@ const express = require('express');
 const { createNasConnectorRoutes } = require('../routes/nasConnectorRoutes');
 const { NasConnectorJobQueue } = require('../services/nasConnectorJobQueue');
 
-const HMAC_SECRET = 'this-is-a-long-test-only-connector-hmac-secret';
 const INSTALLATION_ID = 'a9d24d65-1a96-4f65-aa06-40c74c5934ac';
 const ROOT = { connectorRootId: 'office-projects', displayName: 'Office Projects', uploadsEnabled: true };
-const DEVICE_SECRET = 'Z2VuZXJhdGVkLWRldmljZS1zZWNyZXQtMzItYnl0ZXM';
+const SHARED_ACCESS_KEY = 'Z2VuZXJhdGVkLWRldmljZS1zZWNyZXQtMzItYnl0ZXM';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -31,14 +30,12 @@ const matchesFilter = (record, filter) => Object.entries(filter)
     : valueMatches(record[key], expected)));
 
 const createInMemoryModels = () => {
-  const enrollments = [];
   const connectors = [];
   const roots = [];
   const jobs = [];
   const fileEntries = [];
   const shares = [];
   const audits = [];
-  let enrollmentSequence = 1;
   let connectorSequence = 1;
   let jobSequence = 1;
 
@@ -54,38 +51,6 @@ const createInMemoryModels = () => {
     }
     record.updatedAt = new Date();
     return record;
-  };
-
-  const EnrollmentTokenModel = {
-    async create(document) {
-      if (enrollments.some((entry) => entry.tokenHash === document.tokenHash)) {
-        const error = new Error('duplicate enrollment token');
-        error.code = 11000;
-        throw error;
-      }
-      const record = { _id: `0${String(enrollmentSequence++).padStart(23, '0')}`, consumedAt: null, revokedAt: null, ...document };
-      enrollments.push(record);
-      return record;
-    },
-    async findOne(filter) {
-      return enrollments.find((entry) => matchesFilter(entry, filter)) || null;
-    },
-    async findOneAndUpdate(filter, update) {
-      const record = enrollments.find((entry) => matchesFilter(entry, filter));
-      if (!record) return null;
-      Object.assign(record, update.$set);
-      return record;
-    },
-    async updateOne(filter, update) {
-      const record = enrollments.find((entry) => matchesFilter(entry, filter));
-      if (record) Object.assign(record, update.$set);
-      return { matchedCount: record ? 1 : 0 };
-    },
-    async updateMany(filter, update) {
-      const matching = enrollments.filter((entry) => matchesFilter(entry, filter));
-      matching.forEach((entry) => Object.assign(entry, update.$set));
-      return { matchedCount: matching.length };
-    },
   };
 
   const ConnectorModel = {
@@ -291,14 +256,13 @@ const createInMemoryModels = () => {
   };
 
   return {
-    EnrollmentTokenModel,
     ConnectorModel,
     StorageRootModel,
     TransferJobModel,
     FileEntryModel,
     FileShareModel,
     AuditEventModel: { async create(event) { audits.push(clone(event)); return event; } },
-    state: { enrollments, connectors, roots, jobs, fileEntries, shares, audits },
+    state: { connectors, roots, jobs, fileEntries, shares, audits },
   };
 };
 
@@ -330,15 +294,12 @@ const startApp = async ({
   app.use(express.json());
   const dependencies = {
     config: {
-      authHmacSecret: HMAC_SECRET,
-      sharedSecret: DEVICE_SECRET,
-      enrollmentTokenTtlSeconds: 900,
+      sharedSecret: SHARED_ACCESS_KEY,
       heartbeatIntervalSeconds: 30,
       recoveryStuckAfterMinutes: 30,
       ...configOverrides,
     },
     NasConnectorModel: models.ConnectorModel,
-    NasEnrollmentTokenModel: models.EnrollmentTokenModel,
     NasStorageRootModel: models.StorageRootModel,
     NasTransferJobModel: models.TransferJobModel,
     NasFileEntryModel: models.FileEntryModel,
@@ -368,88 +329,21 @@ const json = async (url, options = {}) => fetch(url, {
   body: response.status === 204 ? null : await response.json(),
 }));
 
-test('admin-issued enrollment token is stored only as a hash and can be redeemed exactly once', async () => {
-  const models = createInMemoryModels();
-  const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
-  try {
-    const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST',
-      headers: { authorization: 'Bearer admin' },
-      body: JSON.stringify({ name: 'Office NAS Connector' }),
-    });
-    assert.equal(issued.response.status, 201);
-    assert.match(issued.body.enrollmentToken, /^nce1_[A-Za-z0-9_-]{43}$/);
-    assert.equal(issued.response.headers.get('cache-control'), 'no-store, private');
-    assert.equal(models.state.enrollments.length, 1);
-    assert.notEqual(models.state.enrollments[0].tokenHash, issued.body.enrollmentToken);
-    assert.equal(JSON.stringify(models.state.enrollments).includes(issued.body.enrollmentToken), false);
+const connectSharedConnector = async (app, {
+  installationId = INSTALLATION_ID,
+  agentVersion = '0.1.0',
+  root = ROOT,
+} = {}) => {
+  const response = await json(`${app.url}/api/nas-connectors/connect`, {
+    method: 'POST',
+    headers: { authorization: `ConnectorKey ${SHARED_ACCESS_KEY}` },
+    body: JSON.stringify({ installationId, agentVersion, root }),
+  });
+  assert.equal(response.response.status, 200);
+  return response.body.connector;
+};
 
-    const payload = {
-      enrollmentToken: issued.body.enrollmentToken,
-      installationId: INSTALLATION_ID,
-      deviceSecret: DEVICE_SECRET,
-      agentVersion: '0.1.0',
-      root: ROOT,
-    };
-    const enrolled = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    assert.equal(enrolled.response.status, 201);
-    assert.equal(enrolled.body.connector.name, 'Office NAS Connector');
-    assert.equal(enrolled.body.connector.credentialHash, undefined);
-    assert.equal(enrolled.body.heartbeatIntervalSeconds, 30);
-    assert.equal(models.state.connectors[0].credentialHash === DEVICE_SECRET, false);
-    assert.equal(models.state.roots[0].displayName, 'Office Projects');
-    assert.equal(models.state.enrollments[0].consumedInstallationId, INSTALLATION_ID);
-    assert.notEqual(models.state.enrollments[0].consumedDeviceSecretHash, DEVICE_SECRET);
-
-    const roots = await json(`${app.url}/api/nas-connectors/${enrolled.body.connector.id}/roots`, {
-      headers: { authorization: 'Bearer admin' },
-    });
-    assert.equal(roots.response.status, 200);
-    assert.deepEqual(roots.body.roots.map((root) => ({
-      connectorId: root.connectorId,
-      connectorRootId: root.connectorRootId,
-      name: root.name,
-    })), [{
-      connectorId: enrolled.body.connector.id,
-      connectorRootId: ROOT.connectorRootId,
-      name: ROOT.displayName,
-    }]);
-
-    // If the Service lost the original 201 response, it can safely retry the
-    // exact same request. The backend returns the same connector, not a second
-    // connector and not a newly issued credential.
-    const recovered = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    assert.equal(recovered.response.status, 200);
-    assert.equal(recovered.body.connector.id, enrolled.body.connector.id);
-    assert.equal(models.state.connectors.length, 1);
-
-    // Possession of only the consumed enrollment token is not enough to
-    // retrieve connector metadata or create a second connector.
-    const wrongSecret = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({ ...payload, deviceSecret: 'a'.repeat(43) }),
-    });
-    assert.equal(wrongSecret.response.status, 401);
-    assert.equal(wrongSecret.body.code, 'NAS_CONNECTOR_ENROLLMENT_INVALID');
-
-    const wrongInstallation = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({ ...payload, installationId: 'b9d24d65-1a96-4f65-aa06-40c74c5934ac' }),
-    });
-    assert.equal(wrongInstallation.response.status, 401);
-    assert.equal(wrongInstallation.body.code, 'NAS_CONNECTOR_ENROLLMENT_INVALID');
-  } finally {
-    await close(app.server);
-  }
-});
-
-test('a shared connector key creates or reconnects an installation without an enrollment token', async () => {
+test('a shared connector key creates or reconnects an installation', async () => {
   const models = createInMemoryModels();
   const app = await startApp({
     models,
@@ -469,26 +363,25 @@ test('a shared connector key creates or reconnects an installation without an en
 
     const connected = await json(`${app.url}/api/nas-connectors/connect`, {
       method: 'POST',
-      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      headers: { authorization: `ConnectorKey ${SHARED_ACCESS_KEY}` },
       body: JSON.stringify(payload),
     });
     assert.equal(connected.response.status, 200);
     assert.equal(connected.body.connector.status, 'active');
     assert.equal(models.state.connectors.length, 1);
     assert.equal(models.state.roots.length, 1);
-    assert.equal(models.state.enrollments.length, 0);
 
     const connectorId = connected.body.connector.id;
     const heartbeat = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({ ...payload, state: 'ready', queueLength: 0 }),
     });
     assert.equal(heartbeat.response.status, 200);
 
     const reconnected = await json(`${app.url}/api/nas-connectors/connect`, {
       method: 'POST',
-      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      headers: { authorization: `ConnectorKey ${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({ ...payload, root: { ...ROOT, displayName: 'Updated Office Projects' } }),
     });
     assert.equal(reconnected.response.status, 200);
@@ -507,7 +400,7 @@ test('an authenticated connector receives and acknowledges one job over HTTPS po
   try {
     const connection = await json(`${app.url}/api/nas-connectors/connect`, {
       method: 'POST',
-      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      headers: { authorization: `ConnectorKey ${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '1.0.0', root: ROOT }),
     });
     const connectorId = connection.body.connector.id;
@@ -525,7 +418,7 @@ test('an authenticated connector receives and acknowledges one job over HTTPS po
 
     const polled = await json(`${app.url}/api/nas-connectors/control/jobs/poll`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({ waitSeconds: 0 }),
     });
     assert.equal(polled.response.status, 200);
@@ -535,7 +428,7 @@ test('an authenticated connector receives and acknowledges one job over HTTPS po
 
     const acknowledged = await json(`${app.url}/api/nas-connectors/control/jobs/ack`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({
         jobId: polled.body.assignment.jobId,
         deliveryId: polled.body.assignment.deliveryId,
@@ -557,7 +450,7 @@ test('an administrator can re-enable a disabled shared-key connector without iss
     const payload = { installationId: INSTALLATION_ID, agentVersion: '1.0.0', root: ROOT };
     const connected = await json(`${app.url}/api/nas-connectors/connect`, {
       method: 'POST',
-      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      headers: { authorization: `ConnectorKey ${SHARED_ACCESS_KEY}` },
       body: JSON.stringify(payload),
     });
     const connectorId = connected.body.connector.id;
@@ -575,11 +468,10 @@ test('an administrator can re-enable a disabled shared-key connector without iss
     assert.equal(enabled.response.status, 200);
     assert.equal(enabled.body.connector.status, 'offline');
     assert.equal(models.state.roots[0].status, 'active');
-    assert.equal(models.state.enrollments.length, 0);
 
     const heartbeat = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({ ...payload, state: 'ready', queueLength: 0 }),
     });
     assert.equal(heartbeat.response.status, 200);
@@ -596,20 +488,8 @@ test('heartbeat authenticates the connector credential and is refused after admi
     requireHttpsMiddleware: (req, res, next) => next(),
   });
   try {
-    const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'NAS' }),
-    });
-    const enrolled = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: issued.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    const connectorId = enrolled.body.connector.id;
+    const connector = await connectSharedConnector(app);
+    const connectorId = connector.id;
     const heartbeatPayload = {
       installationId: INSTALLATION_ID,
       agentVersion: '0.1.1',
@@ -619,7 +499,7 @@ test('heartbeat authenticates the connector credential and is refused after admi
     };
     const heartbeat = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify(heartbeatPayload),
     });
     assert.equal(heartbeat.response.status, 200);
@@ -643,7 +523,7 @@ test('heartbeat authenticates the connector credential and is refused after admi
 
     const afterRevocation = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify(heartbeatPayload),
     });
     assert.equal(afterRevocation.response.status, 401);
@@ -715,20 +595,8 @@ test('admin listing persists a stale active connector as offline and a valid hea
     now: () => new Date(currentTime),
   });
   try {
-    const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'NAS' }),
-    });
-    const enrolled = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: issued.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    const connectorId = enrolled.body.connector.id;
+    const connector = await connectSharedConnector(app);
+    const connectorId = connector.id;
     assert.equal(models.state.connectors[0].status, 'active');
 
     currentTime = new Date(currentTime.getTime() + (91 * 1000));
@@ -742,7 +610,7 @@ test('admin listing persists a stale active connector as offline and a valid hea
 
     const recovered = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({
         installationId: INSTALLATION_ID,
         agentVersion: '0.1.1',
@@ -770,20 +638,8 @@ test('admin can queue one idempotent index-root delivery job for an enabled conn
   const models = createInMemoryModels();
   const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
   try {
-    const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'Office NAS' }),
-    });
-    const enrolled = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: issued.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    const connectorId = enrolled.body.connector.id;
+    const connector = await connectSharedConnector(app);
+    const connectorId = connector.id;
     const jobUrl = `${app.url}/api/nas-connectors/${connectorId}/roots/${ROOT.connectorRootId}/index-jobs`;
 
     const denied = await json(jobUrl, {
@@ -842,27 +698,15 @@ test('admin can queue one idempotent index-root delivery job for an enabled conn
   }
 });
 
-test('an enrolled connector can request and immediately accept its own local index scan', async () => {
+test('a shared-key connector can request and immediately accept its own local index scan', async () => {
   const models = createInMemoryModels();
   const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
   try {
-    const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'Office NAS' }),
-    });
-    const enrolled = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: issued.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    const connectorId = enrolled.body.connector.id;
+    const connector = await connectSharedConnector(app);
+    const connectorId = connector.id;
     const request = () => json(`${app.url}/api/nas-connectors/control/index-requests`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({ connectorRootId: ROOT.connectorRootId }),
     });
 
@@ -887,20 +731,8 @@ test('an authenticated connector turns an accepted index job into a completed re
   const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
   const scanId = 'b9d24d65-1a96-4f65-aa06-40c74c5934ac';
   try {
-    const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'Office NAS' }),
-    });
-    const enrolled = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: issued.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    const connectorId = enrolled.body.connector.id;
+    const connector = await connectSharedConnector(app);
+    const connectorId = connector.id;
     const jobResponse = await json(
       `${app.url}/api/nas-connectors/${connectorId}/roots/${ROOT.connectorRootId}/index-jobs`,
       { method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}' },
@@ -909,7 +741,7 @@ test('an authenticated connector turns an accepted index job into a completed re
     // Durable polling acknowledgement is separately covered; this route test
     // starts at the point where that acknowledgement has committed.
     models.state.jobs[0].status = 'accepted';
-    const connectorHeaders = { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` };
+    const connectorHeaders = { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` };
 
     const started = await json(`${app.url}/api/nas-connectors/control/jobs/${jobId}/index/start`, {
       method: 'POST', headers: connectorHeaders, body: JSON.stringify({ scanId }),
@@ -988,12 +820,8 @@ test('cache completion replays after the share became ready but the entry update
     configOverrides: { cachePrefix: 'nas-cache/' },
   });
   try {
-    const connected = await json(`${app.url}/api/nas-connectors/connect`, {
-      method: 'POST',
-      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
-      body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '1.0.0', root: ROOT }),
-    });
-    const connectorId = connected.body.connector.id;
+    const connector = await connectSharedConnector(app, { agentVersion: '1.0.0' });
+    const connectorId = connector.id;
     const root = models.state.roots[0];
     const fileEntryId = 'a'.repeat(24);
     const fileShareId = 'b'.repeat(24);
@@ -1036,7 +864,7 @@ test('cache completion replays after the share became ready but the entry update
     };
     const request = {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
       body: JSON.stringify({ versionFingerprint: 'version-1', sizeBytes: 42 }),
     };
 
@@ -1059,21 +887,9 @@ test('an authenticated connector applies small relative watcher updates without 
   const models = createInMemoryModels();
   const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
   try {
-    const issued = await json(app.url + '/api/nas-connectors/enrollment-tokens', {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'Office NAS' }),
-    });
-    const enrolled = await json(app.url + '/api/nas-connectors/enroll', {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: issued.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    const connectorId = enrolled.body.connector.id;
-    const headers = { authorization: 'Connector ' + connectorId + '.' + DEVICE_SECRET };
+    const connector = await connectSharedConnector(app);
+    const connectorId = connector.id;
+    const headers = { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` };
     const send = (changes) => json(app.url + '/api/nas-connectors/control/catalogue/changes', {
       method: 'POST',
       headers,
@@ -1112,171 +928,24 @@ test('an authenticated connector applies small relative watcher updates without 
   }
 });
 
-test('admin re-enrollment tokens rotate a revoked or offline connector credential and reactivate it', async () => {
-  const models = createInMemoryModels();
-  const app = await startApp({
-    models,
-    requireHttpsMiddleware: (req, res, next) => next(),
-  });
-  try {
-    const initialToken = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'Office NAS' }),
-    });
-    const initialEnrollment = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: initialToken.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    const connectorId = initialEnrollment.body.connector.id;
-    const firstReEnrollmentToken = await json(`${app.url}/api/nas-connectors/${connectorId}/re-enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
-    });
-    assert.equal(firstReEnrollmentToken.response.status, 201);
-    const firstReEnrollmentRecord = models.state.enrollments.at(-1);
-    assert.equal(firstReEnrollmentRecord.purpose, 're_enrollment');
-    assert.equal(firstReEnrollmentRecord.targetConnectorId, connectorId);
-    assert.notEqual(firstReEnrollmentRecord.targetCredentialHash, DEVICE_SECRET);
-
-    const revoked = await json(`${app.url}/api/nas-connectors/${connectorId}/revoke`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
-    });
-    assert.equal(revoked.response.status, 200);
-    assert.equal(models.state.connectors[0].status, 'revoked');
-
-    // Revoking invalidates an unused re-enrollment token, so it cannot undo an
-    // emergency revocation later.
-    const invalidated = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: firstReEnrollmentToken.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: 'b'.repeat(43),
-        agentVersion: '0.1.1',
-        root: ROOT,
-      }),
-    });
-    assert.equal(invalidated.response.status, 401);
-    assert.equal(invalidated.body.code, 'NAS_CONNECTOR_ENROLLMENT_INVALID');
-
-    const recoveryToken = await json(`${app.url}/api/nas-connectors/${connectorId}/re-enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
-    });
-    const rotatedSecret = 'b'.repeat(43);
-
-    // A re-enrollment token must rotate the credential. Submitting the old
-    // secret is rejected without consuming the token, so the operator can
-    // correct the mistake with a fresh pending secret.
-    const oldSecretAttempt = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: recoveryToken.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.1',
-        root: ROOT,
-      }),
-    });
-    assert.equal(oldSecretAttempt.response.status, 401);
-    assert.equal(models.state.enrollments.at(-1).consumedAt, null);
-
-    const reEnrolled = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: recoveryToken.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: rotatedSecret,
-        agentVersion: '0.1.1',
-        root: { ...ROOT, displayName: 'Restored NAS Root' },
-      }),
-    });
-    assert.equal(reEnrolled.response.status, 201);
-    assert.equal(reEnrolled.body.connector.id, connectorId);
-    assert.equal(reEnrolled.body.connector.status, 'active');
-    assert.notEqual(models.state.connectors[0].credentialHash, DEVICE_SECRET);
-    assert.equal(models.state.roots[0].status, 'active');
-    assert.equal(models.state.roots[0].displayName, 'Restored NAS Root');
-
-    // Connector transport now uses the configured shared key, independently
-    // of this retained legacy-token migration test.
-    const invalidSharedKey = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
-      method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${'d'.repeat(43)}` },
-      body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '0.1.1', root: ROOT, state: 'ready', queueLength: 0 }),
-    });
-    assert.equal(invalidSharedKey.response.status, 401);
-
-    const configuredSharedKey = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
-      method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
-      body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '0.1.1', root: ROOT, state: 'ready', queueLength: 0 }),
-    });
-    assert.equal(configuredSharedKey.response.status, 200);
-
-    // An offline connector uses the same re-enrollment flow and returns active.
-    models.state.connectors[0].status = 'offline';
-    const offlineToken = await json(`${app.url}/api/nas-connectors/${connectorId}/re-enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
-    });
-    const offlineSecret = 'c'.repeat(43);
-    const reactivated = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: offlineToken.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: offlineSecret,
-        agentVersion: '0.1.2',
-        root: ROOT,
-      }),
-    });
-    assert.equal(reactivated.response.status, 201);
-    assert.equal(reactivated.body.connector.status, 'active');
-    assert.equal(models.state.connectors[0].status, 'active');
-
-    const recovered = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: offlineToken.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: offlineSecret,
-        agentVersion: '0.1.2',
-        root: ROOT,
-      }),
-    });
-    assert.equal(recovered.response.status, 200);
-    assert.equal(recovered.body.connector.id, connectorId);
-    assert.equal(models.state.connectors.length, 1);
-  } finally {
-    await close(app.server);
-  }
-});
-
-test('admin list is protected and invalid enrollment input does not consume a token', async () => {
+test('admin list remains protected and retired enrollment routes are absent', async () => {
   const models = createInMemoryModels();
   const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
   try {
     const denied = await json(`${app.url}/api/nas-connectors`, { headers: { authorization: 'Bearer regular' } });
     assert.equal(denied.response.status, 403);
 
-    const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'NAS' }),
-    });
-    const invalid = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: issued.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: 'too-short',
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    assert.equal(invalid.response.status, 400);
-    assert.equal(models.state.enrollments[0].consumedAt, null);
+    const retiredPaths = [
+      '/api/nas-connectors/enrollment-tokens',
+      '/api/nas-connectors/enroll',
+      `/api/nas-connectors/${'1'.repeat(24)}/re-enrollment-tokens`,
+    ];
+    for (const path of retiredPaths) {
+      const response = await fetch(`${app.url}${path}`, {
+        method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
+      });
+      assert.equal(response.status, 404);
+    }
 
     const list = await json(`${app.url}/api/nas-connectors`, { headers: { authorization: 'Bearer admin' } });
     assert.equal(list.response.status, 200);
@@ -1286,11 +955,11 @@ test('admin list is protected and invalid enrollment input does not consume a to
   }
 });
 
-test('default connector transport guard refuses non-HTTPS enrollment requests', async () => {
+test('default connector transport guard refuses non-HTTPS connection requests', async () => {
   const models = createInMemoryModels();
   const app = await startApp({ models });
   try {
-    const response = await json(`${app.url}/api/nas-connectors/enroll`, { method: 'POST', body: '{}' });
+    const response = await json(`${app.url}/api/nas-connectors/connect`, { method: 'POST', body: '{}' });
     assert.equal(response.response.status, 400);
     assert.equal(response.body.code, 'NAS_CONNECTOR_HTTPS_REQUIRED');
   } finally {
@@ -1302,8 +971,8 @@ test('an explicitly private HTTP connector setting bypasses only the transport g
   const models = createInMemoryModels();
   const app = await startApp({ models, configOverrides: { allowInsecureHttp: true } });
   try {
-    const response = await json(`${app.url}/api/nas-connectors/enroll`, { method: 'POST', body: '{}' });
-    assert.equal(response.response.status, 400);
+    const response = await json(`${app.url}/api/nas-connectors/connect`, { method: 'POST', body: '{}' });
+    assert.equal(response.response.status, 401);
     assert.notEqual(response.body.code, 'NAS_CONNECTOR_HTTPS_REQUIRED');
   } finally {
     await close(app.server);

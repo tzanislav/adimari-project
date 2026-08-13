@@ -625,7 +625,7 @@ function NasFileBrowser() {
             NAS root
             <select value={rootId} onChange={(event) => selectRoot(event.target.value)} disabled={!roots.length}>
               {!roots.length && <option value="">No indexed NAS roots are available</option>}
-              {roots.map((root) => <option key={root.id} value={root.id}>{root.name}{root.status === 'offline' ? ' (connector offline)' : ''}</option>)}
+              {roots.map((root) => <option key={root.id} value={root.id}>{root.name}{root.availability === 'offline' ? ' (connector offline)' : ''}</option>)}
             </select>
           </label>
           <form className="file-server-new-folder" onSubmit={(event) => void runSearch(event)}>
@@ -638,7 +638,7 @@ function NasFileBrowser() {
 
       {activeRoot && (
         <p className="file-server-muted">
-          {activeRoot.status === 'offline' ? 'The connector is offline; the catalogue may not reflect recent NAS changes.' : 'Catalogue is connected to the NAS.'}
+          {activeRoot.availability === 'offline' ? 'The connector is offline; the catalogue may not reflect recent NAS changes.' : 'Catalogue is connected to the NAS.'}
           {' Last full scan: '}{formatDate(activeRoot.lastFullScanAt)}.
         </p>
       )}

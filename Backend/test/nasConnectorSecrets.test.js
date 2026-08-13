@@ -6,38 +6,20 @@ const test = require('node:test');
 const {
   BASE64URL_256_BIT_PATTERN,
   NasConnectorSecretError,
-  createDeviceSecret,
-  createEnrollmentToken,
-  hashDeviceSecret,
-  hashEnrollmentToken,
-  normalizeDeviceSecret,
-  verifyDeviceSecret,
+  normalizeSharedSecret,
+  verifySharedSecret,
 } = require('../services/nasConnectorSecrets');
 
-const HMAC_SECRET = 'this-is-a-long-test-only-connector-hmac-secret';
+const SHARED_ACCESS_KEY = 'Z2VuZXJhdGVkLWRldmljZS1zZWNyZXQtMzItYnl0ZXM';
 
-test('NAS connector tokens and device secrets have 256 bits of random base64url material', () => {
-  const first = createEnrollmentToken(HMAC_SECRET);
-  const second = createEnrollmentToken(HMAC_SECRET);
-  const deviceSecret = createDeviceSecret();
-
-  assert.match(first.token, /^nce1_[A-Za-z0-9_-]{43}$/);
-  assert.notEqual(first.token, second.token);
-  assert.equal(first.tokenHash, hashEnrollmentToken(first.token, HMAC_SECRET));
-  assert.match(deviceSecret, BASE64URL_256_BIT_PATTERN);
-  assert.equal(normalizeDeviceSecret(deviceSecret), deviceSecret);
+test('a shared connector key must be exactly 32 bytes of base64url material', () => {
+  assert.match(SHARED_ACCESS_KEY, BASE64URL_256_BIT_PATTERN);
+  assert.equal(normalizeSharedSecret(SHARED_ACCESS_KEY), SHARED_ACCESS_KEY);
+  assert.throws(() => normalizeSharedSecret('not-a-shared-key'), NasConnectorSecretError);
 });
 
-test('connector credential comparison rejects malformed or incorrect device secrets without exposing them', () => {
-  const deviceSecret = createDeviceSecret();
-  const hash = hashDeviceSecret(deviceSecret, HMAC_SECRET);
-
-  assert.equal(verifyDeviceSecret({ deviceSecret, expectedHash: hash, hmacSecret: HMAC_SECRET }), true);
-  assert.equal(verifyDeviceSecret({
-    deviceSecret: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    expectedHash: hash,
-    hmacSecret: HMAC_SECRET,
-  }), false);
-  assert.equal(verifyDeviceSecret({ deviceSecret: 'not-a-secret', expectedHash: hash, hmacSecret: HMAC_SECRET }), false);
-  assert.throws(() => normalizeDeviceSecret('not-a-secret'), NasConnectorSecretError);
+test('shared connector-key comparison accepts only the configured key', () => {
+  assert.equal(verifySharedSecret({ sharedSecret: SHARED_ACCESS_KEY, expectedSecret: SHARED_ACCESS_KEY }), true);
+  assert.equal(verifySharedSecret({ sharedSecret: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', expectedSecret: SHARED_ACCESS_KEY }), false);
+  assert.equal(verifySharedSecret({ sharedSecret: 'not-a-shared-key', expectedSecret: SHARED_ACCESS_KEY }), false);
 });

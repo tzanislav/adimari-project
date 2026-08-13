@@ -36,8 +36,8 @@ The audit found five issues to fix before extending the feature set:
    non-idempotent order. A partial failure can leave the share ready while its
    job remains permanently in progress.
 
-The largest safe simplification is to remove the unused legacy enrollment-token
-mode. A second, larger simplification is to replace the custom persistent WSS
+The largest safe simplification was removing the unused legacy enrollment-token
+mode. A second, larger simplification was replacing the custom persistent WSS
 delivery channel with authenticated HTTPS long polling. For this installation
 size, that would preserve the outbound-only design while removing most session,
 ping, message-correlation, and in-memory delivery-target machinery.
@@ -373,8 +373,8 @@ the testing plan below.
 
 ### P2.1 — Remove the legacy enrollment-token system if no deployed client uses it
 
-The active Connector uses one manually distributed shared key. The repository
-still contains the older token/device-secret system:
+At audit time, the active Connector used one manually distributed shared key,
+but the repository still contained the older token/device-secret system:
 
 - enrollment-token model and TTL/recovery workflow;
 - issue, redeem, recovery, and re-enrollment routes;
@@ -382,11 +382,12 @@ still contains the older token/device-secret system:
 - Connector pending-device-secret state and unused `EnrollAsync` client;
 - extensive token-specific tests and documentation.
 
-This is the largest low-risk deletion available, provided deployment inventory
-confirms there is no older Connector. Remove it as one explicit compatibility
-breaking change. With shared-key-only authentication, rename `DeviceSecret` and
-`EnrollmentToken` fields to `SharedAccessKey` at the next local IPC/state schema
-version.
+The coordinated removal is complete: the token model, routes, rate limiter,
+HMAC configuration, credential-hash field, secret helpers, client call,
+Control Center contract/UI terms, tests, and API/deployment documentation were
+removed together. Local IPC now uses version 2 and the `SharedAccessKey` /
+connection vocabulary. The historical MongoDB collection is left untouched by
+the application and has an explicit planned-maintenance cleanup note.
 
 The shared key should still be compared in constant time, stored with DPAPI on
 Windows, excluded from logs, and sent only over the approved transport.
@@ -660,8 +661,8 @@ immediately afterward.
 - **Phase 2:** completed with regression coverage for the repaired queue and
   delivery paths.
 - **Phase 3:** storage construction/configuration normalization is complete.
-  Legacy enrollment-token removal remains intentionally deferred until the
-  deployment inventory confirms no old Connector installation needs it.
+  Legacy enrollment-token/device-secret compatibility was removed in the
+  coordinated shared-key release, including the local IPC contract update.
 - **Phase 4:** completed. A single Connector job runner dispatches durable
   jobs to type-specific handlers, and HTTPS delivery is isolated in its own
   Connector client instead of the general agent client.

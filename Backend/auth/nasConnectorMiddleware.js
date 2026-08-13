@@ -41,16 +41,11 @@ const authenticateConnectorAuthorization = async ({
   if (!parsed || !verifySharedSecret({ sharedSecret: parsed.sharedSecret, expectedSecret: sharedSecret })) return null;
 
   try {
-    // The credential hash is hidden by the Mongoose schema by default, so
-    // select it only for this server-side authentication result; it is never
-    // serialized.
     const query = NasConnectorModel.findOne({
       _id: parsed.connectorId,
       status: { $in: ['active', 'offline'] },
     });
-    const connector = query && typeof query.select === 'function'
-      ? await query.select('+credentialHash')
-      : await query;
+    const connector = await query;
 
     if (!connector) {
       return null;

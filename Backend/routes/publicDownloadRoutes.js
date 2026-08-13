@@ -15,7 +15,7 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
   const config = dependencies.config || getFileServerConfig();
   const storage = dependencies.storage || createFileStorageService({ config });
   const nasConfig = dependencies.nasConfig || null;
-  let cacheStorage = dependencies.cacheStorage || null;
+  let cacheStorage = dependencies.cacheStorage || dependencies.storageSet?.cache || null;
   const FileShareModel = dependencies.FileShareModel || FileShare;
   const NasFileEntryModel = dependencies.NasFileEntryModel || NasFileEntry;
   const FileAuditEventModel = dependencies.FileAuditEventModel || FileAuditEvent;

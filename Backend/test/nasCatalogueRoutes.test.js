@@ -407,6 +407,21 @@ test('a browser upload stages privately then queues one opaque NAS-write job', a
     jobQueue: {},
   });
   try {
+    const invalidName = await fetch(app.url + '/api/nas-catalogue/roots/' + ROOT_ID + '/uploads', {
+      method: 'POST',
+      headers: { authorization: 'Bearer moderator', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        parentPath: 'Design',
+        fileName: 'CON.txt',
+        sizeBytes: 7,
+        contentType: 'text/plain',
+      }),
+    });
+    assert.equal(invalidName.status, 400);
+    assert.equal((await invalidName.json()).code, 'NAS_UPLOAD_FILE_NAME_INVALID');
+    assert.deepEqual(storageCalls, []);
+    assert.equal(jobs.length, 0);
+
     const start = await fetch(app.url + '/api/nas-catalogue/roots/' + ROOT_ID + '/uploads', {
       method: 'POST',
       headers: { authorization: 'Bearer moderator', 'content-type': 'application/json' },

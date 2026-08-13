@@ -52,14 +52,6 @@ const optionalInteger = (environment, key, { min, max, defaultValue }) => {
   return value;
 };
 
-const requiredSecret = (environment, key) => {
-  const value = requiredString(environment, key);
-  if (Buffer.byteLength(value, 'utf8') < 32) {
-    throw new NasConnectorConfigurationError(`${key} must be at least 32 bytes long.`);
-  }
-  return value;
-};
-
 const requiredSharedSecret = (environment, key) => {
   const value = requiredString(environment, key);
   if (!/^[A-Za-z0-9_-]{43}$/.test(value)) {
@@ -128,25 +120,9 @@ const createNasConnectorConfig = (environment = process.env) => {
       min: 1,
       max: MAX_PRESIGNED_URL_TTL_SECONDS,
     }),
-    authHmacSecret: requiredSecret(environment, 'NAS_CONNECTOR_AUTH_HMAC_SECRET'),
     // A small trusted deployment intentionally uses one manually distributed
-    // connector key instead of enrollment tokens and per-device rotation.
+    // connector key for every Connector request.
     sharedSecret: requiredSharedSecret(environment, 'NAS_CONNECTOR_SHARED_SECRET'),
-    // Legacy token routes remain available only for an older connector during
-    // migration. The shared-key flow does not require either token setting.
-    enrollmentTokenTtlSeconds: optionalInteger(environment, 'NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS', {
-      min: 60,
-      max: 24 * 60 * 60,
-      defaultValue: 900,
-    }),
-    // A consumed token is retained briefly only to let the same Service recover
-    // after a lost 2xx response. This never extends the token's redemption
-    // deadline, which remains enrollmentTokenTtlSeconds.
-    enrollmentRecoveryTtlSeconds: optionalInteger(environment, 'NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS', {
-      min: 60,
-      max: 7 * 24 * 60 * 60,
-      defaultValue: 60 * 60,
-    }),
     heartbeatIntervalSeconds,
     heartbeatStaleAfterSeconds,
     // A short DB-backed lease governs safe HTTPS-poll replay when an

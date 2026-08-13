@@ -151,13 +151,9 @@ NAS_CONNECTOR_THUMBNAIL_MAX_DIMENSION=320
 NAS_CONNECTOR_MAX_UPLOAD_BYTES=50000000000000
 NAS_CONNECTOR_BROWSER_UPLOAD_URL_TTL_SECONDS=900
 NAS_CONNECTOR_TRANSFER_URL_TTL_SECONDS=3600
-NAS_CONNECTOR_AUTH_HMAC_SECRET=<backend-only random secret, at least 32 bytes>
 # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 # Enter this same value once in each trusted Connector Control Center.
 NAS_CONNECTOR_SHARED_SECRET=<43-character base64url shared connector key>
-# Optional legacy-token compatibility only; the shared-key connector does not use them.
-# NAS_CONNECTOR_ENROLLMENT_TOKEN_TTL_SECONDS=900
-# NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS=3600
 NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS=30
 NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS=90
 NAS_CONNECTOR_JOB_LEASE_SECONDS=90
@@ -177,9 +173,13 @@ retention setting is also intentionally fixed to the S3 lifecycle rule below.
 
 Use a secret manager or a locally generated secret; do not put a generated
 value in source control, the Vite frontend, a publish package, or an operator
-ticket. Preserve `NAS_CONNECTOR_AUTH_HMAC_SECRET` across ordinary releases.
-If `NAS_CONNECTOR_SHARED_SECRET` is rotated, update the server first, then enter
+ticket. If `NAS_CONNECTOR_SHARED_SECRET` is rotated, update the server first, then enter
 the new value in each trusted Control Center and click **Connect connector**.
+
+Deploy the Connector service and Control Center together for this cleanup
+release because their local pipe contract is version 2. An existing
+DPAPI-protected shared key is read from the prior local state shape, so a key
+does not need to be re-entered unless it is intentionally rotated or rejected.
 
 The code accepts either a dedicated NAS backend IAM role or a pair of
 `NAS_CONNECTOR_AWS_ACCESS_KEY_ID` and `NAS_CONNECTOR_AWS_SECRET_ACCESS_KEY`.
@@ -225,33 +225,22 @@ before attachment. It deliberately grants no access to `files/` and no
 `s3:PutObjectAcl` permission. The backend creates a scoped pre-signed PUT URL
 for each cache object; the Windows connector needs no AWS IAM user or key.
 
-## 4. MongoDB rollout check
+## 4. Retired enrollment data cleanup
 
-Fresh Phase 2A databases receive a TTL index on
-`nas_enrollment_tokens.recoveryExpiresAt`. If any early connector deployment
-created the older TTL index on `expiresAt`, inspect the production database
-before relying on lost-response enrollment recovery:
+This release removes the enrollment-token API and model. After the backend and
+all trusted Windows Connectors have been updated and reconnected with the
+shared access key, the historical `nas_enrollment_tokens` MongoDB collection is
+unused.
+
+Do not delete it during application deployment. In a planned maintenance
+window, take the normal database backup, confirm that no old Connector is still
+calling the removed routes, then remove the collection if the historical data
+is no longer required:
 
 ```javascript
 use your_database_name
-db.nas_enrollment_tokens.getIndexes()
+db.nas_enrollment_tokens.drop()
 ```
-
-Only if inspection shows a TTL index exactly like
-`{ name: "expiresAt_1", key: { expiresAt: 1 }, expireAfterSeconds: 0 }`, make a
-planned migration:
-
-```javascript
-db.nas_enrollment_tokens.dropIndex("expiresAt_1")
-db.nas_enrollment_tokens.createIndex(
-  { recoveryExpiresAt: 1 },
-  { name: "recoveryExpiresAt_1", expireAfterSeconds: 0 }
-)
-```
-
-Do not drop any differently named or non-TTL index merely because it contains
-`expiresAt`. The TTL monitor is periodic, so it may remove expired documents a
-short time after their expiry timestamp.
 
 ## 5. Deploy and validate the backend
 
@@ -307,7 +296,7 @@ After deployment, use one small, non-critical folder for a practical check:
 1. Confirm the public HTTPS origin works and that the host does **not** expose
    TCP 5001, SMB, MongoDB, or the S3 bucket.
 2. In the Control Center, confirm **Service**, **Web server**, **Connector access**,
-   **Last heartbeat**, and **Live control channel** are healthy. In **NAS
+   **Last heartbeat**, and **Job polling** are healthy. In **NAS
    Connectors**, confirm the installation is active and recently seen.
 3. Browse and search a folder; test one uncached Open/Download, an image
    thumbnail/lightbox, one NAS file create/change/delete, and one browser
@@ -427,7 +416,10 @@ Use `-KeepPreviousPackages 1` when disk space requires a single rollback
 package; the installer intentionally permits only one or two. It removes only
 the exact randomly named staging directory created by a failed run, keeps a
 failed installed package for inspection, and prunes older successful previous
-packages only after the updated service has remained Running for 10 seconds.
+packages only after the updated service has remained Running for 10 seconds
+and answered a bounded, read-only local status-pipe request. If `-Start` is
+omitted, it keeps every existing rollback package. Backend heartbeat remains an
+operator post-install check and is not required for local package recovery.
 
 Preview its planned change first with `-WhatIf`. The helper intentionally does
 not grant **Log on as a service**, alter remote NAS ACLs, change an existing
