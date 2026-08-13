@@ -165,6 +165,9 @@ const createNasConnectorConfig = (environment = process.env) => {
     // HTTPS remains the normal deployment. This explicit switch exists for a
     // small trusted/local installation that deliberately prefers plain HTTP.
     allowInsecureHttp: optionalBoolean(environment, 'NAS_CONNECTOR_ALLOW_HTTP', false),
+    // This destructive reset endpoint exists only for disposable development
+    // environments. Production deployments must leave it disabled.
+    developmentResetEnabled: optionalBoolean(environment, 'NAS_CONNECTOR_DEVELOPMENT_RESET_ENABLED', false),
   };
 
   if (config.region !== fileServerConfig.region || config.bucketName !== fileServerConfig.bucketName) {

@@ -177,7 +177,7 @@ ticket. If `NAS_CONNECTOR_SHARED_SECRET` is rotated, update the server first, th
 the new value in each trusted Control Center and click **Connect connector**.
 
 Deploy the Connector service and Control Center together for this cleanup
-release because their local pipe contract is version 2. An existing
+release because their local pipe contract is version 3. An existing
 DPAPI-protected shared key is read from the prior local state shape, so a key
 does not need to be re-entered unless it is intentionally rotated or rejected.
 

@@ -357,6 +357,40 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
       return send(new DeleteObjectCommand({ Bucket: config.bucketName, Key: managedS3Key }));
     },
 
+    // Reserved for an explicitly enabled development reset. This is not
+    // exposed through browser-facing routes and clears only this service's
+    // already-isolated managed prefix.
+    async deleteAllManagedFiles() {
+      const prefix = config.prefix;
+      let continuationToken;
+      let deletedCount = 0;
+      do {
+        const result = await send(new ListObjectsV2Command({
+          Bucket: config.bucketName,
+          Prefix: prefix,
+          MaxKeys: 1_000,
+          ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+        }));
+        const objects = (result.Contents || []).filter(({ Key }) => Key && Key.startsWith(prefix));
+        if (objects.length) {
+          const deletion = await send(new DeleteObjectsCommand({
+            Bucket: config.bucketName,
+            Delete: { Objects: objects.map(({ Key }) => ({ Key })), Quiet: true },
+          }));
+          if (deletion.Errors?.length) {
+            throw new FileStorageError({
+              code: 'FILE_PREFIX_DELETE_INCOMPLETE',
+              message: 'Some managed objects could not be deleted.',
+              status: 502,
+            });
+          }
+          deletedCount += objects.length;
+        }
+        continuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+      } while (continuationToken);
+      return { prefix, deletedCount };
+    },
+
     async deleteFolder({ folder } = {}) {
       const normalizedFolder = normalizeFolderPath(folder);
       if (!normalizedFolder) {

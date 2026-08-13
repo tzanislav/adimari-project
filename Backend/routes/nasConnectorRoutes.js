@@ -1320,6 +1320,52 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     }
   });
 
+  // This is deliberately unavailable unless an operator explicitly enables it
+  // in a disposable environment. It clears only the authenticated connector's
+  // backend state. Because object prefixes are deployment-wide, it also clears
+  // every temporary NAS object in those prefixes. It never accesses NAS source
+  // files.
+  router.post('/control/reset-all', requireHttpsMiddleware, connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      if (config.developmentResetEnabled !== true) {
+        throw new NasConnectorApiError({
+          code: 'NAS_CONNECTOR_DEVELOPMENT_RESET_DISABLED',
+          message: 'Development reset is disabled.',
+          status: 404,
+        });
+      }
+
+      const connectorId = connectorIdOf(req.connector);
+      const roots = await queryAsPlainArray(NasStorageRootModel.find({ connectorId }));
+      const rootIds = roots.map((root) => root._id || root.id);
+      const entries = rootIds.length
+        ? await queryAsPlainArray(NasFileEntryModel.find({ storageRootId: { $in: rootIds } }))
+        : [];
+      const entryIds = entries.map((entry) => entry._id || entry.id);
+      const shares = entryIds.length
+        ? await queryAsPlainArray(FileShareModel.find({ sourceType: 'nas_file', nasFileEntryId: { $in: entryIds } }))
+        : [];
+
+      await Promise.all([
+        getCacheStorage().deleteAllManagedFiles(),
+        getThumbnailStorage().deleteAllManagedFiles(),
+        getStagingStorage().deleteAllManagedFiles(),
+      ]);
+
+      await Promise.all([
+        NasTransferJobModel.deleteMany({ connectorId }),
+        rootIds.length ? NasFileEntryModel.deleteMany({ storageRootId: { $in: rootIds } }) : Promise.resolve(),
+        entryIds.length ? FileShareModel.deleteMany({ sourceType: 'nas_file', nasFileEntryId: { $in: entryIds } }) : Promise.resolve(),
+        NasStorageRootModel.deleteMany({ connectorId }),
+        NasConnectorModel.deleteOne({ _id: connectorId }),
+      ]);
+
+      return res.status(204).end();
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
   router.post('/control/heartbeat', heartbeatLimiter, connectorAuthenticateMiddleware, async (req, res) => {
     try {
       const request = normalizeHeartbeatRequest(req.body);
