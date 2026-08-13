@@ -7,6 +7,8 @@ const apiBase = `${serverUrl}/api/nas-catalogue`;
 
 const UPLOAD_URL_BATCH_SIZE = 20;
 const UPLOAD_CONCURRENCY = 3;
+const MIN_IMAGE_ZOOM = 1;
+const MAX_IMAGE_ZOOM = 5;
 
 class NasCatalogueApiError extends Error {
   constructor(message) {
@@ -50,6 +52,54 @@ const formatBytes = (value) => {
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString() : '—');
 
+const getFileExtension = (fileName) => {
+  const lastDot = fileName.lastIndexOf('.');
+  if (lastDot <= 0 || lastDot === fileName.length - 1) return 'file';
+  return fileName.slice(lastDot + 1).toLowerCase();
+};
+
+const getFileIconUrl = (entry) => {
+  const iconName = entry.entryType === 'folder' ? 'folder' : getFileExtension(entry.name);
+  return `/File%20Icons/${encodeURIComponent(iconName)}.png`;
+};
+
+const getFileIconFallbackUrl = (entry) => (
+  entry.entryType === 'file' && getFileExtension(entry.name) !== 'file'
+    ? '/File%20Icons/file.png'
+    : ''
+);
+
+const renderNasEntryIcon = (entry) => (
+  <span className="nas-entry-icon" aria-hidden="true">
+    <span className="nas-entry-icon-fallback" />
+    <img
+      className="nas-entry-icon-image"
+      src={getFileIconUrl(entry)}
+      alt=""
+      data-fallback-src={getFileIconFallbackUrl(entry)}
+      onLoad={(event) => { event.currentTarget.previousElementSibling.hidden = true; }}
+      onError={(event) => {
+        const image = event.currentTarget;
+        const fallbackSrc = image.dataset.fallbackSrc;
+        if (fallbackSrc && !image.dataset.usedFallback) {
+          image.dataset.usedFallback = 'true';
+          image.src = fallbackSrc;
+          return;
+        }
+        image.style.display = 'none';
+      }}
+    />
+  </span>
+);
+
+const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
+
+const clampImagePosition = ({ x, y, scale }, viewport) => ({
+  x: clamp(x, viewport.width * (1 - scale), 0),
+  y: clamp(y, viewport.height * (1 - scale), 0),
+  scale,
+});
+
 function NasFileBrowser() {
   const [roots, setRoots] = useState([]);
   const [rootId, setRootId] = useState('');
@@ -69,6 +119,9 @@ function NasFileBrowser() {
   const [thumbnails, setThumbnails] = useState({});
   const [uploadState, setUploadState] = useState(null);
   const fileInputRef = useRef(null);
+  const imageViewportRef = useRef(null);
+  const imageDragRef = useRef(null);
+  const [imageView, setImageView] = useState({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
 
   const activeRoot = useMemo(
     () => roots.find((root) => root.id === rootId) || listing.root || null,
@@ -538,6 +591,73 @@ function NasFileBrowser() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [lightbox]);
 
+  useEffect(() => {
+    if (!lightbox) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [lightbox]);
+
+  useEffect(() => {
+    imageDragRef.current = null;
+    setImageView({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
+  }, [lightbox?.entry.id]);
+
+  const zoomImageAtPointer = (event) => {
+    event.stopPropagation();
+    const viewport = imageViewportRef.current?.getBoundingClientRect();
+    if (!viewport) return;
+
+    const pointerX = event.clientX - viewport.left;
+    const pointerY = event.clientY - viewport.top;
+    const zoomFactor = Math.exp(-event.deltaY * 0.0015);
+    setImageView((current) => {
+      const scale = clamp(current.scale * zoomFactor, MIN_IMAGE_ZOOM, MAX_IMAGE_ZOOM);
+      const scaleChange = scale / current.scale;
+      return clampImagePosition({
+        x: pointerX - ((pointerX - current.x) * scaleChange),
+        y: pointerY - ((pointerY - current.y) * scaleChange),
+        scale,
+      }, viewport);
+    });
+  };
+
+  const beginImagePan = (event) => {
+    event.stopPropagation();
+    if (imageView.scale <= MIN_IMAGE_ZOOM) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    imageDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: imageView.x,
+      originY: imageView.y,
+    };
+  };
+
+  const panImage = (event) => {
+    const drag = imageDragRef.current;
+    const viewport = imageViewportRef.current?.getBoundingClientRect();
+    if (!drag || drag.pointerId !== event.pointerId || !viewport) return;
+    event.preventDefault();
+    setImageView((current) => clampImagePosition({
+      x: drag.originX + event.clientX - drag.startX,
+      y: drag.originY + event.clientY - drag.startY,
+      scale: current.scale,
+    }, viewport));
+  };
+
+  const endImagePan = (event) => {
+    if (imageDragRef.current?.pointerId !== event.pointerId) return;
+    imageDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   const breadcrumbs = folder ? folder.split('/') : [];
   const visibleEntries = searchState ? searchState.entries : listing.entries;
 
@@ -668,7 +788,8 @@ function NasFileBrowser() {
               <article className={`file-server-row ${entry.entryType === 'folder' ? 'folder' : ''}`} key={entry.id}>
                 {entry.entryType === 'folder' ? (
                   <button className="file-server-name-button" onClick={() => setFolder(entry.relativePath)}>
-                    <span aria-hidden="true">▸</span> {entry.name}
+                    {renderNasEntryIcon(entry)}
+                    <span className="file-server-file-name">{entry.name}</span>
                   </button>
                 ) : (
                   <div className="nas-file-name-cell">
@@ -677,7 +798,8 @@ function NasFileBrowser() {
                         ? <img className="nas-file-thumbnail" src={thumbnails[entry.id].url} alt="" />
                         : <span className="nas-file-thumbnail placeholder" aria-label="Thumbnail preparing">Image</span>
                     )}
-                  <div className="file-server-file-name"><span aria-hidden="true">◻</span> {entry.name}</div>
+                    {entry.previewKind !== 'image' && renderNasEntryIcon(entry)}
+                    <div className="file-server-file-name">{entry.name}</div>
                   </div>
                 )}
                 <span>{entry.entryType === 'folder' ? 'Folder' : formatBytes(entry.sizeBytes)}</span>
@@ -730,16 +852,28 @@ function NasFileBrowser() {
       {lightbox && (
         <section className="nas-image-lightbox" role="dialog" aria-modal="true" aria-label={`Image preview: ${lightbox.entry.name}`}>
           <header className="nas-image-lightbox-header">
-            <span className="nas-image-lightbox-title">{lightbox.entry.name}</span>
             <div className="nas-image-lightbox-actions">
               <button className="nas-image-icon-button" type="button" onClick={downloadLightboxImage} title="Download image" aria-label="Download image">&#8595;</button>
               <button className="nas-image-icon-button" type="button" onClick={closeLightbox} autoFocus title="Close image viewer" aria-label="Close image viewer">&#215;</button>
             </div>
           </header>
-          <div className="nas-image-lightbox-content">
+          <div className="nas-image-lightbox-content" ref={imageViewportRef} onClick={closeLightbox}>
             {lightbox.loading && <p className="nas-image-lightbox-loading" role="status">{lightbox.loadingLabel || 'Loading image...'}</p>}
             {lightbox.error && <p className="nas-image-lightbox-error" role="alert">{lightbox.error}</p>}
-            {!lightbox.error && lightbox.imageUrl && <img src={lightbox.imageUrl} alt={lightbox.entry.name} />}
+            {!lightbox.error && lightbox.imageUrl && (
+              <img
+                className="nas-image-lightbox-image"
+                src={lightbox.imageUrl}
+                alt={lightbox.entry.name}
+                style={{ transform: `translate3d(${imageView.x}px, ${imageView.y}px, 0) scale(${imageView.scale})` }}
+                onWheel={zoomImageAtPointer}
+                onPointerDown={beginImagePan}
+                onPointerMove={panImage}
+                onPointerUp={endImagePan}
+                onPointerCancel={endImagePan}
+                onClick={(event) => event.stopPropagation()}
+              />
+            )}
           </div>
           <footer className="nas-image-lightbox-nav">
             <button type="button" onClick={() => void openImageLightbox(lightbox.previous)} disabled={!lightbox.previous || lightbox.loading}>Previous</button>
