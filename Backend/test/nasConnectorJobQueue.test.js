@@ -166,6 +166,51 @@ test('persists an index-root assignment before accepting its acknowledgement and
   unregister();
 });
 
+test('recovers an abandoned accepted job and prioritizes a requested file delivery', async () => {
+  const model = createJobModel();
+  const currentTime = new Date('2026-08-13T00:10:00.000Z');
+  const queue = new NasConnectorJobQueue({
+    NasTransferJobModel: model,
+    leaseSeconds: 15,
+    acceptedJobTimeoutSeconds: 120,
+    now: () => new Date(currentTime),
+    createDeliveryId: () => deliveryUuid(1),
+  });
+
+  const abandoned = await model.create({
+    type: 'generate_thumbnail',
+    status: 'accepted',
+    connectorId: CONNECTOR_ID,
+    storageRootId: STORAGE_ROOT_ID,
+    connectorRootId: ROOT_ID,
+    payload: { fileEntryId: 'a'.repeat(24) },
+    acceptedAt: new Date(currentTime.getTime() - (5 * 60 * 1000)),
+    deliveryId: deliveryUuid(99),
+  });
+  const requested = await model.create({
+    type: 'cache_for_download',
+    status: 'queued',
+    connectorId: CONNECTOR_ID,
+    storageRootId: STORAGE_ROOT_ID,
+    connectorRootId: ROOT_ID,
+    payload: { fileEntryId: 'b'.repeat(24), fileShareId: 'c'.repeat(24) },
+  });
+
+  const assignments = [];
+  const unregister = queue.registerDeliveryTarget(CONNECTOR_ID, async (assignment) => {
+    assignments.push(assignment);
+    return deliveryUuid(101);
+  });
+  await queue.requestDispatch(CONNECTOR_ID);
+
+  assert.equal(abandoned.status, 'queued');
+  assert.equal(abandoned.acceptedAt, null);
+  assert.equal(assignments.length, 1);
+  assert.equal(assignments[0].jobId, requested._id);
+  assert.equal(assignments[0].jobType, 'cache_for_download');
+  unregister();
+});
+
 test('an expired delivery receives a new lease and an old acknowledgement cannot change it', async () => {
   const model = createJobModel();
   let currentTime = new Date('2026-08-12T12:00:00.000Z');

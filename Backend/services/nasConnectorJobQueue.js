@@ -18,6 +18,15 @@ const DELIVERABLE_JOB_TYPES = Object.freeze([
   GENERATE_THUMBNAIL_JOB_TYPE,
   WRITE_UPLOAD_TO_NAS_JOB_TYPE,
 ]);
+// A person waiting to open/download a file should never sit behind a large
+// background thumbnail backlog. The connector still processes one job at a
+// time; this only decides which queued job gets that next slot.
+const DELIVERY_PRIORITY = Object.freeze([
+  CACHE_FOR_DOWNLOAD_JOB_TYPE,
+  WRITE_UPLOAD_TO_NAS_JOB_TYPE,
+  GENERATE_THUMBNAIL_JOB_TYPE,
+  INDEX_ROOT_JOB_TYPE,
+]);
 const ACTIVE_JOB_STATUSES = Object.freeze(['queued', 'assigned', 'accepted']);
 // A thumbnail browser request polls while the connector is generating the
 // image. Treat that running job as active too, otherwise a second poll races
@@ -139,6 +148,7 @@ class NasConnectorJobQueue {
   constructor({
     NasTransferJobModel,
     leaseSeconds = 90,
+    acceptedJobTimeoutSeconds = 120,
     now = () => new Date(),
     createDeliveryId = () => crypto.randomUUID(),
     resolveDeliveryTarget = null,
@@ -149,9 +159,13 @@ class NasConnectorJobQueue {
     if (!Number.isSafeInteger(leaseSeconds) || leaseSeconds < 15 || leaseSeconds > 600) {
       throw new Error('NAS connector job queue lease must be between 15 and 600 seconds.');
     }
+    if (!Number.isSafeInteger(acceptedJobTimeoutSeconds) || acceptedJobTimeoutSeconds < 30 || acceptedJobTimeoutSeconds > 3_600) {
+      throw new Error('NAS connector accepted-job timeout must be between 30 and 3600 seconds.');
+    }
 
     this.NasTransferJobModel = NasTransferJobModel;
     this.leaseSeconds = leaseSeconds;
+    this.acceptedJobTimeoutSeconds = acceptedJobTimeoutSeconds;
     this.now = now;
     this.createDeliveryId = createDeliveryId;
     this.resolveDeliveryTarget = typeof resolveDeliveryTarget === 'function'
@@ -626,6 +640,33 @@ class NasConnectorJobQueue {
     }));
     if (activeLease) return activeLease;
 
+    // Persisting the acknowledgement before execution protects against a
+    // lost socket frame. A service crash in the small gap immediately after
+    // that acknowledgement used to leave the job "accepted" forever, which
+    // blocked every later delivery. Workers change to in_progress before
+    // doing real work, so an old accepted state is safe to retry.
+    const acceptedBefore = new Date(now.getTime() - (this.acceptedJobTimeoutSeconds * 1000));
+    const recovered = await this.NasTransferJobModel.updateMany(
+      {
+        connectorId: key,
+        type: { $in: DELIVERABLE_JOB_TYPES },
+        status: 'accepted',
+        acceptedAt: { $lte: acceptedBefore },
+      },
+      {
+        $set: {
+          status: 'queued',
+          deliveryId: null,
+          leaseExpiresAt: null,
+          assignedAt: null,
+          acceptedAt: null,
+        },
+      },
+    );
+    if (recovered?.matchedCount) {
+      traceIndex('recovered_abandoned_accepted_jobs', { connectorId: key, count: recovered.matchedCount });
+    }
+
     // The connector deliberately owns one serial local queue.  Do not assign
     // the next job while it has already accepted or is executing one; its
     // completion endpoint explicitly requests the next durable dispatch.
@@ -658,24 +699,31 @@ class NasConnectorJobQueue {
       throw new Error('Job queue delivery ID generator returned an invalid value.');
     }
     const leaseExpiresAt = new Date(now.getTime() + (this.leaseSeconds * 1000));
-    const claimed = await resolveQuery(this.NasTransferJobModel.findOneAndUpdate(
-      {
-        connectorId: key,
-        type: { $in: DELIVERABLE_JOB_TYPES },
-        status: 'queued',
-      },
-      {
-        $set: {
-          status: 'assigned',
-          deliveryId,
-          assignedAt: now,
-          leaseExpiresAt,
+    for (const type of DELIVERY_PRIORITY) {
+      const claimed = await resolveQuery(this.NasTransferJobModel.findOneAndUpdate(
+        {
+          connectorId: key,
+          type,
+          status: 'queued',
         },
-        $inc: { attemptCount: 1 },
-      },
-      { new: true, sort: { createdAt: 1 } },
-    ));
-    return claimed || null;
+        {
+          $set: {
+            status: 'assigned',
+            deliveryId,
+            assignedAt: now,
+            leaseExpiresAt,
+          },
+          $inc: { attemptCount: 1 },
+        },
+        // Cache jobs are created by an active browser action; use the newest
+        // one first so an old abandoned request cannot make the person who is
+        // currently waiting for a file appear stuck. Background work remains
+        // FIFO within its own class.
+        { new: true, sort: { createdAt: type === CACHE_FOR_DOWNLOAD_JOB_TYPE ? -1 : 1 } },
+      ));
+      if (claimed) return claimed;
+    }
+    return null;
   }
 
   toAssignment(job) {
@@ -774,6 +822,7 @@ module.exports = {
   ACTIVE_JOB_STATUSES,
   CACHE_FOR_DOWNLOAD_JOB_TYPE,
   DELIVERABLE_JOB_TYPES,
+  DELIVERY_PRIORITY,
   GENERATE_THUMBNAIL_JOB_TYPE,
   INDEX_ROOT_JOB_TYPE,
   MANUAL_INDEX_ACTIVE_STATUSES,
