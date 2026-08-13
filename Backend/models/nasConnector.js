@@ -7,6 +7,7 @@ const nasConnectorSchema = new mongoose.Schema({
   installationId: { type: String, required: true, unique: true, index: true, maxlength: 200 },
   status: { type: String, enum: ['active', 'offline', 'revoked'], default: 'offline', required: true, index: true },
   agentVersion: { type: String, default: null, maxlength: 80 },
+  thumbnailWorkerCount: { type: Number, default: 1, min: 1, max: 16 },
   lastSeenAt: { type: Date, default: null, index: true },
   revokedAt: { type: Date, default: null },
   revokedBy: { type: String, default: null },

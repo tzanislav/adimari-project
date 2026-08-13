@@ -85,6 +85,9 @@ const createJobModel = () => {
       matching.forEach((entry) => applyUpdate(entry, update));
       return { matchedCount: matching.length };
     },
+    async countDocuments(filter) {
+      return records.filter((entry) => matches(entry, filter)).length;
+    },
   };
 };
 
@@ -372,6 +375,43 @@ test('reuses a thumbnail job while its image generation is in progress', async (
   assert.equal(repeated.created, false);
   assert.equal(repeated.job._id, first.job._id);
   assert.equal(model.records.length, 1);
+});
+
+test('an upgraded connector receives four thumbnail jobs concurrently and no fifth job', async () => {
+  const model = createJobModel();
+  let deliverySequence = 1;
+  const queue = new NasConnectorJobQueue({
+    NasTransferJobModel: model,
+    NasConnectorModel: { async findOne() { return { thumbnailWorkerCount: 4 }; } },
+    createDeliveryId: () => deliveryUuid(deliverySequence++),
+  });
+
+  for (let index = 0; index < 5; index += 1) {
+    await model.create({
+      type: 'generate_thumbnail',
+      status: 'queued',
+      connectorId: CONNECTOR_ID,
+      storageRootId: STORAGE_ROOT_ID,
+      connectorRootId: ROOT_ID,
+      payload: { fileEntryId: index.toString(16).padStart(24, 'a') },
+    });
+  }
+
+  const accepted = [];
+  for (let index = 0; index < 4; index += 1) {
+    const assignment = await queue.poll(CONNECTOR_ID);
+    assert.equal(assignment.jobType, 'generate_thumbnail');
+    accepted.push(assignment.jobId);
+    assert.equal((await queue.acknowledgePolled({
+      connectorId: CONNECTOR_ID,
+      payload: { jobId: assignment.jobId, deliveryId: assignment.deliveryId, status: 'accepted' },
+    })).accepted, true);
+  }
+
+  assert.equal(new Set(accepted).size, 4);
+  assert.equal(await queue.poll(CONNECTOR_ID), null);
+  assert.equal(model.records.filter((job) => job.status === 'accepted').length, 4);
+  assert.equal(model.records.filter((job) => job.status === 'queued').length, 1);
 });
 
 test('reuses a manual index job while its scan is in progress', async () => {

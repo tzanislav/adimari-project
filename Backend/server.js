@@ -57,6 +57,7 @@ const nasStorageSet = nasConnectorConfig
 const nasConnectorJobQueue = nasConnectorConfig
   ? new NasConnectorJobQueue({
     NasTransferJobModel: NasTransferJob,
+    NasConnectorModel: NasConnector,
     leaseSeconds: nasConnectorConfig.jobLeaseSeconds,
   })
   : null;

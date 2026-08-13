@@ -19,3 +19,25 @@ Provide a commit message when useful:
 ```
 
 The defaults use the existing EC2 host, `/home/ubuntu/adimari-project`, and the key at `D:\Libraries\Work\Dev\Web Development\adimari-key-pair.pem`. Override them with the corresponding parameters if those locations change.
+
+## Updating the NAS Connector
+
+After copying a published connector release to the NAS-connected Windows PC at
+`C:\staging\connector-release` (with `service`, `control-center`, and
+`Install-AdimariNasConnector.ps1` inside it), run the wrapper from an elevated
+PowerShell session on that PC:
+
+```powershell
+.\Update-NasConnector.ps1
+```
+
+It previews the guarded installer by default. Apply the update only after
+reviewing the preview:
+
+```powershell
+.\Update-NasConnector.ps1 -Apply
+```
+
+The update preserves connector state and its existing service account. It
+retains two rollback packages by default; use `-KeepPreviousPackages 1` only
+when disk space requires it.

@@ -130,6 +130,17 @@ const normalizeQueueLength = (value) => {
   return value;
 };
 
+// Legacy connector installations do not report thumbnail parallelism. Keep
+// them on the original serial behavior until they explicitly advertise a
+// safe local capacity.
+const normalizeThumbnailWorkerCount = (value) => {
+  if (value === undefined) return 1;
+  if (!Number.isSafeInteger(value) || value < 1 || value > 16) {
+    throw new NasConnectorValidationError('Thumbnail worker count is invalid.');
+  }
+  return value;
+};
+
 const assertObjectId = (value, label = 'ID') => {
   if (!mongoose.isObjectIdOrHexString(value)) {
     throw new NasConnectorValidationError(`${label} is invalid.`);
@@ -149,5 +160,6 @@ module.exports = {
   normalizeInstallationId,
   normalizeQueueLength,
   normalizeRelativePath,
+  normalizeThumbnailWorkerCount,
   normalizeUploadsEnabled,
 };

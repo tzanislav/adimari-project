@@ -43,6 +43,7 @@ const {
   normalizeHeartbeatState,
   normalizeInstallationId,
   normalizeQueueLength,
+  normalizeThumbnailWorkerCount,
 } = require('../services/nasConnectorValidation');
 
 class NasConnectorApiError extends Error {
@@ -89,6 +90,7 @@ const serializeConnector = (connector) => {
     installationId: value.installationId,
     status: value.status,
     agentVersion: value.agentVersion || null,
+    thumbnailWorkerCount: Number.isSafeInteger(value.thumbnailWorkerCount) ? value.thumbnailWorkerCount : 1,
     lastSeenAt: value.lastSeenAt || null,
     revokedAt: value.revokedAt || null,
     createdAt: value.createdAt || null,
@@ -184,6 +186,7 @@ const normalizeSharedConnectionRequest = (body = {}) => ({
   installationId: normalizeInstallationId(body.installationId),
   agentVersion: normalizeAgentVersion(body.agentVersion),
   root: normalizeConnectorRoot(body.root),
+  thumbnailWorkerCount: normalizeThumbnailWorkerCount(body.thumbnailWorkerCount),
 });
 
 const normalizeHeartbeatRequest = (body = {}) => ({
@@ -192,6 +195,7 @@ const normalizeHeartbeatRequest = (body = {}) => ({
   root: normalizeConnectorRoot(body.root),
   state: normalizeHeartbeatState(body.state),
   queueLength: normalizeQueueLength(body.queueLength),
+  thumbnailWorkerCount: normalizeThumbnailWorkerCount(body.thumbnailWorkerCount),
 });
 
 const isPlainObject = (value) => value !== null
@@ -266,6 +270,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
   const heartbeatLimiter = dependencies.heartbeatLimiter || passThrough;
   const jobQueue = dependencies.jobQueue || new NasConnectorJobQueue({
     NasTransferJobModel,
+    NasConnectorModel,
     leaseSeconds: Number.isSafeInteger(config.jobLeaseSeconds) ? config.jobLeaseSeconds : 90,
     now: dependencies.now || (() => new Date()),
   });
@@ -436,6 +441,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
             installationId: request.installationId,
             status: 'active',
             agentVersion: request.agentVersion,
+            thumbnailWorkerCount: request.thumbnailWorkerCount,
             lastSeenAt: connectedAt,
           });
         } catch (error) {
@@ -453,6 +459,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
             name: request.root.displayName,
             status: 'active',
             agentVersion: request.agentVersion,
+            thumbnailWorkerCount: request.thumbnailWorkerCount,
             lastSeenAt: connectedAt,
             lastErrorCode: null,
             lastErrorMessage: null,
@@ -1401,6 +1408,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
           $set: {
             status: 'active',
             agentVersion: request.agentVersion,
+            thumbnailWorkerCount: request.thumbnailWorkerCount,
             lastSeenAt: seenAt,
             lastErrorCode: null,
             lastErrorMessage: null,

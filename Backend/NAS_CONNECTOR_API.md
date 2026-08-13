@@ -51,8 +51,10 @@ Incorrect, unknown, disabled, or revoked Connector credentials receive
 
 - `POST /api/nas-connectors/control/heartbeat` updates liveness, root metadata,
   and the reported queue state. Its body contains the same installation/root
-  shape as `/connect`, plus `state` (`ready`, `busy`, or `degraded`) and a
-  non-negative `queueLength`.
+  shape as `/connect`, plus `state` (`ready`, `busy`, or `degraded`), a
+  non-negative `queueLength`, and an optional `thumbnailWorkerCount` from 1 to
+  16. Omitting the latter preserves one-at-a-time behavior for legacy
+  connectors; current connectors advertise four worker slots.
 - `POST /api/nas-connectors/control/jobs/poll` waits for one durable job
   assignment. It accepts an optional bounded `waitSeconds`.
 - `POST /api/nas-connectors/control/jobs/ack` acknowledges one exact

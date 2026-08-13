@@ -33,6 +33,7 @@ Thumbs.db
 
 
 /scripts/*
+!/scripts/Update-NasConnector.ps1
 /backup/*
 
 # Backend example configuration contains placeholders only and must be shared.

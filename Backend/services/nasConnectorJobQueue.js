@@ -140,12 +140,14 @@ const normalizeThumbnailPayload = (value) => {
 };
 
 /**
- * Durable backend queue for one serial connector. MongoDB remains the
- * authority; authenticated HTTPS polling reads only a short-lived lease.
+ * Durable backend queue. MongoDB remains the authority; authenticated HTTPS
+ * polling reads only a short-lived lease. Cache, upload, and index work stays
+ * serial; an upgraded connector may advertise several thumbnail workers.
  */
 class NasConnectorJobQueue {
   constructor({
     NasTransferJobModel,
+    NasConnectorModel = null,
     leaseSeconds = 90,
     acceptedJobTimeoutSeconds = 120,
     inProgressJobTimeoutSeconds = 20 * 60,
@@ -166,11 +168,35 @@ class NasConnectorJobQueue {
     }
 
     this.NasTransferJobModel = NasTransferJobModel;
+    this.NasConnectorModel = NasConnectorModel;
     this.leaseSeconds = leaseSeconds;
     this.acceptedJobTimeoutSeconds = acceptedJobTimeoutSeconds;
     this.inProgressJobTimeoutSeconds = inProgressJobTimeoutSeconds;
     this.now = now;
     this.createDeliveryId = createDeliveryId;
+  }
+
+  async thumbnailWorkerCount(connectorId) {
+    if (!this.NasConnectorModel || typeof this.NasConnectorModel.findOne !== 'function') return 1;
+    const connector = await resolveQuery(this.NasConnectorModel.findOne({ _id: connectorId }));
+    const count = connector?.thumbnailWorkerCount;
+    return Number.isSafeInteger(count) && count >= 1 && count <= 16 ? count : 1;
+  }
+
+  async activeThumbnailJobCount(connectorId) {
+    const filter = {
+      connectorId,
+      type: GENERATE_THUMBNAIL_JOB_TYPE,
+      status: { $in: ['accepted', 'in_progress'] },
+    };
+    if (typeof this.NasTransferJobModel.countDocuments === 'function') {
+      return this.NasTransferJobModel.countDocuments(filter);
+    }
+
+    // The production model has countDocuments. This fallback preserves the
+    // original serial behavior for lean test doubles without that method.
+    const active = await resolveQuery(this.NasTransferJobModel.findOne(filter));
+    return active ? 1 : 0;
   }
 
   async enqueueIndexRoot({
@@ -541,15 +567,14 @@ class NasConnectorJobQueue {
       traceIndex('failed_abandoned_in_progress_jobs', { connectorId: key, count: abandoned.matchedCount });
     }
 
-    // The connector deliberately owns one serial local queue.  Do not assign
-    // the next job while it has already accepted or is executing one; its
-    // completion endpoint lets the next poll claim subsequent work.
-    const activeExecution = await resolveQuery(this.NasTransferJobModel.findOne({
+    // Indexing, cache delivery, and writes stay in one NAS-access lane. They
+    // must never race each other or a future serial connector capability.
+    const activeSerialExecution = await resolveQuery(this.NasTransferJobModel.findOne({
       connectorId: key,
-      type: { $in: DELIVERABLE_JOB_TYPES },
+      type: { $in: [CACHE_FOR_DOWNLOAD_JOB_TYPE, WRITE_UPLOAD_TO_NAS_JOB_TYPE, INDEX_ROOT_JOB_TYPE] },
       status: { $in: ['accepted', 'in_progress'] },
     }));
-    if (activeExecution) return null;
+    if (activeSerialExecution) return null;
 
     await this.NasTransferJobModel.updateMany(
       {
@@ -568,12 +593,12 @@ class NasConnectorJobQueue {
       },
     );
 
-    const deliveryId = this.createDeliveryId().toLowerCase();
-    if (!isCanonicalUuid(deliveryId)) {
-      throw new Error('Job queue delivery ID generator returned an invalid value.');
-    }
-    const leaseExpiresAt = new Date(now.getTime() + (this.leaseSeconds * 1000));
-    for (const type of DELIVERY_PRIORITY) {
+    const claimNext = async (type) => {
+      const deliveryId = this.createDeliveryId().toLowerCase();
+      if (!isCanonicalUuid(deliveryId)) {
+        throw new Error('Job queue delivery ID generator returned an invalid value.');
+      }
+      const leaseExpiresAt = new Date(now.getTime() + (this.leaseSeconds * 1000));
       const claimed = await resolveQuery(this.NasTransferJobModel.findOneAndUpdate(
         {
           connectorId: key,
@@ -595,7 +620,25 @@ class NasConnectorJobQueue {
         // FIFO within its own class.
         { new: true, sort: { createdAt: type === CACHE_FOR_DOWNLOAD_JOB_TYPE ? -1 : 1 } },
       ));
+      return claimed;
+    };
+
+    // Interactive file requests retain priority over background thumbnails.
+    for (const type of [CACHE_FOR_DOWNLOAD_JOB_TYPE, WRITE_UPLOAD_TO_NAS_JOB_TYPE]) {
+      const claimed = await claimNext(type);
       if (claimed) return claimed;
+    }
+
+    const thumbnailWorkers = await this.thumbnailWorkerCount(key);
+    const activeThumbnails = await this.activeThumbnailJobCount(key);
+    if (activeThumbnails < thumbnailWorkers) {
+      const thumbnail = await claimNext(GENERATE_THUMBNAIL_JOB_TYPE);
+      if (thumbnail) return thumbnail;
+    }
+
+    // A broad scan should not compete with a thumbnail batch for NAS I/O.
+    if (activeThumbnails === 0) {
+      return claimNext(INDEX_ROOT_JOB_TYPE);
     }
     return null;
   }
