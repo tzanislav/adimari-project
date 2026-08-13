@@ -6,6 +6,7 @@ const FileAuditEvent = require('../models/fileAuditEvent');
 const FileShare = require('../models/fileShare');
 const NasFileEntry = require('../models/nasFileEntry');
 const { FileStorageError, createFileStorageService } = require('../services/fileStorageService');
+const { createNasStorageService } = require('../services/nasStorageService');
 const { hashShareToken } = require('../services/fileShareToken');
 
 const notFound = (res) => res.status(404).json({ error: 'Download link not found.' });
@@ -35,13 +36,11 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
         status: 503,
       });
     }
-    cacheStorage = createFileStorageService({
-      config: {
-        ...config,
-        region: nasConfig.region,
-        bucketName: nasConfig.bucketName,
-        prefix: nasConfig.cachePrefix,
-        credentials: nasConfig.credentials || config.credentials,
+    cacheStorage = createNasStorageService({
+      nasConfig,
+      fileServerConfig: config,
+      prefix: nasConfig.cachePrefix,
+      overrides: {
         downloadUrlTtlSeconds: config.downloadUrlTtlSeconds,
       },
     });

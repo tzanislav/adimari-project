@@ -7,7 +7,8 @@ const NasFileEntry = require('../models/nasFileEntry');
 const NasStorageRoot = require('../models/nasStorageRoot');
 const NasTransferJob = require('../models/nasTransferJob');
 const { createShareToken } = require('../services/fileShareToken');
-const { createFileStorageService, FileStorageError } = require('../services/fileStorageService');
+const { FileStorageError } = require('../services/fileStorageService');
+const { createNasStorageService } = require('../services/nasStorageService');
 const {
   FileStorageValidationError,
   computeMultipartPartSize,
@@ -163,6 +164,12 @@ const sendError = (res, error) => {
   if (error instanceof FileStorageValidationError) {
     return res.status(400).json({ code: 'NAS_UPLOAD_REQUEST_INVALID', error: 'The upload request is invalid.' });
   }
+  if (error?.code === 11000) {
+    return res.status(409).json({
+      code: 'NAS_UPLOAD_DESTINATION_RESERVED',
+      error: 'Another upload is already in progress for that destination.',
+    });
+  }
   if (error?.name === 'CastError') {
     return res.status(400).json({ code: 'NAS_CATALOGUE_REQUEST_INVALID', error: 'The catalogue request is invalid.' });
   }
@@ -201,14 +208,10 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
     if (!nasConfig || !fileServerConfig) {
       throw new NasCatalogueApiError('NAS_DELIVERY_UNAVAILABLE', 'NAS file delivery is not configured.', 503);
     }
-    cacheStorage = createFileStorageService({
-      config: {
-        ...fileServerConfig,
-        region: nasConfig.region,
-        bucketName: nasConfig.bucketName,
-        prefix: nasConfig.cachePrefix,
-        credentials: nasConfig.credentials || fileServerConfig.credentials,
-      },
+    cacheStorage = createNasStorageService({
+      nasConfig,
+      fileServerConfig,
+      prefix: nasConfig.cachePrefix,
     });
     return cacheStorage;
   };
@@ -218,14 +221,10 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
     if (!nasConfig || !fileServerConfig) {
       throw new NasCatalogueApiError('NAS_DELIVERY_UNAVAILABLE', 'NAS image delivery is not configured.', 503);
     }
-    thumbnailStorage = createFileStorageService({
-      config: {
-        ...fileServerConfig,
-        region: nasConfig.region,
-        bucketName: nasConfig.bucketName,
-        prefix: nasConfig.thumbnailPrefix,
-        credentials: nasConfig.credentials || fileServerConfig.credentials,
-      },
+    thumbnailStorage = createNasStorageService({
+      nasConfig,
+      fileServerConfig,
+      prefix: nasConfig.thumbnailPrefix,
     });
     return thumbnailStorage;
   };
@@ -235,13 +234,11 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
     if (!nasConfig || !fileServerConfig) {
       throw new NasCatalogueApiError('NAS_UPLOAD_UNAVAILABLE', 'NAS uploads are not configured.', 503);
     }
-    stagingStorage = createFileStorageService({
-      config: {
-        ...fileServerConfig,
-        region: nasConfig.region,
-        bucketName: nasConfig.bucketName,
-        prefix: nasConfig.uploadStagingPrefix,
-        credentials: nasConfig.credentials || fileServerConfig.credentials,
+    stagingStorage = createNasStorageService({
+      nasConfig,
+      fileServerConfig,
+      prefix: nasConfig.uploadStagingPrefix,
+      overrides: {
         uploadPartUrlTtlSeconds: nasConfig.browserUploadUrlTtlSeconds,
       },
     });
@@ -326,7 +323,6 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
         fileEntryId: objectIdOf(entry),
         fileShareId: created.share._id || created.share.id,
         requestedBy: actorUid,
-        waitForDelivery: false,
       });
       console.info('[NAS cache] share_queued', {
         entryId: objectIdOf(entry),
@@ -459,6 +455,10 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
         storageRootId: rootId,
         connectorRootId: root.connectorRootId,
         requestedBy: actorUid,
+        // The catalogue is eventually consistent with the NAS.  Reserve the
+        // logical destination durably, rather than relying on a preceding
+        // catalogue lookup to prevent two browser uploads from racing.
+        idempotencyKey: `write:${rootId}:${relativeDestinationPath}`,
         payload: {
           relativeDestinationPath,
           expectedSize: request.sizeBytes,
@@ -486,7 +486,10 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
       if (stagedJob) {
         await NasTransferJobModel.findOneAndUpdate(
           { _id: objectIdOf(stagedJob), status: 'staging' },
-          { $set: { status: 'failed', completedAt: new Date(), errorCode: 'staging_start_failed' } },
+          {
+            $set: { status: 'failed', completedAt: new Date(), errorCode: 'staging_start_failed' },
+            $unset: { idempotencyKey: 1 },
+          },
           { new: false },
         ).catch(() => {});
       }
@@ -556,7 +559,6 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
       );
       if (!queued) throw new NasCatalogueApiError('NAS_UPLOAD_NOT_FOUND', 'The active upload was not found.', 404);
       console.info('[NAS upload] staging_completed', { jobId: uploadId, connectorId: objectIdOf(queued.connectorId) });
-      if (typeof jobQueue.requestDispatch === 'function') void jobQueue.requestDispatch(queued.connectorId);
       return res.json({ job: serializeTransferJob(queued) });
     } catch (error) {
       return sendError(res, error);
@@ -580,7 +582,10 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
       }
       await NasTransferJobModel.findOneAndUpdate(
         { _id: uploadId, requestedBy: actorUid, status: 'staging' },
-        { $set: { status: 'cancelled', completedAt: new Date(), errorCode: 'browser_aborted' } },
+        {
+          $set: { status: 'cancelled', completedAt: new Date(), errorCode: 'browser_aborted' },
+          $unset: { idempotencyKey: 1 },
+        },
         { new: false },
       );
       console.info('[NAS upload] staging_aborted', { jobId: uploadId });
@@ -743,7 +748,6 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
           fileEntryId: entryId,
           versionFingerprint: entry.versionFingerprint,
           requestedBy: actorUid,
-          waitForDelivery: false,
         });
         console.info('[NAS thumbnail] queued', {
           entryId,
@@ -874,9 +878,16 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
       const limit = parsePageSize(req.query.limit);
       const offset = parseCursor(req.query.cursor);
       if (rootId) await findBrowsableRoot(rootId);
+      // A global search must use the same visibility boundary as root/folder
+      // browsing.  Old catalogue rows intentionally remain after a root is
+      // disabled, but they must not be discoverable through search.
+      const browsableRootIds = rootId
+        ? [rootId]
+        : (await resolveArrayQuery(NasStorageRootModel.find({ status: { $in: ['active', 'offline'] } })))
+          .map((root) => objectIdOf(root));
       const filter = {
         deletedAt: null,
-        ...(rootId ? { storageRootId: rootId } : {}),
+        storageRootId: { $in: browsableRootIds },
         $or: [
           { name: { $regex: escapeRegex(query), $options: 'i' } },
           { relativePath: { $regex: escapeRegex(query), $options: 'i' } },

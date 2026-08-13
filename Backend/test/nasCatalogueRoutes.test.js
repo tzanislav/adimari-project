@@ -48,6 +48,7 @@ const createModels = () => {
     { _id: 'b'.repeat(24), storageRootId: ROOT_ID, relativePath: 'Design/preview.jpg', parentPath: 'Design', name: 'preview.jpg', entryType: 'file', sizeBytes: 1024, modifiedAt: '2026-08-11T12:00:00.000Z', contentType: 'image/jpeg', previewKind: 'image', availabilityStatus: 'offline', thumbnailStatus: 'not_requested', lastIndexedAt: '2026-08-12T12:00:00.000Z', deletedAt: null },
     { _id: 'e'.repeat(24), storageRootId: ROOT_ID, relativePath: 'Design/cover.png', parentPath: 'Design', name: 'cover.png', entryType: 'file', sizeBytes: 512, modifiedAt: '2026-08-10T12:00:00.000Z', contentType: 'image/png', previewKind: 'image', availabilityStatus: 'offline', thumbnailStatus: 'not_requested', lastIndexedAt: '2026-08-12T12:00:00.000Z', deletedAt: null },
     { _id: 'c'.repeat(24), storageRootId: ROOT_ID, relativePath: 'brief.pdf', parentPath: '', name: 'brief.pdf', entryType: 'file', sizeBytes: 2048, modifiedAt: '2026-08-12T12:00:00.000Z', contentType: 'application/pdf', previewKind: 'none', availabilityStatus: 'offline', thumbnailStatus: 'not_requested', lastIndexedAt: '2026-08-12T12:00:00.000Z', deletedAt: null },
+    { _id: 'f'.repeat(24), storageRootId: DISABLED_ROOT_ID, relativePath: 'disabled-preview.jpg', parentPath: '', name: 'disabled-preview.jpg', entryType: 'file', sizeBytes: 2048, modifiedAt: '2026-08-12T12:00:00.000Z', contentType: 'image/jpeg', previewKind: 'image', availabilityStatus: 'offline', thumbnailStatus: 'not_requested', lastIndexedAt: '2026-08-12T12:00:00.000Z', deletedAt: null },
     { _id: 'd'.repeat(24), storageRootId: ROOT_ID, relativePath: 'removed.docx', parentPath: '', name: 'removed.docx', entryType: 'file', sizeBytes: 10, modifiedAt: '2026-08-01T12:00:00.000Z', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', previewKind: 'none', availabilityStatus: 'unavailable', thumbnailStatus: 'not_requested', lastIndexedAt: '2026-08-01T12:00:00.000Z', deletedAt: '2026-08-12T12:00:00.000Z' },
   ];
   const makeQuery = (records) => {
@@ -147,6 +148,10 @@ test('catalogue search is role-protected and rejects unsafe navigation input', a
     const searchPayload = await search.json();
     assert.deepEqual(searchPayload.entries.map((entry) => entry.name), ['preview.jpg']);
     assert.equal(searchPayload.entries[0].rootId, ROOT_ID);
+
+    const globalSearch = await fetch(`${app.url}/api/nas-catalogue/search?q=preview`, { headers: { authorization: 'Bearer moderator' } });
+    const globalPayload = await globalSearch.json();
+    assert.deepEqual(globalPayload.entries.map((entry) => entry.name), ['preview.jpg']);
   } finally {
     await close(app.server);
   }
@@ -206,7 +211,6 @@ test('a moderator can create a preparing share and queue one opaque cache-delive
       fileEntryId: 'c'.repeat(24),
       fileShareId: 'e'.repeat(24),
       requestedBy: 'user-id',
-      waitForDelivery: false,
     });
   } finally {
     await close(app.server);
@@ -338,7 +342,6 @@ test('opening a folder can queue one persistent thumbnail without exposing an im
       fileEntryId: 'b'.repeat(24),
       versionFingerprint: 'version-1',
       requestedBy: 'user-id',
-      waitForDelivery: false,
     }]);
   } finally {
     await close(app.server);
@@ -347,7 +350,6 @@ test('opening a folder can queue one persistent thumbnail without exposing an im
 
 test('a browser upload stages privately then queues one opaque NAS-write job', async () => {
   const jobs = [];
-  const dispatched = [];
   const storageCalls = [];
   const setNested = (target, path, value) => {
     const keys = path.split('.');
@@ -357,6 +359,11 @@ test('a browser upload stages privately then queues one opaque NAS-write job', a
   };
   const transferJobs = {
     async create(document) {
+      if (document.idempotencyKey && jobs.some((job) => job.idempotencyKey === document.idempotencyKey)) {
+        const error = new Error('duplicate destination reservation');
+        error.code = 11000;
+        throw error;
+      }
       const job = { _id: 'f'.repeat(24), ...clone(document) };
       jobs.push(job);
       return job;
@@ -397,9 +404,7 @@ test('a browser upload stages privately then queues one opaque NAS-write job', a
       async headFile() { return { ContentLength: 7 }; },
       async abortMultipartUpload() { storageCalls.push('abort'); },
     },
-    jobQueue: {
-      requestDispatch(connectorId) { dispatched.push(String(connectorId)); },
-    },
+    jobQueue: {},
   });
   try {
     const start = await fetch(app.url + '/api/nas-catalogue/roots/' + ROOT_ID + '/uploads', {
@@ -416,6 +421,19 @@ test('a browser upload stages privately then queues one opaque NAS-write job', a
     const started = await start.json();
     assert.deepEqual(Object.keys(started).sort(), ['maxParts', 'partSize', 'uploadId']);
     assert.equal(started.uploadId, 'f'.repeat(24));
+
+    const duplicate = await fetch(app.url + '/api/nas-catalogue/roots/' + ROOT_ID + '/uploads', {
+      method: 'POST',
+      headers: { authorization: 'Bearer moderator', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        parentPath: 'Design',
+        fileName: 'from-browser.txt',
+        sizeBytes: 7,
+        contentType: 'text/plain',
+      }),
+    });
+    assert.equal(duplicate.status, 409);
+    assert.equal((await duplicate.json()).code, 'NAS_UPLOAD_DESTINATION_RESERVED');
 
     const parts = await fetch(app.url + '/api/nas-catalogue/uploads/' + started.uploadId + '/parts', {
       method: 'POST',
@@ -435,7 +453,6 @@ test('a browser upload stages privately then queues one opaque NAS-write job', a
     assert.equal(payload.job.type, 'write_upload_to_nas');
     assert.equal(payload.job.status, 'queued');
     assert.equal('payload' in payload.job, false);
-    assert.deepEqual(dispatched, ['1'.repeat(24)]);
     assert.deepEqual(storageCalls, ['start', 'parts', 'complete']);
   } finally {
     await close(app.server);

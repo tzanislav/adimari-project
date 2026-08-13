@@ -23,11 +23,14 @@ const { createFileRoutes } = require('./routes/fileRoutes'); // Private S3 file-
 const { createPublicDownloadRoutes } = require('./routes/publicDownloadRoutes'); // Anonymous share downloads
 const { createNasConnectorRoutes } = require('./routes/nasConnectorRoutes'); // Windows NAS connector control plane
 const { createNasCatalogueRoutes } = require('./routes/nasCatalogueRoutes'); // Indexed NAS browse API
-const { createNasConnectorControlChannel } = require('./control/nasConnectorControlChannel'); // Persistent connector presence channel
 const NasConnector = require('./models/nasConnector');
 const NasStorageRoot = require('./models/nasStorageRoot');
 const NasTransferJob = require('./models/nasTransferJob');
+const NasFileEntry = require('./models/nasFileEntry');
+const NasAuditEvent = require('./models/nasAuditEvent');
 const { NasConnectorJobQueue } = require('./services/nasConnectorJobQueue');
+const { NasRetentionService } = require('./services/nasRetentionService');
+const { createNasStorageService } = require('./services/nasStorageService');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -49,24 +52,19 @@ const nasConnectorJobQueue = nasConnectorConfig
     leaseSeconds: nasConnectorConfig.jobLeaseSeconds,
   })
   : null;
-const nasConnectorControlChannel = nasConnectorConfig
-  ? createNasConnectorControlChannel({
+const nasRetentionService = nasConnectorConfig
+  ? new NasRetentionService({
+    NasTransferJobModel: NasTransferJob,
+    NasAuditEventModel: NasAuditEvent,
+    NasFileEntryModel: NasFileEntry,
+    thumbnailStorage: createNasStorageService({
+      nasConfig: nasConnectorConfig,
+      fileServerConfig: getFileServerConfig(),
+      prefix: nasConnectorConfig.thumbnailPrefix,
+    }),
     config: nasConnectorConfig,
-    NasConnectorModel: NasConnector,
-    NasStorageRootModel: NasStorageRoot,
-    jobQueue: nasConnectorJobQueue,
   })
   : null;
-if (nasConnectorJobQueue && nasConnectorControlChannel) {
-  // The queue normally registers this target as part of WSS hello. Resolving
-  // it again from the active-session registry lets a browser action dispatch
-  // immediately even if that registration races a short reconnect.
-  nasConnectorJobQueue.setDeliveryTargetResolver((connectorId) => (
-    nasConnectorControlChannel.sessionRegistry.has(connectorId)
-      ? (assignment) => nasConnectorControlChannel.sessionRegistry.sendJobAssignment(connectorId, assignment)
-      : null
-  ));
-}
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -261,6 +259,14 @@ mongoose
   .connect(mongoURI)
   .then(() => {
     console.log('Connected to MongoDB');
+    if (nasRetentionService) {
+      const sweep = () => nasRetentionService.runOnce()
+        .then((summary) => console.info('[NAS retention] sweep_complete', summary))
+        .catch((error) => console.error('[NAS retention] sweep_failed', error?.code || error?.name || 'unknown'));
+      void sweep();
+      const timer = setInterval(sweep, nasConnectorConfig.retentionSweepIntervalHours * 60 * 60 * 1_000);
+      timer.unref?.();
+    }
   })
   .catch((err) => {
     console.error('Failed to connect to MongoDB:', err);
@@ -279,7 +285,6 @@ if (nasConnectorConfig) {
     config: nasConnectorConfig,
     enrollmentLimiter: nasConnectorEnrollmentLimiter,
     heartbeatLimiter: nasConnectorHeartbeatLimiter,
-    controlSessionRegistry: nasConnectorControlChannel.sessionRegistry,
     jobQueue: nasConnectorJobQueue,
   }));
   app.use('/api/nas-catalogue', fileManagerLimiter, createNasCatalogueRoutes({
@@ -324,9 +329,6 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 5001;
 const bindHost = getBackendBindHost();
 const server = http.createServer(app);
-if (nasConnectorControlChannel) {
-  nasConnectorControlChannel.attach(server);
-}
 server.listen(PORT, bindHost, () => {
   console.log('Server listening on http://' + bindHost + ':' + PORT + ' (loopback only)');
 });

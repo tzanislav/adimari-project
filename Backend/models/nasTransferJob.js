@@ -16,7 +16,7 @@ const nasTransferJobSchema = new mongoose.Schema({
   },
   connectorId: { type: mongoose.Schema.Types.ObjectId, ref: 'NasConnector', required: true, index: true },
   storageRootId: { type: mongoose.Schema.Types.ObjectId, ref: 'NasStorageRoot', required: true, index: true },
-  // Opaque connector-local root ID carried in WSS assignments. It is never a
+  // Opaque connector-local root ID carried in HTTPS-poll assignments. It is never a
   // Windows/UNC path and lets the service reject work for another root before
   // any future executor resolves a local folder.
   connectorRootId: { type: String, default: null, maxlength: 200, index: true },
@@ -53,6 +53,9 @@ const nasTransferJobSchema = new mongoose.Schema({
   // entries absent from that scan at completion.
   scanStartedAt: { type: Date, default: null, index: true },
   completedAt: { type: Date, default: null },
+  // The retention service derives this from the terminal completion time. A
+  // TTL index is the final guard; explicit sweeps make cleanup observable.
+  purgeAfter: { type: Date, default: null },
   errorCode: { type: String, default: null, maxlength: 100 },
   errorMessage: { type: String, default: null, maxlength: 1_000 },
 }, { timestamps: true, versionKey: 'version' });
@@ -61,5 +64,6 @@ nasTransferJobSchema.index({ connectorId: 1, status: 1, createdAt: 1 });
 nasTransferJobSchema.index({ storageRootId: 1, status: 1, updatedAt: -1 });
 nasTransferJobSchema.index({ connectorId: 1, type: 1, status: 1, leaseExpiresAt: 1 });
 nasTransferJobSchema.index({ storageRootId: 1, scanId: 1, status: 1 });
+nasTransferJobSchema.index({ purgeAfter: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.models.NasTransferJob || mongoose.model('NasTransferJob', nasTransferJobSchema, 'nas_transfer_jobs');

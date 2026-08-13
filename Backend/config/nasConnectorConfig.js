@@ -149,29 +149,42 @@ const createNasConnectorConfig = (environment = process.env) => {
     }),
     heartbeatIntervalSeconds,
     heartbeatStaleAfterSeconds,
-    // This channel supplements, but never replaces, the REST heartbeat. Keep
-    // it independently configurable so operators can tune persistent-socket
-    // liveness without changing the authoritative REST cadence.
-    controlPingIntervalSeconds: optionalInteger(environment, 'NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS', {
-      min: 5,
-      max: 60 * 60,
-      defaultValue: heartbeatIntervalSeconds,
-    }),
-    // Defense in depth for HTTP upgrades. Nginx must enforce a stricter
-    // public-edge limit as well because it can reject before Node allocates a
-    // WebSocket or touches MongoDB.
-    controlUpgradeRateLimitPerMinute: optionalInteger(environment, 'NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE', {
-      min: 1,
-      max: 1_000,
-      defaultValue: 30,
-    }),
-    // The durable-delivery proof slice assigns a short DB-backed lease over
-    // WSS. It does not execute files yet; the lease only governs safe replay
-    // when an acknowledgement is lost or a connector reconnects.
+    // A short DB-backed lease governs safe HTTPS-poll replay when an
+    // acknowledgement is interrupted or a connector restarts.
     jobLeaseSeconds: optionalInteger(environment, 'NAS_CONNECTOR_JOB_LEASE_SECONDS', {
       min: 15,
       max: 600,
       defaultValue: 90,
+    }),
+    terminalJobRetentionDays: optionalInteger(environment, 'NAS_CONNECTOR_TERMINAL_JOB_RETENTION_DAYS', {
+      min: 7,
+      max: 3_650,
+      defaultValue: 30,
+    }),
+    deletedEntryRetentionDays: optionalInteger(environment, 'NAS_CONNECTOR_DELETED_ENTRY_RETENTION_DAYS', {
+      min: 7,
+      max: 3_650,
+      defaultValue: 30,
+    }),
+    auditRetentionDays: optionalInteger(environment, 'NAS_CONNECTOR_AUDIT_RETENTION_DAYS', {
+      min: 30,
+      max: 3_650,
+      defaultValue: 365,
+    }),
+    staleThumbnailRetentionDays: optionalInteger(environment, 'NAS_CONNECTOR_STALE_THUMBNAIL_RETENTION_DAYS', {
+      min: 1,
+      max: 3_650,
+      defaultValue: 14,
+    }),
+    retentionSweepIntervalHours: optionalInteger(environment, 'NAS_CONNECTOR_RETENTION_SWEEP_INTERVAL_HOURS', {
+      min: 1,
+      max: 24 * 7,
+      defaultValue: 6,
+    }),
+    recoveryStuckAfterMinutes: optionalInteger(environment, 'NAS_CONNECTOR_RECOVERY_STUCK_AFTER_MINUTES', {
+      min: 10,
+      max: 7 * 24 * 60,
+      defaultValue: 30,
     }),
     // HTTPS remains the normal deployment. This explicit switch exists for a
     // small trusted/local installation that deliberately prefers plain HTTP.

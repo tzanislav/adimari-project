@@ -5,6 +5,7 @@ const test = require('node:test');
 const express = require('express');
 
 const { createNasConnectorRoutes } = require('../routes/nasConnectorRoutes');
+const { NasConnectorJobQueue } = require('../services/nasConnectorJobQueue');
 
 const HMAC_SECRET = 'this-is-a-long-test-only-connector-hmac-secret';
 const INSTALLATION_ID = 'a9d24d65-1a96-4f65-aa06-40c74c5934ac';
@@ -35,6 +36,7 @@ const createInMemoryModels = () => {
   const roots = [];
   const jobs = [];
   const fileEntries = [];
+  const shares = [];
   const audits = [];
   let enrollmentSequence = 1;
   let connectorSequence = 1;
@@ -230,6 +232,14 @@ const createInMemoryModels = () => {
   };
 
   const FileEntryModel = {
+    find(filter) {
+      const matching = fileEntries.filter((entry) => matchesFilter(entry, filter));
+      return {
+        sort() {
+          return { lean: async () => clone(matching) };
+        },
+      };
+    },
     async bulkWrite(operations) {
       operations.forEach(({ updateOne }) => {
         let record = fileEntries.find((entry) => matchesFilter(entry, updateOne.filter));
@@ -265,14 +275,30 @@ const createInMemoryModels = () => {
     },
   };
 
+  const FileShareModel = {
+    async create(document) {
+      const record = { _id: `5${String(shares.length + 1).padStart(23, '0')}`, ...document };
+      shares.push(record);
+      return record;
+    },
+    async findOne(filter) {
+      return shares.find((entry) => matchesFilter(entry, filter)) || null;
+    },
+    async findOneAndUpdate(filter, update) {
+      const record = shares.find((entry) => matchesFilter(entry, filter));
+      return record ? applyUpdate(record, update) : null;
+    },
+  };
+
   return {
     EnrollmentTokenModel,
     ConnectorModel,
     StorageRootModel,
     TransferJobModel,
     FileEntryModel,
+    FileShareModel,
     AuditEventModel: { async create(event) { audits.push(clone(event)); return event; } },
-    state: { enrollments, connectors, roots, jobs, fileEntries, audits },
+    state: { enrollments, connectors, roots, jobs, fileEntries, shares, audits },
   };
 };
 
@@ -297,8 +323,8 @@ const startApp = async ({
   requireHttpsMiddleware,
   configOverrides = {},
   now,
-  controlSessionRegistry,
   jobQueue,
+  cacheStorage,
 } = {}) => {
   const app = express();
   app.use(express.json());
@@ -308,6 +334,7 @@ const startApp = async ({
       sharedSecret: DEVICE_SECRET,
       enrollmentTokenTtlSeconds: 900,
       heartbeatIntervalSeconds: 30,
+      recoveryStuckAfterMinutes: 30,
       ...configOverrides,
     },
     NasConnectorModel: models.ConnectorModel,
@@ -315,14 +342,15 @@ const startApp = async ({
     NasStorageRootModel: models.StorageRootModel,
     NasTransferJobModel: models.TransferJobModel,
     NasFileEntryModel: models.FileEntryModel,
+    FileShareModel: models.FileShareModel,
     NasAuditEventModel: models.AuditEventModel,
     authenticateMiddleware: adminAuthentication,
     authorizeAdminMiddleware: adminAuthorization,
   };
-  if (controlSessionRegistry) dependencies.controlSessionRegistry = controlSessionRegistry;
   if (jobQueue) dependencies.jobQueue = jobQueue;
   if (requireHttpsMiddleware) dependencies.requireHttpsMiddleware = requireHttpsMiddleware;
   if (now) dependencies.now = now;
+  if (cacheStorage) dependencies.cacheStorage = cacheStorage;
   app.use('/api/nas-connectors', createNasConnectorRoutes(dependencies));
   const server = await new Promise((resolve) => {
     const listeningServer = app.listen(0, () => resolve(listeningServer));
@@ -472,6 +500,56 @@ test('a shared connector key creates or reconnects an installation without an en
   }
 });
 
+test('an authenticated connector receives and acknowledges one job over HTTPS polling', async () => {
+  const models = createInMemoryModels();
+  const jobQueue = new NasConnectorJobQueue({ NasTransferJobModel: models.TransferJobModel, leaseSeconds: 90 });
+  const app = await startApp({ models, jobQueue, requireHttpsMiddleware: (req, res, next) => next() });
+  try {
+    const connection = await json(`${app.url}/api/nas-connectors/connect`, {
+      method: 'POST',
+      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '1.0.0', root: ROOT }),
+    });
+    const connectorId = connection.body.connector.id;
+    const root = models.state.roots[0];
+    const queued = await models.TransferJobModel.create({
+      connectorId,
+      storageRootId: root._id,
+      connectorRootId: ROOT.connectorRootId,
+      type: 'index_root',
+      status: 'queued',
+      payload: {},
+    });
+    const directPoll = await jobQueue.poll(connectorId);
+    assert.equal(directPoll.jobId, queued._id);
+
+    const polled = await json(`${app.url}/api/nas-connectors/control/jobs/poll`, {
+      method: 'POST',
+      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      body: JSON.stringify({ waitSeconds: 0 }),
+    });
+    assert.equal(polled.response.status, 200);
+    assert.equal(polled.body.assignment.jobId, queued._id);
+    assert.equal(polled.body.assignment.jobType, 'index_root');
+    assert.equal(models.state.jobs[0].status, 'assigned');
+
+    const acknowledged = await json(`${app.url}/api/nas-connectors/control/jobs/ack`, {
+      method: 'POST',
+      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      body: JSON.stringify({
+        jobId: polled.body.assignment.jobId,
+        deliveryId: polled.body.assignment.deliveryId,
+        status: 'accepted',
+      }),
+    });
+    assert.equal(acknowledged.response.status, 200);
+    assert.deepEqual(acknowledged.body, { accepted: true, replay: false });
+    assert.equal(models.state.jobs[0].status, 'accepted');
+  } finally {
+    await close(app.server);
+  }
+});
+
 test('an administrator can re-enable a disabled shared-key connector without issuing a token', async () => {
   const models = createInMemoryModels();
   const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
@@ -511,55 +589,11 @@ test('an administrator can re-enable a disabled shared-key connector without iss
   }
 });
 
-test('admin can send a no-op live-channel test to an active connector', async () => {
-  const models = createInMemoryModels();
-  const sentTo = [];
-  const app = await startApp({
-    models,
-    requireHttpsMiddleware: (req, res, next) => next(),
-    controlSessionRegistry: {
-      sendTestMessage(connectorId) {
-        sentTo.push(connectorId);
-        return true;
-      },
-    },
-  });
-  try {
-    const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: JSON.stringify({ name: 'NAS' }),
-    });
-    const enrolled = await json(`${app.url}/api/nas-connectors/enroll`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enrollmentToken: issued.body.enrollmentToken,
-        installationId: INSTALLATION_ID,
-        deviceSecret: DEVICE_SECRET,
-        agentVersion: '0.1.0',
-        root: ROOT,
-      }),
-    });
-    const connectorId = enrolled.body.connector.id;
-
-    const response = await json(`${app.url}/api/nas-connectors/${connectorId}/test-message`, {
-      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
-    });
-    assert.equal(response.response.status, 202);
-    assert.equal(response.body.sent, true);
-    assert.deepEqual(sentTo, [connectorId]);
-  } finally {
-    await close(app.server);
-  }
-});
-
 test('heartbeat authenticates the connector credential and is refused after admin revocation', async () => {
   const models = createInMemoryModels();
-  const closedSessions = [];
   const app = await startApp({
     models,
     requireHttpsMiddleware: (req, res, next) => next(),
-    controlSessionRegistry: {
-      closeConnector(connectorId, options) { closedSessions.push({ connectorId, options }); },
-    },
   });
   try {
     const issued = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
@@ -606,7 +640,6 @@ test('heartbeat authenticates the connector credential and is refused after admi
     assert.equal(revoked.response.status, 200);
     assert.equal(revoked.body.connector.status, 'revoked');
     assert.equal(models.state.roots[0].status, 'disabled');
-    assert.deepEqual(closedSessions, [{ connectorId, options: undefined }]);
 
     const afterRevocation = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
@@ -614,6 +647,59 @@ test('heartbeat authenticates the connector credential and is refused after admi
       body: JSON.stringify(heartbeatPayload),
     });
     assert.equal(afterRevocation.response.status, 401);
+  } finally {
+    await close(app.server);
+  }
+});
+
+test('an administrator can identify and stop a genuinely stale recovery job without replaying it', async () => {
+  const models = createInMemoryModels();
+  const currentTime = new Date('2026-08-13T12:00:00.000Z');
+  const connectorId = '1'.repeat(24);
+  const shareId = '5'.repeat(24);
+  models.state.jobs.push({
+    _id: '3'.repeat(24),
+    connectorId,
+    storageRootId: '2'.repeat(24),
+    connectorRootId: ROOT.connectorRootId,
+    type: 'cache_for_download',
+    status: 'in_progress',
+    payload: { fileEntryId: 'a'.repeat(24), fileShareId: shareId },
+    updatedAt: new Date(currentTime.getTime() - (31 * 60 * 1_000)),
+    createdAt: new Date(currentTime.getTime() - (31 * 60 * 1_000)),
+  });
+  models.state.shares.push({
+    _id: shareId,
+    status: 'active',
+    deliveryStatus: 'preparing',
+  });
+  const app = await startApp({
+    models,
+    now: () => new Date(currentTime),
+    requireHttpsMiddleware: (req, res, next) => next(),
+  });
+  try {
+    const listed = await json(`${app.url}/api/nas-connectors/recovery/jobs`, {
+      headers: { authorization: 'Bearer admin' },
+    });
+    assert.equal(listed.response.status, 200);
+    assert.equal(listed.body.jobs.length, 1);
+    assert.equal(listed.body.jobs[0].id, '3'.repeat(24));
+
+    const stopped = await json(`${app.url}/api/nas-connectors/${connectorId}/jobs/${'3'.repeat(24)}/recovery/stop`, {
+      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
+    });
+    assert.equal(stopped.response.status, 200);
+    assert.equal(stopped.body.job.status, 'failed');
+    assert.equal(models.state.jobs[0].errorCode, 'operator_recovery_stopped');
+    assert.equal(models.state.shares[0].deliveryStatus, 'failed');
+    assert.equal(models.state.audits.at(-1).action, 'job_recovery_stopped');
+
+    const repeated = await json(`${app.url}/api/nas-connectors/${connectorId}/jobs/${'3'.repeat(24)}/recovery/stop`, {
+      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
+    });
+    assert.equal(repeated.response.status, 409);
+    assert.equal(repeated.body.code, 'NAS_CONNECTOR_JOB_NOT_STUCK');
   } finally {
     await close(app.server);
   }
@@ -820,8 +906,8 @@ test('an authenticated connector turns an accepted index job into a completed re
       { method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}' },
     );
     const jobId = jobResponse.body.job.id;
-    // WSS durable acknowledgement is separately covered; this route test starts
-    // at the point where that acknowledgement has committed.
+    // Durable polling acknowledgement is separately covered; this route test
+    // starts at the point where that acknowledgement has committed.
     models.state.jobs[0].status = 'accepted';
     const connectorHeaders = { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` };
 
@@ -831,6 +917,22 @@ test('an authenticated connector turns an accepted index job into a completed re
     assert.equal(started.response.status, 200);
     assert.equal(models.state.jobs[0].status, 'in_progress');
     assert.equal(models.state.jobs[0].scanId, scanId);
+
+    // A full scan must make the same cache/thumbnail transition as a watcher
+    // update when it observes a new version of an existing file.
+    models.state.fileEntries.push({
+      _id: '4'.repeat(24),
+      storageRootId: models.state.roots[0]._id,
+      relativePath: 'design/preview.jpg',
+      parentPath: 'design',
+      name: 'preview.jpg',
+      entryType: 'file',
+      sizeBytes: 1024,
+      versionFingerprint: 'old-version',
+      availabilityStatus: 'online',
+      thumbnailStatus: 'ready',
+      deletedAt: null,
+    });
 
     const batch = await json(`${app.url}/api/nas-connectors/control/jobs/${jobId}/index/batches`, {
       method: 'POST',
@@ -854,7 +956,8 @@ test('an authenticated connector turns an accepted index job into a completed re
     assert.equal(models.state.fileEntries.length, 1);
     assert.equal(models.state.fileEntries[0].relativePath, 'design/preview.jpg');
     assert.equal(models.state.fileEntries[0].lastSeenScanId, scanId);
-    assert.equal(models.state.fileEntries[0].availabilityStatus, 'offline');
+    assert.equal(models.state.fileEntries[0].availabilityStatus, 'stale');
+    assert.equal(models.state.fileEntries[0].thumbnailStatus, 'stale');
 
     const completed = await json(`${app.url}/api/nas-connectors/control/jobs/${jobId}/index/complete`, {
       method: 'POST', headers: connectorHeaders, body: JSON.stringify({ scanId, entryCount: 1 }),
@@ -870,6 +973,83 @@ test('an authenticated connector turns an accepted index job into a completed re
     });
     assert.equal(completionRetry.response.status, 200);
     assert.equal(completionRetry.body.job.status, 'completed');
+  } finally {
+    await close(app.server);
+  }
+});
+
+test('cache completion replays after the share became ready but the entry update failed', async () => {
+  const models = createInMemoryModels();
+  const cacheStorage = { async headFile() { return { ContentLength: 42 }; } };
+  const app = await startApp({
+    models,
+    cacheStorage,
+    requireHttpsMiddleware: (req, res, next) => next(),
+    configOverrides: { cachePrefix: 'nas-cache/' },
+  });
+  try {
+    const connected = await json(`${app.url}/api/nas-connectors/connect`, {
+      method: 'POST',
+      headers: { authorization: `ConnectorKey ${DEVICE_SECRET}` },
+      body: JSON.stringify({ installationId: INSTALLATION_ID, agentVersion: '1.0.0', root: ROOT }),
+    });
+    const connectorId = connected.body.connector.id;
+    const root = models.state.roots[0];
+    const fileEntryId = 'a'.repeat(24);
+    const fileShareId = 'b'.repeat(24);
+    models.state.fileEntries.push({
+      _id: fileEntryId,
+      storageRootId: root._id,
+      relativePath: 'design/preview.jpg',
+      entryType: 'file',
+      sizeBytes: 42,
+      versionFingerprint: 'version-1',
+      availabilityStatus: 'offline',
+      thumbnailStatus: 'not_requested',
+      deletedAt: null,
+    });
+    models.state.shares.push({
+      _id: fileShareId,
+      sourceType: 'nas_file',
+      nasFileEntryId: fileEntryId,
+      status: 'active',
+      deliveryStatus: 'preparing',
+      cacheExpiresAt: new Date(Date.now() + 60_000),
+    });
+    const job = await models.TransferJobModel.create({
+      type: 'cache_for_download',
+      status: 'in_progress',
+      connectorId,
+      storageRootId: root._id,
+      connectorRootId: ROOT.connectorRootId,
+      idempotencyKey: 'cache:replay',
+      payload: { fileEntryId, fileShareId },
+    });
+    const originalUpdateEntry = models.FileEntryModel.findOneAndUpdate;
+    let failEntryUpdateOnce = true;
+    models.FileEntryModel.findOneAndUpdate = async (...args) => {
+      if (failEntryUpdateOnce) {
+        failEntryUpdateOnce = false;
+        throw new Error('injected entry update failure');
+      }
+      return originalUpdateEntry(...args);
+    };
+    const request = {
+      method: 'POST',
+      headers: { authorization: `Connector ${connectorId}.${DEVICE_SECRET}` },
+      body: JSON.stringify({ versionFingerprint: 'version-1', sizeBytes: 42 }),
+    };
+
+    const failedAttempt = await json(`${app.url}/api/nas-connectors/control/jobs/${job._id}/cache/complete`, request);
+    assert.equal(failedAttempt.response.status, 500);
+    assert.equal(models.state.shares[0].deliveryStatus, 'ready');
+    assert.equal(models.state.jobs[0].status, 'in_progress');
+
+    const replay = await json(`${app.url}/api/nas-connectors/control/jobs/${job._id}/cache/complete`, request);
+    assert.equal(replay.response.status, 200);
+    assert.equal(replay.body.job.status, 'completed');
+    assert.equal(models.state.fileEntries[0].availabilityStatus, 'online');
+    assert.equal(models.state.fileEntries[0].cacheVersionFingerprint, 'version-1');
   } finally {
     await close(app.server);
   }
@@ -934,13 +1114,9 @@ test('an authenticated connector applies small relative watcher updates without 
 
 test('admin re-enrollment tokens rotate a revoked or offline connector credential and reactivate it', async () => {
   const models = createInMemoryModels();
-  const closedSessions = [];
   const app = await startApp({
     models,
     requireHttpsMiddleware: (req, res, next) => next(),
-    controlSessionRegistry: {
-      closeConnector(connectorId, options) { closedSessions.push({ connectorId, options }); },
-    },
   });
   try {
     const initialToken = await json(`${app.url}/api/nas-connectors/enrollment-tokens`, {
@@ -957,8 +1133,6 @@ test('admin re-enrollment tokens rotate a revoked or offline connector credentia
       }),
     });
     const connectorId = initialEnrollment.body.connector.id;
-    const originalCredentialHash = models.state.connectors[0].credentialHash;
-
     const firstReEnrollmentToken = await json(`${app.url}/api/nas-connectors/${connectorId}/re-enrollment-tokens`, {
       method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
     });
@@ -1026,10 +1200,6 @@ test('admin re-enrollment tokens rotate a revoked or offline connector credentia
     assert.notEqual(models.state.connectors[0].credentialHash, DEVICE_SECRET);
     assert.equal(models.state.roots[0].status, 'active');
     assert.equal(models.state.roots[0].displayName, 'Restored NAS Root');
-    assert.deepEqual(closedSessions.at(-1), {
-      connectorId,
-      options: { expectedCredentialHash: originalCredentialHash },
-    });
 
     // Connector transport now uses the configured shared key, independently
     // of this retained legacy-token migration test.

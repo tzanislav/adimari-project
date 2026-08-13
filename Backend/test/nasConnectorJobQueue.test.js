@@ -22,7 +22,9 @@ const matchesValue = (actual, expected) => {
 };
 
 const matches = (record, filter) => Object.entries(filter)
-  .every(([key, expected]) => matchesValue(record[key], expected));
+  .every(([key, expected]) => (key === '$or'
+    ? expected.some((clause) => matches(record, clause))
+    : matchesValue(record[key], expected)));
 
 const createJobModel = () => {
   const records = [];
@@ -30,6 +32,7 @@ const createJobModel = () => {
 
   const applyUpdate = (record, update = {}) => {
     if (update.$set) Object.assign(record, update.$set);
+    if (update.$unset) Object.keys(update.$unset).forEach((key) => { delete record[key]; });
     if (update.$inc) {
       Object.entries(update.$inc).forEach(([key, amount]) => {
         record[key] = (record[key] || 0) + amount;
@@ -87,7 +90,7 @@ const createJobModel = () => {
 
 const deliveryUuid = (number) => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`;
 
-test('persists an index-root assignment before accepting its acknowledgement and accepts an exact retry', async () => {
+test('polling persists an index-root lease before accepting its acknowledgement and accepts an exact retry', async () => {
   const model = createJobModel();
   let currentTime = new Date('2026-08-12T12:00:00.000Z');
   let deliverySequence = 1;
@@ -114,56 +117,71 @@ test('persists an index-root assignment before accepting its acknowledgement and
   assert.equal(repeatedEnqueue.created, false);
   assert.equal(first.job._id, repeatedEnqueue.job._id);
 
-  const assignments = [];
-  const unregister = queue.registerDeliveryTarget(CONNECTOR_ID, async (assignment) => {
-    assignments.push(assignment);
-    return deliveryUuid(100 + assignments.length);
-  });
-  await queue.requestDispatch(CONNECTOR_ID);
-  assert.equal(assignments.length, 1);
-  assert.deepEqual(Object.keys(assignments[0]).sort(), [
+  const firstAssignment = await queue.poll(CONNECTOR_ID);
+  assert.deepEqual(Object.keys(firstAssignment).sort(), [
     'connectorRootId', 'deliveryId', 'jobId', 'jobType', 'leaseExpiresAt', 'payload',
   ]);
   assert.equal(model.records[0].status, 'assigned');
 
-  // Repeating the admin request is an explicit delivery retry, not merely a
-  // passive duplicate response. It keeps the same durable lease/job but sends
-  // another correlated assignment frame to the live Connector session.
-  const retriedEnqueue = await queue.enqueueIndexRoot({
-    connectorId: CONNECTOR_ID,
-    storageRootId: STORAGE_ROOT_ID,
-    connectorRootId: ROOT_ID,
-    requestedBy: 'admin-user',
-  });
-  assert.equal(retriedEnqueue.created, false);
-  assert.equal(assignments.length, 2);
-  assert.equal(assignments[1].jobId, assignments[0].jobId);
-  assert.equal(assignments[1].deliveryId, assignments[0].deliveryId);
+  const retriedAssignment = await queue.poll(CONNECTOR_ID);
+  assert.equal(retriedAssignment.jobId, firstAssignment.jobId);
+  assert.equal(retriedAssignment.deliveryId, firstAssignment.deliveryId);
 
   const acknowledgement = {
-    jobId: assignments[0].jobId,
-    deliveryId: assignments[0].deliveryId,
+    jobId: firstAssignment.jobId,
+    deliveryId: firstAssignment.deliveryId,
     status: 'accepted',
   };
-  const replyTo = deliveryUuid(101);
-  const accepted = await queue.acknowledge({
+  const accepted = await queue.acknowledgePolled({
     connectorId: CONNECTOR_ID,
     payload: acknowledgement,
-    replyTo,
   });
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.replay, false);
   assert.equal(model.records[0].status, 'accepted');
   assert.ok(model.records[0].acceptedAt);
 
-  const replay = await queue.acknowledge({
+  const replay = await queue.acknowledgePolled({
     connectorId: CONNECTOR_ID,
     payload: { ...acknowledgement, status: 'duplicate' },
-    replyTo,
   });
   assert.equal(replay.accepted, true);
   assert.equal(replay.replay, true);
-  unregister();
+});
+
+test('HTTPS polling reuses a durable lease until its local receipt is acknowledged', async () => {
+  const model = createJobModel();
+  const queue = new NasConnectorJobQueue({
+    NasTransferJobModel: model,
+    leaseSeconds: 15,
+    createDeliveryId: () => deliveryUuid(700),
+  });
+  const queued = await queue.enqueueIndexRoot({
+    connectorId: CONNECTOR_ID,
+    storageRootId: STORAGE_ROOT_ID,
+    connectorRootId: ROOT_ID,
+  });
+
+  const first = await queue.poll(CONNECTOR_ID);
+  const retry = await queue.poll(CONNECTOR_ID);
+  assert.equal(first.jobId, queued.job._id);
+  assert.equal(retry.jobId, first.jobId);
+  assert.equal(retry.deliveryId, first.deliveryId);
+  assert.equal(model.records[0].status, 'assigned');
+
+  const accepted = await queue.acknowledgePolled({
+    connectorId: CONNECTOR_ID,
+    payload: { jobId: first.jobId, deliveryId: first.deliveryId, status: 'accepted' },
+  });
+  assert.equal(accepted.accepted, true);
+  assert.equal(model.records[0].status, 'accepted');
+
+  const replay = await queue.acknowledgePolled({
+    connectorId: CONNECTOR_ID,
+    payload: { jobId: first.jobId, deliveryId: first.deliveryId, status: 'duplicate' },
+  });
+  assert.equal(replay.accepted, true);
+  assert.equal(replay.replay, true);
 });
 
 test('recovers an abandoned accepted job and prioritizes a requested file delivery', async () => {
@@ -196,19 +214,48 @@ test('recovers an abandoned accepted job and prioritizes a requested file delive
     payload: { fileEntryId: 'b'.repeat(24), fileShareId: 'c'.repeat(24) },
   });
 
-  const assignments = [];
-  const unregister = queue.registerDeliveryTarget(CONNECTOR_ID, async (assignment) => {
-    assignments.push(assignment);
-    return deliveryUuid(101);
-  });
-  await queue.requestDispatch(CONNECTOR_ID);
+  const assignment = await queue.poll(CONNECTOR_ID);
 
   assert.equal(abandoned.status, 'queued');
   assert.equal(abandoned.acceptedAt, null);
-  assert.equal(assignments.length, 1);
-  assert.equal(assignments[0].jobId, requested._id);
-  assert.equal(assignments[0].jobType, 'cache_for_download');
-  unregister();
+  assert.equal(assignment.jobId, requested._id);
+  assert.equal(assignment.jobType, 'cache_for_download');
+});
+
+test('watchdog fails an abandoned in-progress job and releases the next queued job', async () => {
+  const model = createJobModel();
+  const currentTime = new Date('2026-08-13T00:30:00.000Z');
+  const queue = new NasConnectorJobQueue({
+    NasTransferJobModel: model,
+    leaseSeconds: 15,
+    inProgressJobTimeoutSeconds: 60,
+    now: () => new Date(currentTime),
+    createDeliveryId: () => deliveryUuid(55),
+  });
+  const stuck = await model.create({
+    type: 'generate_thumbnail',
+    status: 'in_progress',
+    connectorId: CONNECTOR_ID,
+    storageRootId: STORAGE_ROOT_ID,
+    connectorRootId: ROOT_ID,
+    idempotencyKey: 'generate_thumbnail:stuck',
+    payload: { fileEntryId: 'a'.repeat(24) },
+    progressUpdatedAt: new Date(currentTime.getTime() - (2 * 60 * 1000)),
+  });
+  const next = await model.create({
+    type: 'cache_for_download',
+    status: 'queued',
+    connectorId: CONNECTOR_ID,
+    storageRootId: STORAGE_ROOT_ID,
+    connectorRootId: ROOT_ID,
+    payload: { fileEntryId: 'b'.repeat(24), fileShareId: 'c'.repeat(24) },
+  });
+  const assignment = await queue.poll(CONNECTOR_ID);
+
+  assert.equal(stuck.status, 'failed');
+  assert.equal(stuck.errorCode, 'connector_job_watchdog_timeout');
+  assert.equal(stuck.idempotencyKey, undefined);
+  assert.equal(assignment.jobId, next._id);
 });
 
 test('an expired delivery receives a new lease and an old acknowledgement cannot change it', async () => {
@@ -227,38 +274,28 @@ test('an expired delivery receives a new lease and an old acknowledgement cannot
     connectorRootId: ROOT_ID,
   });
 
-  const assignments = [];
-  const unregister = queue.registerDeliveryTarget(CONNECTOR_ID, async (assignment) => {
-    assignments.push(assignment);
-    return deliveryUuid(200 + assignments.length);
-  });
-  await queue.requestDispatch(CONNECTOR_ID);
-  const first = assignments[0];
+  const first = await queue.poll(CONNECTOR_ID);
   assert.ok(first);
 
   currentTime = new Date(currentTime.getTime() + (16 * 1000));
-  await queue.requestDispatch(CONNECTOR_ID);
-  const second = assignments[1];
+  const second = await queue.poll(CONNECTOR_ID);
   assert.ok(second);
   assert.notEqual(second.deliveryId, first.deliveryId);
   assert.equal(model.records[0].attemptCount, 2);
 
-  const oldAcknowledgement = await queue.acknowledge({
+  const oldAcknowledgement = await queue.acknowledgePolled({
     connectorId: CONNECTOR_ID,
     payload: { jobId: first.jobId, deliveryId: first.deliveryId, status: 'accepted' },
-    replyTo: deliveryUuid(201),
   });
   assert.equal(oldAcknowledgement.accepted, false);
   assert.equal(model.records[0].status, 'assigned');
 
-  const currentAcknowledgement = await queue.acknowledge({
+  const currentAcknowledgement = await queue.acknowledgePolled({
     connectorId: CONNECTOR_ID,
     payload: { jobId: second.jobId, deliveryId: second.deliveryId, status: 'duplicate' },
-    replyTo: deliveryUuid(202),
   });
   assert.equal(currentAcknowledgement.accepted, true);
   assert.equal(model.records[0].status, 'accepted');
-  unregister();
 });
 
 test('delivers an index job when Mongoose has minimized its required empty payload', async () => {
@@ -276,17 +313,10 @@ test('delivers an index job when Mongoose has minimized its required empty paylo
   // Mongoose removes empty Mixed fields with its default `minimize` option.
   delete model.records[0].payload;
 
-  const assignments = [];
-  const unregister = queue.registerDeliveryTarget(CONNECTOR_ID, async (assignment) => {
-    assignments.push(assignment);
-    return deliveryUuid(299);
-  });
-  await queue.requestDispatch(CONNECTOR_ID);
+  const assignment = await queue.poll(CONNECTOR_ID);
 
-  assert.equal(assignments.length, 1);
-  assert.deepEqual(assignments[0].payload, {});
+  assert.deepEqual(assignment.payload, {});
   assert.equal(model.records[0].status, 'assigned');
-  unregister();
 });
 
 test('delivers one cache-for-download job with opaque file and share IDs', async () => {
@@ -307,28 +337,20 @@ test('delivers one cache-for-download job with opaque file and share IDs', async
   });
   assert.equal(created.created, true);
 
-  const assignments = [];
-  const unregister = queue.registerDeliveryTarget(CONNECTOR_ID, async (assignment) => {
-    assignments.push(assignment);
-    return deliveryUuid(377);
-  });
-  await queue.requestDispatch(CONNECTOR_ID);
-  assert.equal(assignments.length, 1);
-  assert.equal(assignments[0].jobType, 'cache_for_download');
-  assert.deepEqual(assignments[0].payload, { fileEntryId, fileShareId });
+  const assignment = await queue.poll(CONNECTOR_ID);
+  assert.equal(assignment.jobType, 'cache_for_download');
+  assert.deepEqual(assignment.payload, { fileEntryId, fileShareId });
 
-  const acknowledgement = await queue.acknowledge({
+  const acknowledgement = await queue.acknowledgePolled({
     connectorId: CONNECTOR_ID,
     payload: {
-      jobId: assignments[0].jobId,
-      deliveryId: assignments[0].deliveryId,
+      jobId: assignment.jobId,
+      deliveryId: assignment.deliveryId,
       status: 'accepted',
     },
-    replyTo: deliveryUuid(377),
   });
   assert.equal(acknowledgement.accepted, true);
   assert.equal(model.records[0].status, 'accepted');
-  unregister();
 });
 
 test('reuses a thumbnail job while its image generation is in progress', async () => {
@@ -345,6 +367,25 @@ test('reuses a thumbnail job while its image generation is in progress', async (
   const first = await queue.enqueueThumbnail(request);
   model.records[0].status = 'in_progress';
   const repeated = await queue.enqueueThumbnail(request);
+
+  assert.equal(first.created, true);
+  assert.equal(repeated.created, false);
+  assert.equal(repeated.job._id, first.job._id);
+  assert.equal(model.records.length, 1);
+});
+
+test('reuses a manual index job while its scan is in progress', async () => {
+  const model = createJobModel();
+  const queue = new NasConnectorJobQueue({ NasTransferJobModel: model });
+  const request = {
+    connectorId: CONNECTOR_ID,
+    storageRootId: STORAGE_ROOT_ID,
+    connectorRootId: ROOT_ID,
+  };
+
+  const first = await queue.enqueueIndexRoot(request);
+  model.records[0].status = 'in_progress';
+  const repeated = await queue.enqueueIndexRoot(request);
 
   assert.equal(first.created, true);
   assert.equal(repeated.created, false);
@@ -373,16 +414,9 @@ test('delivers an upload job without its backend-private staging payload', async
       stagingKey: 'nas-upload-staging/private/object',
     },
   });
-  const assignments = [];
-  const unregister = queue.registerDeliveryTarget(CONNECTOR_ID, async (assignment) => {
-    assignments.push(assignment);
-    return deliveryUuid(388);
-  });
-  await queue.requestDispatch(CONNECTOR_ID);
+  const assignment = await queue.poll(CONNECTOR_ID);
 
-  assert.equal(assignments.length, 1);
-  assert.equal(assignments[0].jobType, WRITE_UPLOAD_TO_NAS_JOB_TYPE);
-  assert.deepEqual(assignments[0].payload, {});
-  assert.equal('stagingKey' in assignments[0].payload, false);
-  unregister();
+  assert.equal(assignment.jobType, WRITE_UPLOAD_TO_NAS_JOB_TYPE);
+  assert.deepEqual(assignment.payload, {});
+  assert.equal('stagingKey' in assignment.payload, false);
 });

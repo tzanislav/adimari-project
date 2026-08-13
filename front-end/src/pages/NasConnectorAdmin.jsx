@@ -87,6 +87,10 @@ function NasConnectorAdmin() {
   const [cancellingIndexConnectorId, setCancellingIndexConnectorId] = useState(null);
   const [testingConnectorId, setTestingConnectorId] = useState(null);
   const [indexJobsByConnector, setIndexJobsByConnector] = useState({});
+  const [recoveryJobs, setRecoveryJobs] = useState([]);
+  const [recoveryLoading, setRecoveryLoading] = useState(true);
+  const [recoveryError, setRecoveryError] = useState('');
+  const [stoppingRecoveryJobId, setStoppingRecoveryJobId] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -108,6 +112,24 @@ function NasConnectorAdmin() {
   useEffect(() => {
     void loadConnectors();
   }, [loadConnectors]);
+
+  const loadRecoveryJobs = useCallback(async ({ showLoading = true } = {}) => {
+    if (showLoading) setRecoveryLoading(true);
+    setRecoveryError('');
+
+    try {
+      const data = await apiRequest('/recovery/jobs');
+      setRecoveryJobs(Array.isArray(data?.jobs) ? data.jobs : []);
+    } catch (requestError) {
+      setRecoveryError(describeError(requestError));
+    } finally {
+      if (showLoading) setRecoveryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRecoveryJobs();
+  }, [loadRecoveryJobs]);
 
   const loadIndexJobs = useCallback(async (connectorIds) => {
     const results = await Promise.all(connectorIds.map(async (connectorId) => {
@@ -304,6 +326,33 @@ function NasConnectorAdmin() {
     }
   };
 
+  const stopRecoveryJob = async (job) => {
+    if (!job?.id || !job?.connectorId) return;
+
+    const confirmed = window.confirm(
+      `Stop this stale ${job.type || 'connector'} job? This records it as failed and does not replay NAS work. You can request a new operation after reviewing the failure.`,
+    );
+    if (!confirmed) return;
+
+    setStoppingRecoveryJobId(job.id);
+    setError('');
+    setNotice('');
+    setRecoveryError('');
+    try {
+      await apiRequest(`/${encodeURIComponent(job.connectorId)}/jobs/${encodeURIComponent(job.id)}/recovery/stop`, {
+        method: 'POST',
+        body: {},
+      });
+      setRecoveryJobs((current) => current.filter((entry) => entry.id !== job.id));
+      setNotice(`Stopped the stale ${job.type || 'connector'} job. It was not replayed.`);
+      await loadConnectors({ showLoading: false });
+    } catch (requestError) {
+      setRecoveryError(describeError(requestError));
+    } finally {
+      setStoppingRecoveryJobId(null);
+    }
+  };
+
   return (
     <main className="nas-connector-admin-page">
       <header className="nas-connector-admin-header">
@@ -312,7 +361,7 @@ function NasConnectorAdmin() {
           <h1>NAS Connectors</h1>
           <p>Monitor Windows connector installations that provide access to NAS-backed files.</p>
         </div>
-        <button className="nas-connector-button" type="button" onClick={() => void loadConnectors()} disabled={loading}>
+        <button className="nas-connector-button" type="button" onClick={() => { void loadConnectors(); void loadRecoveryJobs(); }} disabled={loading || recoveryLoading}>
           Refresh
         </button>
       </header>
@@ -326,6 +375,59 @@ function NasConnectorAdmin() {
 
       {error && <p className="nas-connector-message error" role="alert">{error}</p>}
       {notice && <p className="nas-connector-message success" role="status">{notice}</p>}
+
+      <section className="nas-connector-list-section nas-connector-recovery" aria-labelledby="nas-recovery-title">
+        <div className="nas-connector-list-heading">
+          <div>
+            <h2 id="nas-recovery-title">Stale jobs</h2>
+            <p>Only active jobs with no backend progress for the configured recovery interval appear here. Stopping one marks it failed; it never retries NAS work automatically.</p>
+          </div>
+          <button className="nas-connector-button compact" type="button" onClick={() => void loadRecoveryJobs()} disabled={recoveryLoading}>
+            {recoveryLoading ? 'Checking...' : 'Check stale jobs'}
+          </button>
+        </div>
+
+        {recoveryError && <p className="nas-connector-message error" role="alert">{recoveryError}</p>}
+        {recoveryLoading ? (
+          <p className="nas-connector-empty">Checking active jobs...</p>
+        ) : recoveryJobs.length === 0 ? (
+          <p className="nas-connector-empty">No stale active jobs were found.</p>
+        ) : (
+          <div className="nas-connector-table-wrap">
+            <table className="nas-connector-table nas-connector-recovery-table">
+              <thead>
+                <tr>
+                  <th scope="col">Job</th>
+                  <th scope="col">State</th>
+                  <th scope="col">Last backend progress</th>
+                  <th scope="col"><span className="nas-connector-visually-hidden">Recovery action</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {recoveryJobs.map((job) => {
+                  const connector = connectors.find((entry) => entry.id === job.connectorId);
+                  const isStopping = stoppingRecoveryJobId === job.id;
+                  return (
+                    <tr key={job.id}>
+                      <td data-label="Job">
+                        <strong>{(job.type || 'connector job').replaceAll('_', ' ')}</strong>
+                        <span className="nas-connector-installation-id">{connector?.name || job.connectorId}</span>
+                      </td>
+                      <td data-label="State"><span className={`nas-connector-index-status ${job.status || 'unknown'}`}>{job.status || 'unknown'}</span></td>
+                      <td data-label="Last backend progress">{formatDate(job.progressUpdatedAt || job.updatedAt || job.assignedAt || job.createdAt)}</td>
+                      <td className="nas-connector-actions" data-label="Recovery action">
+                        <button className="nas-connector-button danger compact" type="button" onClick={() => void stopRecoveryJob(job)} disabled={isStopping}>
+                          {isStopping ? 'Stopping...' : 'Stop stale job'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="nas-connector-list-section" aria-labelledby="nas-connectors-title">
         <div className="nas-connector-list-heading">

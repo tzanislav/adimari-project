@@ -36,30 +36,6 @@ server {
     # Express.
     client_max_body_size 1m;
 
-    # Keep this exact endpoint ahead of the general proxy location. It limits
-    # unauthenticated WSS upgrade abuse before traffic reaches Node.
-    location = /api/nas-connectors/control/socket {
-        limit_req zone=adimari_connector_upgrade burst=10 nodelay;
-        limit_conn adimari_connector_connection 2;
-
-        proxy_pass http://127.0.0.1:__ADIMARI_BACKEND_PORT__;
-        proxy_http_version 1.1;
-
-        # Overwrite every client-controlled forwarding header. In particular,
-        # do not append `$http_x_forwarded_for`: the backend uses this value
-        # only after trusting this local proxy as its per-client rate-limit key.
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $adimari_connection_upgrade;
-        proxy_read_timeout 3600s;
-        proxy_send_timeout 3600s;
-        proxy_buffering off;
-    }
-
     location / {
         proxy_pass http://127.0.0.1:__ADIMARI_BACKEND_PORT__;
         proxy_http_version 1.1;
@@ -74,12 +50,5 @@ server {
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # The exact connector socket location above needs these headers. They
-        # are harmless for ordinary HTTPS requests routed here.
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $adimari_connection_upgrade;
-        proxy_read_timeout 3600s;
-        proxy_send_timeout 3600s;
-        proxy_buffering off;
     }
 }

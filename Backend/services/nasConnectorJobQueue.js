@@ -140,18 +140,17 @@ const normalizeThumbnailPayload = (value) => {
 };
 
 /**
- * Durable backend queue plus a tiny in-process bridge to the one active WSS
- * session. MongoDB remains the authority: the socket only carries a lease.
- * This service assumes the documented single Node/PM2 process deployment.
+ * Durable backend queue for one serial connector. MongoDB remains the
+ * authority; authenticated HTTPS polling reads only a short-lived lease.
  */
 class NasConnectorJobQueue {
   constructor({
     NasTransferJobModel,
     leaseSeconds = 90,
     acceptedJobTimeoutSeconds = 120,
+    inProgressJobTimeoutSeconds = 20 * 60,
     now = () => new Date(),
     createDeliveryId = () => crypto.randomUUID(),
-    resolveDeliveryTarget = null,
   } = {}) {
     if (!NasTransferJobModel) {
       throw new Error('NAS connector job queue requires a transfer-job model.');
@@ -162,22 +161,16 @@ class NasConnectorJobQueue {
     if (!Number.isSafeInteger(acceptedJobTimeoutSeconds) || acceptedJobTimeoutSeconds < 30 || acceptedJobTimeoutSeconds > 3_600) {
       throw new Error('NAS connector accepted-job timeout must be between 30 and 3600 seconds.');
     }
+    if (!Number.isSafeInteger(inProgressJobTimeoutSeconds) || inProgressJobTimeoutSeconds < 60 || inProgressJobTimeoutSeconds > 86_400) {
+      throw new Error('NAS connector in-progress-job timeout must be between 60 and 86400 seconds.');
+    }
 
     this.NasTransferJobModel = NasTransferJobModel;
     this.leaseSeconds = leaseSeconds;
     this.acceptedJobTimeoutSeconds = acceptedJobTimeoutSeconds;
+    this.inProgressJobTimeoutSeconds = inProgressJobTimeoutSeconds;
     this.now = now;
     this.createDeliveryId = createDeliveryId;
-    this.resolveDeliveryTarget = typeof resolveDeliveryTarget === 'function'
-      ? resolveDeliveryTarget
-      : null;
-    this.deliveryTargets = new Map();
-    this.dispatching = new Map();
-    this.leaseTimers = new Map();
-    // Assignment message IDs are ephemeral socket correlations. They never
-    // contain credentials or native paths and live only for the active socket
-    // session, so a connector can safely repeat a lost acknowledgement.
-    this.assignmentMessageIds = new Map();
   }
 
   async enqueueIndexRoot({
@@ -185,7 +178,6 @@ class NasConnectorJobQueue {
     storageRootId,
     connectorRootId,
     requestedBy = null,
-    waitForDelivery = true,
   } = {}) {
     const normalizedConnectorId = connectorIdOf(connectorId);
     const normalizedStorageRootId = connectorIdOf(storageRootId);
@@ -200,13 +192,9 @@ class NasConnectorJobQueue {
     const idempotencyKey = `${INDEX_ROOT_JOB_TYPE}:${normalizedConnectorId}:${normalizedRootId}`;
     const existing = await resolveQuery(this.NasTransferJobModel.findOne({
       idempotencyKey,
-      status: { $in: ACTIVE_JOB_STATUSES },
+      status: { $in: MANUAL_INDEX_ACTIVE_STATUSES },
     }));
     if (existing) {
-      // The same browser action is also a useful explicit retry for a job
-      // whose original socket frame was lost. In particular, a server restart
-      // loses in-memory lease timers but not the durable `assigned` row.
-      await this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
       return { job: existing, created: false };
     }
 
@@ -229,17 +217,12 @@ class NasConnectorJobQueue {
       if (error?.code !== 11000) throw error;
       job = await resolveQuery(this.NasTransferJobModel.findOne({
         idempotencyKey,
-        status: { $in: ACTIVE_JOB_STATUSES },
+        status: { $in: MANUAL_INDEX_ACTIVE_STATUSES },
       }));
       if (!job) throw error;
-      await this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
       return { job, created: false };
     }
 
-    // There is nothing to send until the connector has a live WSS session.
-    // Leaving the record queued avoids a short-lived no-target dispatch race;
-    // registerDeliveryTarget immediately requests delivery when it connects.
-    await this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
     return { job, created: true };
   }
 
@@ -255,7 +238,6 @@ class NasConnectorJobQueue {
     fileEntryId,
     fileShareId,
     requestedBy = null,
-    waitForDelivery = false,
   } = {}) {
     const normalizedConnectorId = connectorIdOf(connectorId);
     const normalizedStorageRootId = connectorIdOf(storageRootId);
@@ -274,7 +256,6 @@ class NasConnectorJobQueue {
       status: { $in: ACTIVE_JOB_STATUSES },
     }));
     if (existing) {
-      this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
       return { job: existing, created: false };
     }
 
@@ -290,7 +271,6 @@ class NasConnectorJobQueue {
     };
     try {
       const job = await this.NasTransferJobModel.create(document);
-      this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
       return { job, created: true };
     } catch (error) {
       if (error?.code !== 11000) throw error;
@@ -299,7 +279,6 @@ class NasConnectorJobQueue {
         status: { $in: ACTIVE_JOB_STATUSES },
       }));
       if (!job) throw error;
-      this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
       return { job, created: false };
     }
   }
@@ -311,7 +290,6 @@ class NasConnectorJobQueue {
     fileEntryId,
     versionFingerprint,
     requestedBy = null,
-    waitForDelivery = false,
   } = {}) {
     const normalizedConnectorId = connectorIdOf(connectorId);
     const normalizedStorageRootId = connectorIdOf(storageRootId);
@@ -331,7 +309,6 @@ class NasConnectorJobQueue {
       status: { $in: ACTIVE_THUMBNAIL_JOB_STATUSES },
     }));
     if (existing) {
-      this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
       return { job: existing, created: false };
     }
     const document = {
@@ -346,7 +323,6 @@ class NasConnectorJobQueue {
     };
     try {
       const job = await this.NasTransferJobModel.create(document);
-      this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
       return { job, created: true };
     } catch (error) {
       if (error?.code !== 11000) throw error;
@@ -355,17 +331,16 @@ class NasConnectorJobQueue {
         status: { $in: ACTIVE_THUMBNAIL_JOB_STATUSES },
       }));
       if (!job) throw error;
-      this.triggerDeliveryAfterQueueWrite(normalizedConnectorId, waitForDelivery);
       return { job, created: false };
     }
   }
 
   /**
    * Creates an already accepted index job for the connector's own local
-   * Control Center. This intentionally bypasses WSS delivery: the local
+   * Control Center. This intentionally bypasses remote delivery: the local
    * service that makes this request persists the matching job immediately
    * before it starts scanning. It gives an operator an observable fallback
-   * when the browser-to-control-channel dispatch has not yet completed.
+   * when a browser-requested remote delivery has not yet completed.
    */
   async requestLocalIndexRoot({ connectorId, storageRootId, connectorRootId } = {}) {
     const normalizedConnectorId = connectorIdOf(connectorId);
@@ -445,140 +420,17 @@ class NasConnectorJobQueue {
     return resolveQuery(query);
   }
 
-  async dispatchAfterQueueWrite(connectorId) {
-    const key = connectorIdOf(connectorId);
-    const delivered = await this.requestDispatch(key);
-    if (delivered || !this.hasDeliveryTarget(key)) return delivered;
-
-    // A live connection can register at the exact instant a new job is
-    // written. Its first dispatch may have checked Mongo just before the job
-    // existed; make one follow-up attempt after that in-flight check settles.
-    return this.requestDispatch(key);
-  }
-
-  triggerDeliveryAfterQueueWrite(connectorId, waitForDelivery) {
-    if (!this.hasDeliveryTarget(connectorId)) return;
-    const dispatch = this.dispatchAfterQueueWrite(connectorId);
-    if (waitForDelivery) return dispatch;
-    void dispatch;
-  }
-
-  setDeliveryTargetResolver(resolveDeliveryTarget) {
-    this.resolveDeliveryTarget = typeof resolveDeliveryTarget === 'function'
-      ? resolveDeliveryTarget
-      : null;
-  }
-
-  getDeliveryTarget(connectorId) {
-    const key = connectorIdOf(connectorId);
-    const resolved = this.resolveDeliveryTarget?.(key);
-    if (typeof resolved === 'function') {
-      return { sendAssignment: resolved, source: 'active_session' };
-    }
-    const registered = this.deliveryTargets.get(key);
-    return registered ? { ...registered, source: 'registered_target' } : null;
-  }
-
-  hasDeliveryTarget(connectorId) {
-    return Boolean(this.getDeliveryTarget(connectorId));
-  }
-
-  /**
-   * Registers the current authenticated WSS session as the delivery target.
-   * The callback returns the assignment message ID when it actually writes a
-   * frame, or null/undefined when the socket is no longer usable.
-   */
-  registerDeliveryTarget(connectorId, sendAssignment) {
-    const key = connectorIdOf(connectorId);
-    if (!key || typeof sendAssignment !== 'function') {
-      throw new Error('A connector ID and assignment sender are required.');
-    }
-    const target = { sendAssignment };
-    this.deliveryTargets.set(key, target);
-    traceIndex('delivery_target_registered', { connectorId: key });
-    // A just-finished pre-connection dispatch may have observed no target.
-    // Make one follow-up attempt in that narrow case so a queued job is not
-    // left waiting until a reconnect or lease timer.
-    const wasDispatching = this.dispatching.has(key);
-    void this.requestDispatch(key).then((delivered) => {
-      if (wasDispatching && !delivered && this.deliveryTargets.get(key) === target) {
-        void this.requestDispatch(key);
-      }
-    });
-
-    return () => {
-      if (this.deliveryTargets.get(key) === target) {
-        this.deliveryTargets.delete(key);
-        traceIndex('delivery_target_removed', { connectorId: key });
-        this.clearLeaseTimer(key);
-        this.clearCorrelationsForConnector(key);
-      }
-    };
-  }
-
-  async requestDispatch(connectorId) {
-    const key = connectorIdOf(connectorId);
-    const current = this.dispatching.get(key);
-    if (current) return current;
-
-    const dispatch = this.dispatchOne(key)
-      .catch((error) => {
-        traceIndex('dispatch_failed', { connectorId: key, reason: error?.code || error?.name || 'unknown' });
-        return false;
-      })
-      .finally(() => this.dispatching.delete(key));
-    this.dispatching.set(key, dispatch);
-    return dispatch;
-  }
-
-  async dispatchOne(connectorId) {
-    const target = this.getDeliveryTarget(connectorId);
-    if (!target) {
-      traceIndex('dispatch_skipped_no_target', { connectorId });
-      return false;
-    }
-
+  // HTTPS polling owns delivery in the simplified transport. Reusing the
+  // existing lease means a lost HTTP response is harmless: the next poll sees
+  // the same assignment until the connector durably acknowledges it.
+  async poll(connectorId) {
     const job = await this.claimOrReuseLease(connectorId);
-    if (!job) {
-      traceIndex('dispatch_skipped_no_job', { connectorId });
-      return false;
-    }
-
-    const assignment = this.toAssignment(job);
-    traceIndex('assignment_sending', {
-      connectorId,
-      jobId: assignment.jobId,
-      deliveryId: assignment.deliveryId,
-      target: target.source,
-    });
-    this.clearCorrelationsForJob(connectorId, assignment.jobId, assignment.deliveryId);
-    this.scheduleLeaseDispatch(connectorId, assignment.leaseExpiresAt);
-    const messageId = await target.sendAssignment(assignment);
-    if (!isCanonicalUuid(messageId)) {
-      traceIndex('assignment_not_written', { connectorId, jobId: assignment.jobId });
-      return false;
-    }
-
-    const correlationKey = this.correlationKey(connectorId, assignment.jobId, assignment.deliveryId);
-    const knownMessageIds = this.assignmentMessageIds.get(correlationKey) || new Set();
-    knownMessageIds.add(messageId.toLowerCase());
-    this.assignmentMessageIds.set(correlationKey, knownMessageIds);
-    traceIndex('assignment_written', { connectorId, jobId: assignment.jobId, messageId });
-    return true;
+    return job ? this.toAssignment(job) : null;
   }
 
-  async acknowledge({ connectorId, payload, replyTo } = {}) {
+  async acknowledgePolled({ connectorId, payload } = {}) {
     const acknowledgement = normalizeAcknowledgement(payload);
-    if (!isCanonicalUuid(replyTo)) return { accepted: false, replay: false };
-
     const key = connectorIdOf(connectorId);
-    const correlationKey = this.correlationKey(key, acknowledgement.jobId, acknowledgement.deliveryId);
-    const knownMessageIds = this.assignmentMessageIds.get(correlationKey);
-    if (!knownMessageIds?.has(replyTo.toLowerCase())) {
-      traceIndex('ack_rejected_unknown_assignment', { connectorId: key, jobId: acknowledgement.jobId, replyTo });
-      return { accepted: false, replay: false };
-    }
-
     const acceptedAt = this.now();
     const updated = await resolveQuery(this.NasTransferJobModel.findOneAndUpdate(
       {
@@ -600,17 +452,10 @@ class NasConnectorJobQueue {
     ));
 
     if (updated) {
-      // Retain this bounded correlation while its socket session is active.
-      // A connector may resend an acknowledgement after its successful frame
-      // was lost; that must stay idempotent rather than become a protocol
-      // error.
-      this.clearLeaseTimer(key);
-      traceIndex('ack_accepted', { connectorId: key, jobId: acknowledgement.jobId, deliveryId: acknowledgement.deliveryId });
+      traceIndex('poll_ack_accepted', { connectorId: key, jobId: acknowledgement.jobId, deliveryId: acknowledgement.deliveryId });
       return { accepted: true, replay: acknowledgement.status === 'duplicate', job: updated };
     }
 
-    // The server may have recorded a prior ack before the socket response was
-    // lost. Treat an exact repeat as idempotent, never as a second execution.
     const alreadyAccepted = await resolveQuery(this.NasTransferJobModel.findOne({
       _id: acknowledgement.jobId,
       connectorId: key,
@@ -619,12 +464,11 @@ class NasConnectorJobQueue {
       deliveryId: acknowledgement.deliveryId,
     }));
     if (alreadyAccepted) {
-      this.clearLeaseTimer(key);
-      traceIndex('ack_replayed', { connectorId: key, jobId: acknowledgement.jobId, deliveryId: acknowledgement.deliveryId });
+      traceIndex('poll_ack_replayed', { connectorId: key, jobId: acknowledgement.jobId, deliveryId: acknowledgement.deliveryId });
       return { accepted: true, replay: true, job: alreadyAccepted };
     }
 
-    traceIndex('ack_rejected_state_mismatch', { connectorId: key, jobId: acknowledgement.jobId, deliveryId: acknowledgement.deliveryId });
+    traceIndex('poll_ack_rejected_state_mismatch', { connectorId: key, jobId: acknowledgement.jobId, deliveryId: acknowledgement.deliveryId });
     return { accepted: false, replay: false };
   }
 
@@ -641,7 +485,7 @@ class NasConnectorJobQueue {
     if (activeLease) return activeLease;
 
     // Persisting the acknowledgement before execution protects against a
-    // lost socket frame. A service crash in the small gap immediately after
+    // lost poll response. A service crash in the small gap immediately after
     // that acknowledgement used to leave the job "accepted" forever, which
     // blocked every later delivery. Workers change to in_progress before
     // doing real work, so an old accepted state is safe to retry.
@@ -667,9 +511,39 @@ class NasConnectorJobQueue {
       traceIndex('recovered_abandoned_accepted_jobs', { connectorId: key, count: recovered.matchedCount });
     }
 
+    // A connector can be powered off or lose its local state while a job is
+    // running.  Treat an unchanged in-progress record as a terminal remote
+    // failure after a generous window so one bad cache/thumbnail/upload cannot
+    // monopolize the connector forever. A later Phase 2 runner will replace
+    // this with per-handler retry policy; this watchdog is the safe floor.
+    const inProgressBefore = new Date(now.getTime() - (this.inProgressJobTimeoutSeconds * 1000));
+    const abandoned = await this.NasTransferJobModel.updateMany(
+      {
+        connectorId: key,
+        type: { $in: DELIVERABLE_JOB_TYPES },
+        status: 'in_progress',
+        $or: [
+          { progressUpdatedAt: { $lte: inProgressBefore } },
+          { progressUpdatedAt: null, updatedAt: { $lte: inProgressBefore } },
+        ],
+      },
+      {
+        $set: {
+          status: 'failed',
+          completedAt: now,
+          errorCode: 'connector_job_watchdog_timeout',
+          errorMessage: 'The connector stopped reporting progress before the job completed.',
+        },
+        $unset: { idempotencyKey: 1 },
+      },
+    );
+    if (abandoned?.matchedCount) {
+      traceIndex('failed_abandoned_in_progress_jobs', { connectorId: key, count: abandoned.matchedCount });
+    }
+
     // The connector deliberately owns one serial local queue.  Do not assign
     // the next job while it has already accepted or is executing one; its
-    // completion endpoint explicitly requests the next durable dispatch.
+    // completion endpoint lets the next poll claim subsequent work.
     const activeExecution = await resolveQuery(this.NasTransferJobModel.findOne({
       connectorId: key,
       type: { $in: DELIVERABLE_JOB_TYPES },
@@ -772,49 +646,6 @@ class NasConnectorJobQueue {
     };
   }
 
-  correlationKey(connectorId, jobId, deliveryId) {
-    return `${connectorIdOf(connectorId)}:${jobId}:${deliveryId}`;
-  }
-
-  clearLeaseTimer(connectorId) {
-    const key = connectorIdOf(connectorId);
-    const timer = this.leaseTimers.get(key);
-    if (timer) clearTimeout(timer);
-    this.leaseTimers.delete(key);
-  }
-
-  scheduleLeaseDispatch(connectorId, leaseExpiresAt) {
-    const key = connectorIdOf(connectorId);
-    const expiry = new Date(leaseExpiresAt);
-    if (Number.isNaN(expiry.getTime())) return;
-    this.clearLeaseTimer(key);
-    // Keep a tiny boundary cushion so the database comparison observes an
-    // expired lease even when timer scheduling is early by a few milliseconds.
-    const delay = Math.max(10, expiry.getTime() - this.now().getTime() + 10);
-    const timer = setTimeout(() => {
-      this.leaseTimers.delete(key);
-      void this.requestDispatch(key);
-    }, Math.min(delay, 0x7fffffff));
-    timer.unref?.();
-    this.leaseTimers.set(key, timer);
-  }
-
-  clearCorrelationsForConnector(connectorId) {
-    const prefix = `${connectorIdOf(connectorId)}:`;
-    for (const correlationKey of this.assignmentMessageIds.keys()) {
-      if (correlationKey.startsWith(prefix)) this.assignmentMessageIds.delete(correlationKey);
-    }
-  }
-
-  clearCorrelationsForJob(connectorId, jobId, retainedDeliveryId) {
-    const prefix = `${connectorIdOf(connectorId)}:${jobId}:`;
-    const retainedKey = this.correlationKey(connectorId, jobId, retainedDeliveryId);
-    for (const correlationKey of this.assignmentMessageIds.keys()) {
-      if (correlationKey.startsWith(prefix) && correlationKey !== retainedKey) {
-        this.assignmentMessageIds.delete(correlationKey);
-      }
-    }
-  }
 }
 
 module.exports = {

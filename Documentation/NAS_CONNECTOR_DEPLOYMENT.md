@@ -1,11 +1,10 @@
 # NAS Connector deployment runbook
 
-This is an operator runbook for deploying the Phase 2 control plane. It does
-not deploy anything by itself. Phase 2A consists of shared-key connector setup,
-the Windows service's outbound HTTPS heartbeats, and the management UI. Phase
-2B adds a persistent, outbound WSS **presence** channel. Phase 2C adds a
-single durable `index_root` delivery request, and Phase 3A executes it as a
-metadata-only NAS scan. The initial Phase 4 slice adds `cache_for_download`:
+This is an operator runbook for deploying the NAS connector. It does not deploy
+anything by itself. The Windows service uses shared-key setup, outbound HTTPS
+heartbeats, and authenticated HTTPS long polling for durable job delivery. It
+can scan NAS metadata, prepare cache delivery, generate thumbnails, track NAS
+changes, and support browser-to-NAS uploads. The initial Phase 4 slice adds `cache_for_download`:
 the connector copies one indexed file directly to the private `nas-cache/`
 prefix using a short-lived backend-issued PUT URL. Current releases also
 generate persistent thumbnails, show image lightboxes, track NAS changes, and
@@ -35,8 +34,8 @@ example `https://files.example.com`. It cannot include a path, query, fragment,
 username, or password.
 
 For local/private testing only, `NAS_CONNECTOR_ALLOW_HTTP=true` permits an
-`http://` Control Center origin and `ws://` control channel without a reverse
-proxy. Do not use this setting for an internet-facing deployment.
+`http://` Control Center origin without a reverse proxy. Do not use this
+setting for an internet-facing deployment.
 
 The Node port must not be reachable from the internet. `Backend/server.js`
 binds only to loopback by default (`127.0.0.1`) and refuses a LAN or wildcard
@@ -61,12 +60,9 @@ explicit operator task.
 2. Obtain a certificate from a CA trusted by the connector Windows machine.
    Production self-signed certificates are not supported: the Control Center
    and service intentionally use normal .NET certificate validation.
-3. Review and copy these templates rather than overwriting an existing site:
-
-   - [upgrade map and limits](Backend/deployment/nginx/adimari-connection-upgrade.map.conf.template)
-     belongs in Nginx's `http {}` context.
-   - [server template](Backend/deployment/nginx/adimari-backend.conf.template)
-     belongs in a site/server configuration.
+3. Review and copy the [server template](Backend/deployment/nginx/adimari-backend.conf.template)
+   rather than overwriting an existing site. It belongs in a site/server
+   configuration.
 
 4. Replace every `__...__` placeholder in the server template. For the current
    deployment, `__ADIMARI_BACKEND_PORT__` is normally the `PORT` value in
@@ -82,19 +78,10 @@ The template always overwrites `X-Forwarded-Proto` with Nginx's `$scheme`. On
 the HTTPS virtual host this makes `req.secure` true in Express; without it,
 every NAS connector route returns `400 NAS_CONNECTOR_HTTPS_REQUIRED`.
 
-It includes an exact, rate- and connection-limited WSS location for
-`/api/nas-connectors/control/socket`, plus the required `Upgrade`,
-`Connection`, HTTP/1.1, and long proxy-timeout headers. Phase 2C uses that
-endpoint for authenticated presence and durable receipt of the one harmless
-`index_root` request; it still does not execute NAS work.
-
 The templates deliberately overwrite `X-Forwarded-For` with Nginx's own
 `$remote_addr`; do not change this to `$proxy_add_x_forwarded_for`. The backend
 uses the value only after recognizing the local Nginx hop, so appending a
-client-supplied value would let a caller evade the defense-in-depth upgrade
-limit. The current in-process session registry requires exactly one Node/PM2
-instance: do not use PM2 cluster mode or multiple backend hosts until session
-revocation is distributed.
+client-supplied value would let a caller supply a misleading forwarding chain.
 
 After the proxy is active, verify both layers:
 
@@ -173,9 +160,14 @@ NAS_CONNECTOR_SHARED_SECRET=<43-character base64url shared connector key>
 # NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS=3600
 NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS=30
 NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS=90
-NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS=30
-NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE=30
 NAS_CONNECTOR_JOB_LEASE_SECONDS=90
+# Conservative backend retention and operator recovery settings.
+NAS_CONNECTOR_TERMINAL_JOB_RETENTION_DAYS=30
+NAS_CONNECTOR_DELETED_ENTRY_RETENTION_DAYS=30
+NAS_CONNECTOR_AUDIT_RETENTION_DAYS=365
+NAS_CONNECTOR_STALE_THUMBNAIL_RETENTION_DAYS=14
+NAS_CONNECTOR_RETENTION_SWEEP_INTERVAL_HOURS=6
+NAS_CONNECTOR_RECOVERY_STUCK_AFTER_MINUTES=30
 ```
 
 The NAS region and bucket must exactly equal `FILE_SERVER_AWS_REGION` and
@@ -213,7 +205,7 @@ configuration:
 | --- | --- |
 | `nas-cache/` | Expire full delivery/cache objects after 10 days and abort incomplete multipart uploads after 7 days. |
 | `nas-upload-staging/` | Expire abandoned browser-upload staging objects after 1 day and abort incomplete multipart uploads after 1 day. |
-| `nas-thumbnails/` | Keep thumbnails; only abort incomplete multipart uploads after 7 days. |
+| `nas-thumbnails/` | Do not use a broad expiry rule; only abort incomplete multipart uploads after 7 days. The backend removes replaced, stale, and retired-entry thumbnails from their catalogue ownership records. |
 
 If bucket versioning is enabled, keep the `NoncurrentVersionExpiration` entries
 for cache and staging. Otherwise the current object can expire while old object
@@ -419,7 +411,7 @@ $credential = Get-Credential 'DOMAIN\svc_adimari_nas'
 The helper is idempotent for the fixed install path
 `C:\Program Files\Adimari\NasConnector`: an update stages both packages,
 stops a running matching service only for the swap, retains the prior program
-directory as `NasConnector.previous-*`, and preserves
+directories as `NasConnector.previous-*` (the newest two by default), and preserves
 `C:\ProgramData\Adimari\NasConnector`. It refuses to overwrite a different
 service or to change an existing service account. For a normal update, omit
 `-ServiceCredential`:
@@ -431,12 +423,18 @@ service or to change an existing service account. For a normal update, omit
   -Start
 ```
 
+Use `-KeepPreviousPackages 1` when disk space requires a single rollback
+package; the installer intentionally permits only one or two. It removes only
+the exact randomly named staging directory created by a failed run, keeps a
+failed installed package for inspection, and prunes older successful previous
+packages only after the updated service has remained Running for 10 seconds.
+
 Preview its planned change first with `-WhatIf`. The helper intentionally does
 not grant **Log on as a service**, alter remote NAS ACLs, change an existing
-service's identity, or delete the prior package. A failed package is retained
-under `C:\Program Files\Adimari` for inspection. Do not manually delete a
-backup until the updated service has run successfully through the heartbeat
-interval.
+service's identity, or delete the configured rollback packages. A failed
+package is retained under `C:\Program Files\Adimari` for inspection. Confirm
+the connector's authenticated heartbeat after every update before relying on
+the rollback backup.
 
 The optional local group `Adimari NAS Connector Operators` controls Control
 Center access in addition to local Administrators. An administrator can grant
@@ -487,10 +485,10 @@ service process.
 5. Wait longer than `NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS` with the
    service stopped only in a planned test; the admin list should show it as
    `offline`. Start it again and confirm a valid heartbeat restores `active`.
-6. Confirm the Control Center shows the control channel as **Connected**. A
-   WSS reconnect by itself must not change connector access status; REST
-   heartbeat remains authoritative. Stop/start the service during a planned test and
-   confirm the control channel reconnects after the heartbeat path is healthy.
+6. Confirm the Control Center shows a recent successful poll. A polling retry
+   by itself must not change connector access status; REST heartbeat remains
+   authoritative. Stop/start the service during a planned test and confirm
+   polling resumes after the heartbeat path is healthy.
 7. If testing the Phase 2C delivery slice, have an administrator call
   `POST /api/nas-connectors/<connectorId>/roots/<connectorRootId>/index-jobs`
    with an empty JSON body. Confirm it returns `201`, the Control Center queue
@@ -534,6 +532,13 @@ restart it, then enter the new key and click **Connect connector** in every
 Control Center. If the local protected credential becomes unreadable, use
 **Reset unreadable credential**, then enter the current shared key again.
 Do not put the shared key in the web application or a browser request.
+
+The NAS Connectors admin page includes a **Stale jobs** panel. It lists only
+active jobs whose backend progress has exceeded
+`NAS_CONNECTOR_RECOVERY_STUCK_AFTER_MINUTES`. **Stop stale job** marks the job
+failed and records an audit event; it does not retry or replay a NAS operation.
+Inspect the connector and job history first, then request a fresh scan,
+delivery, thumbnail, or upload only when that is appropriate.
 
 ## Rollback boundaries
 

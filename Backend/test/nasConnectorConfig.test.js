@@ -54,9 +54,13 @@ test('creates NAS configuration in the existing File Server bucket with isolated
   assert.equal(config.enrollmentRecoveryTtlSeconds, 3_600);
   assert.equal(config.heartbeatIntervalSeconds, 30);
   assert.equal(config.heartbeatStaleAfterSeconds, 90);
-  assert.equal(config.controlPingIntervalSeconds, 30);
-  assert.equal(config.controlUpgradeRateLimitPerMinute, 30);
   assert.equal(config.jobLeaseSeconds, 90);
+  assert.equal(config.terminalJobRetentionDays, 30);
+  assert.equal(config.deletedEntryRetentionDays, 30);
+  assert.equal(config.auditRetentionDays, 365);
+  assert.equal(config.staleThumbnailRetentionDays, 14);
+  assert.equal(config.retentionSweepIntervalHours, 6);
+  assert.equal(config.recoveryStuckAfterMinutes, 30);
   assert.equal(config.allowInsecureHttp, false);
   assert.deepEqual(config.credentials, {
     accessKeyId: 'AKIANAS',
@@ -149,23 +153,6 @@ test('defaults stale heartbeat detection to three intervals and validates an exp
   );
 });
 
-test('uses bounded control-channel ping and upgrade limits', () => {
-  const config = createNasConnectorConfig(createEnvironment({
-    NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS: '45',
-    NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE: '12',
-  }));
-  assert.equal(config.controlPingIntervalSeconds, 45);
-  assert.equal(config.controlUpgradeRateLimitPerMinute, 12);
-  assert.throws(
-    () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS: '4' })),
-    NasConnectorConfigurationError,
-  );
-  assert.throws(
-    () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE: '0' })),
-    NasConnectorConfigurationError,
-  );
-});
-
 test('uses a short bounded lease for durable connector job delivery', () => {
   assert.equal(
     createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_JOB_LEASE_SECONDS: '45' })).jobLeaseSeconds,
@@ -173,6 +160,31 @@ test('uses a short bounded lease for durable connector job delivery', () => {
   );
   assert.throws(
     () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_JOB_LEASE_SECONDS: '14' })),
+    NasConnectorConfigurationError,
+  );
+});
+
+test('uses conservative bounded retention and recovery settings', () => {
+  const config = createNasConnectorConfig(createEnvironment({
+    NAS_CONNECTOR_TERMINAL_JOB_RETENTION_DAYS: '45',
+    NAS_CONNECTOR_DELETED_ENTRY_RETENTION_DAYS: '60',
+    NAS_CONNECTOR_AUDIT_RETENTION_DAYS: '730',
+    NAS_CONNECTOR_STALE_THUMBNAIL_RETENTION_DAYS: '21',
+    NAS_CONNECTOR_RETENTION_SWEEP_INTERVAL_HOURS: '12',
+    NAS_CONNECTOR_RECOVERY_STUCK_AFTER_MINUTES: '45',
+  }));
+  assert.equal(config.terminalJobRetentionDays, 45);
+  assert.equal(config.deletedEntryRetentionDays, 60);
+  assert.equal(config.auditRetentionDays, 730);
+  assert.equal(config.staleThumbnailRetentionDays, 21);
+  assert.equal(config.retentionSweepIntervalHours, 12);
+  assert.equal(config.recoveryStuckAfterMinutes, 45);
+  assert.throws(
+    () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_TERMINAL_JOB_RETENTION_DAYS: '6' })),
+    NasConnectorConfigurationError,
+  );
+  assert.throws(
+    () => createNasConnectorConfig(createEnvironment({ NAS_CONNECTOR_RECOVERY_STUCK_AFTER_MINUTES: '9' })),
     NasConnectorConfigurationError,
   );
 });

@@ -33,7 +33,7 @@ and the following body:
 
 The backend creates or reuses the record for that stable installation ID,
 activates its root, and returns the connector ID plus the heartbeat interval.
-Subsequent HTTP and WSS requests use:
+Subsequent connector HTTPS requests use:
 
 ```text
 Authorization: Connector <connectorId>.<NAS_CONNECTOR_SHARED_SECRET>
@@ -241,33 +241,27 @@ any browser or token action after an ordinary network or service interruption.
 Disabling takes effect on the next request because authentication only accepts
 connectors whose status is `active` or `offline`.
 
-## Persistent control-channel presence
+## Durable HTTPS job polling
 
-The Windows Service may also open the outbound secure WebSocket described in
-[`NAS_CONNECTOR_CONTROL_CHANNEL.md`](NAS_CONNECTOR_CONTROL_CHANNEL.md):
+The Windows Service requests one durable lease with
+`POST /api/nas-connectors/control/jobs/poll`, sending
+`{ "waitSeconds": 20 }` and its ordinary `Connector` authorization header.
+The backend returns `204` when no job is available, or `200` with one opaque
+assignment. The service persists that assignment locally before it reports the
+same `{ jobId, deliveryId, status }` to
+`POST /api/nas-connectors/control/jobs/ack`. Repeating either request is safe:
+the same unacknowledged lease is returned until it expires or is acknowledged,
+and an exact acknowledgement is idempotent.
 
-```text
-wss://<public HTTPS origin>/api/nas-connectors/control/socket
-Sec-WebSocket-Protocol: adimari.nas-control.v1
-Authorization: Connector <connectorId>.<NAS_CONNECTOR_SHARED_SECRET>
-```
-
-Phase 2B provides presence/keepalive. Durable delivery now covers `index_root`
-and the small Phase-4 `cache_for_download` receipt using `job.assign` and
-`job.ack`, documented in
-[`NAS_CONNECTOR_CONTROL_CHANNEL.md`](NAS_CONNECTOR_CONTROL_CHANNEL.md). The
-connector persists a job locally before acknowledging it. The REST heartbeat remains authoritative for
-liveness and connector disable. The backend accepts a maximum of one valid
-session per connector, closes active and pending sessions after disable, and
-rejects a `hello` that names an unknown or disabled configured root.
-The socket never creates or edits root metadata. The connector credential must
-be in the authorization header only—never in the URL or a WebSocket message.
+The REST heartbeat remains authoritative for liveness and connector disable.
+The polling payload never contains a NAS path, object-storage credential, or
+browser credential.
 
 ## Connector indexing reports (Phase 3A)
 
 After the service has durably accepted an `index_root` delivery, it executes
-the scan through authenticated HTTPS—not through the browser or a WebSocket
-payload. The connector sends only safe relative metadata in batches of at most
+the scan through authenticated HTTPS—not through the browser. The connector
+sends only safe relative metadata in batches of at most
 250 entries; native/UNC paths are rejected.
 
 - `POST /api/nas-connectors/control/jobs/:jobId/index/start`
@@ -313,12 +307,6 @@ are not treated as a complete source of truth.
 There is intentionally no browser catalogue endpoint in this slice. The next
 Phase 3B slice will expose the indexed metadata to the existing File Server UI.
 
-This initial session registry is intentionally process-local. Run one Backend
-process/PM2 instance for this feature. Do not use Node cluster mode, multiple
-PM2 instances, or multiple backend hosts until a shared session-invalidation
-fan-out mechanism is implemented; otherwise a revocation on one process cannot
-immediately close a socket owned by another.
-
 ## Required backend environment
 
 In addition to the existing NAS bucket/prefix variables, configure:
@@ -331,9 +319,13 @@ NAS_CONNECTOR_SHARED_SECRET=<32-byte base64url key; enter the same value once in
 # NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS=3600
 NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS=30
 NAS_CONNECTOR_HEARTBEAT_STALE_AFTER_SECONDS=90
-NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS=30
-NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE=30
 NAS_CONNECTOR_JOB_LEASE_SECONDS=90
+NAS_CONNECTOR_TERMINAL_JOB_RETENTION_DAYS=30
+NAS_CONNECTOR_DELETED_ENTRY_RETENTION_DAYS=30
+NAS_CONNECTOR_AUDIT_RETENTION_DAYS=365
+NAS_CONNECTOR_STALE_THUMBNAIL_RETENTION_DAYS=14
+NAS_CONNECTOR_RETENTION_SWEEP_INTERVAL_HOURS=6
+NAS_CONNECTOR_RECOVERY_STUCK_AFTER_MINUTES=30
 ```
 
 The commented enrollment settings are optional compatibility settings for an
@@ -344,15 +336,39 @@ and are not used by the shared-key connector.
 times `NAS_CONNECTOR_HEARTBEAT_INTERVAL_SECONDS`. It must be at least twice the
 configured heartbeat interval and no more than seven days.
 
-`NAS_CONNECTOR_CONTROL_PING_INTERVAL_SECONDS` is optional and defaults to the
-REST heartbeat interval. `NAS_CONNECTOR_CONTROL_UPGRADE_RATE_LIMIT_PER_MINUTE`
-is a bounded Node-side defense-in-depth limit per client address (default 30).
-The trusted HTTPS reverse proxy must also apply its own upgrade rate and
-connection limits before Node; its public listener is the enforcement boundary.
-
 `NAS_CONNECTOR_JOB_LEASE_SECONDS` is optional and defaults to 90. It controls
 only how long the backend waits for durable delivery acknowledgement before it
 may resend the same job; it is not a NAS scan or transfer timeout.
+
+## Retention and stale-job recovery (Phase 6)
+
+The backend runs a bounded retention sweep every six hours by default. It gives
+terminal transfer jobs, audit events, soft-deleted catalogue entries, and stale
+thumbnail objects a conservative lifecycle without relying on an unbounded S3
+listing. MongoDB TTL indexes remove transfer jobs and audit events once their
+`purgeAfter` timestamp is set; the sweep also performs the deletion directly so
+retention is not tied to MongoDB's asynchronous TTL monitor.
+
+The retention and recovery settings above are optional. Their defaults are 30
+days for terminal jobs and deleted entries, 365 days for audits, and 14 days
+for stale thumbnail objects. A newly completed thumbnail also best-effort
+deletes the prior thumbnail object for that catalogue entry.
+
+Administrators have a deliberately small recovery surface for jobs that have
+made no backend-visible progress for `NAS_CONNECTOR_RECOVERY_STUCK_AFTER_MINUTES`
+(30 minutes by default):
+
+- `GET /api/nas-connectors/recovery/jobs` returns at most 100 active stale
+  jobs, ordered by their oldest update.
+- `POST /api/nas-connectors/:connectorId/jobs/:jobId/recovery/stop` accepts
+  `{}` and marks one still-stale job as failed with
+  `operator_recovery_stopped`.
+
+Stopping is intentional and non-destructive: it clears the outstanding delivery
+lease but never automatically replays a NAS operation. Cache and thumbnail
+records that were waiting for the job are marked failed, and the action is
+audited. Request a new operation only after reviewing why the original job
+stopped.
 
 ## Connector cache-delivery reports (Phase 4 initial slice)
 

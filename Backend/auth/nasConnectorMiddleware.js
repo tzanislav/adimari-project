@@ -28,10 +28,10 @@ const parseConnectorKeyAuthorization = (authorization) => {
   return matched ? { sharedSecret: matched[1] } : null;
 };
 
-// This authentication primitive is shared by the Express heartbeat route and
-// the HTTP upgrade handler. It deliberately returns only the selected connector
-// document or null. The supplied shared key is compared only to the server
-// configuration; it is never logged or stored in MongoDB.
+// This authentication primitive is shared by connector HTTPS routes. It
+// deliberately returns only the selected connector document or null. The
+// supplied shared key is compared only to the server configuration; it is
+// never logged or stored in MongoDB.
 const authenticateConnectorAuthorization = async ({
   authorization,
   NasConnectorModel = NasConnector,
@@ -41,9 +41,9 @@ const authenticateConnectorAuthorization = async ({
   if (!parsed || !verifySharedSecret({ sharedSecret: parsed.sharedSecret, expectedSecret: sharedSecret })) return null;
 
   try {
-    // The control-channel hello atomically rechecks this hash after upgrade.
-    // It is hidden by the Mongoose schema by default, so select it only for
-    // this server-side authentication result; it is never serialized.
+    // The credential hash is hidden by the Mongoose schema by default, so
+    // select it only for this server-side authentication result; it is never
+    // serialized.
     const query = NasConnectorModel.findOne({
       _id: parsed.connectorId,
       status: { $in: ['active', 'offline'] },
