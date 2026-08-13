@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const net = require('net');
 const express = require('express');
 const { authenticate, authorizeRole } = require('../auth/authMiddleware');
 const {
@@ -10,6 +11,7 @@ const {
 const { getFileServerConfig } = require('../config/fileServerConfig');
 const { getNasConnectorConfig } = require('../config/nasConnectorConfig');
 const NasAuditEvent = require('../models/nasAuditEvent');
+const NasRateLimitExemption = require('../models/nasRateLimitExemption');
 const NasConnector = require('../models/nasConnector');
 const NasFileEntry = require('../models/nasFileEntry');
 const FileShare = require('../models/fileShare');
@@ -53,6 +55,19 @@ class NasConnectorApiError extends Error {
 }
 
 const currentActorUid = (user) => user?.uid || user?.user_id || user?.email || null;
+
+const normalizeIpAddress = (value) => {
+  const candidate = typeof value === 'string' ? value.trim() : '';
+  const normalized = candidate.startsWith('::ffff:') ? candidate.slice(7) : candidate;
+  if (!net.isIP(normalized)) {
+    throw new NasConnectorApiError({
+      code: 'NAS_RATE_LIMIT_IP_INVALID',
+      message: 'Enter a valid IPv4 or IPv6 address.',
+      status: 400,
+    });
+  }
+  return normalized;
+};
 
 const queryAsPlainArray = async (query) => {
   if (!query) return [];
@@ -243,6 +258,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
   const FileShareModel = dependencies.FileShareModel || FileShare;
   const NasTransferJobModel = dependencies.NasTransferJobModel || NasTransferJob;
   const NasAuditEventModel = dependencies.NasAuditEventModel || NasAuditEvent;
+  const NasRateLimitExemptionModel = dependencies.NasRateLimitExemptionModel || NasRateLimitExemption;
   const authenticateMiddleware = dependencies.authenticateMiddleware || authenticate;
   const authorizeAdminMiddleware = dependencies.authorizeAdminMiddleware || authorizeRole('admin');
   const requireHttpsMiddleware = dependencies.requireHttpsMiddleware
@@ -1454,6 +1470,54 @@ const createNasConnectorRoutes = (dependencies = {}) => {
       await reconcileStaleConnectorLiveness(now());
       const connectors = await queryAsPlainArray(NasConnectorModel.find({}));
       return res.json({ connectors: connectors.map(serializeConnector) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.get('/rate-limit-exemptions', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    try {
+      const exemptions = await queryAsPlainArray(NasRateLimitExemptionModel.find({}));
+      return res.json({ exemptions: exemptions.map((entry) => ({
+        id: String(entry._id || entry.id || ''),
+        ipAddress: entry.ipAddress,
+        createdAt: entry.createdAt || null,
+      })) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/rate-limit-exemptions', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    try {
+      const ipAddress = normalizeIpAddress(req.body?.ipAddress);
+      let exemption;
+      try {
+        exemption = await NasRateLimitExemptionModel.create({ ipAddress, createdBy: currentActorUid(req.user) });
+      } catch (error) {
+        if (error?.code === 11000) {
+          throw new NasConnectorApiError({ code: 'NAS_RATE_LIMIT_IP_EXISTS', message: 'That IP address is already exempt.', status: 409 });
+        }
+        throw error;
+      }
+      return res.status(201).json({ exemption: {
+        id: String(exemption._id || exemption.id || ''),
+        ipAddress: exemption.ipAddress,
+        createdAt: exemption.createdAt || null,
+      } });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  router.delete('/rate-limit-exemptions/:exemptionId', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
+    try {
+      const exemptionId = assertObjectId(req.params.exemptionId, 'Rate-limit exemption ID');
+      const deleted = await NasRateLimitExemptionModel.findByIdAndDelete(exemptionId);
+      if (!deleted) {
+        throw new NasConnectorApiError({ code: 'NAS_RATE_LIMIT_IP_NOT_FOUND', message: 'The IP exemption no longer exists.', status: 404 });
+      }
+      return res.status(204).end();
     } catch (error) {
       return sendError(res, error);
     }

@@ -28,12 +28,14 @@ const NasStorageRoot = require('./models/nasStorageRoot');
 const NasTransferJob = require('./models/nasTransferJob');
 const NasFileEntry = require('./models/nasFileEntry');
 const NasAuditEvent = require('./models/nasAuditEvent');
+const NasRateLimitExemption = require('./models/nasRateLimitExemption');
 const { NasConnectorJobQueue } = require('./services/nasConnectorJobQueue');
 const { NasRetentionService } = require('./services/nasRetentionService');
 const { createNasStorageSet } = require('./services/nasStorageSet');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const net = require('net');
 const path = require('path');
 const { URL } = require('url');
 const app = express();
@@ -178,6 +180,25 @@ const publicDownloadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const normalizeRequestIp = (value) => {
+  const candidate = typeof value === 'string' ? value.trim() : '';
+  const unwrapped = candidate.startsWith('::ffff:') ? candidate.slice(7) : candidate;
+  return net.isIP(unwrapped) ? unwrapped : null;
+};
+
+const nasCatalogueLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isDevelopmentMode ? 500 : 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Database-backed exemptions are deliberately scoped to NAS browsing rather
+  // than weakening the general File Server limiter.
+  skip: async (req) => {
+    const ipAddress = normalizeRequestIp(req.ip);
+    return Boolean(ipAddress && await NasRateLimitExemption.exists({ ipAddress }));
+  },
+});
+
 const nasConnectorHeartbeatLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: isDevelopmentMode ? 1_000 : 120,
@@ -283,7 +304,7 @@ if (nasConnectorConfig) {
     jobQueue: nasConnectorJobQueue,
     storageSet: nasStorageSet,
   }));
-  app.use('/api/nas-catalogue', fileManagerLimiter, createNasCatalogueRoutes({
+  app.use('/api/nas-catalogue', nasCatalogueLimiter, createNasCatalogueRoutes({
     nasConfig: nasConnectorConfig,
     fileServerConfig: getFileServerConfig(),
     jobQueue: nasConnectorJobQueue,

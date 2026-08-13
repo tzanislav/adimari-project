@@ -173,6 +173,9 @@
 .nas-connector-action-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .nas-connector-revoked-note { color: #8d5257; font-size: 11px; }
 .nas-connector-empty { margin: 18px -22px -22px; padding: 28px 22px; border-top: 1px solid #e7ecf1; color: #687789; text-align: center; }
+.nas-connector-rate-limit-list { display: grid; gap: 8px; margin-top: 18px; }
+.nas-connector-rate-limit-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; border: 1px solid #e7ecf1; border-radius: 6px; background: #f8fafc; }
+.nas-connector-rate-limit-item code { color: #263648; font-size: 13px; }
 .nas-connector-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
 
 @media (max-width: 700px) {

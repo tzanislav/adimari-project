@@ -90,6 +90,11 @@ function NasConnectorAdmin() {
   const [recoveryJobs, setRecoveryJobs] = useState([]);
   const [recoveryLoading, setRecoveryLoading] = useState(true);
   const [recoveryError, setRecoveryError] = useState('');
+  const [rateLimitExemptions, setRateLimitExemptions] = useState([]);
+  const [rateLimitExemptionsLoading, setRateLimitExemptionsLoading] = useState(true);
+  const [exemptIpAddress, setExemptIpAddress] = useState('');
+  const [savingExemptIp, setSavingExemptIp] = useState(false);
+  const [deletingExemptIpId, setDeletingExemptIpId] = useState(null);
   const [stoppingRecoveryJobId, setStoppingRecoveryJobId] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
   const [error, setError] = useState('');
@@ -130,6 +135,56 @@ function NasConnectorAdmin() {
   useEffect(() => {
     void loadRecoveryJobs();
   }, [loadRecoveryJobs]);
+
+  const loadRateLimitExemptions = useCallback(async () => {
+    setRateLimitExemptionsLoading(true);
+    try {
+      const data = await apiRequest('/rate-limit-exemptions');
+      setRateLimitExemptions(Array.isArray(data?.exemptions) ? data.exemptions : []);
+    } catch (requestError) {
+      setError(describeError(requestError));
+    } finally {
+      setRateLimitExemptionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRateLimitExemptions();
+  }, [loadRateLimitExemptions]);
+
+  const addRateLimitExemption = async (event) => {
+    event.preventDefault();
+    const ipAddress = exemptIpAddress.trim();
+    if (!ipAddress) return;
+    setSavingExemptIp(true);
+    setError('');
+    setNotice('');
+    try {
+      await apiRequest('/rate-limit-exemptions', { method: 'POST', body: { ipAddress } });
+      setExemptIpAddress('');
+      setNotice(`${ipAddress} is now exempt from the NAS catalogue rate limit.`);
+      await loadRateLimitExemptions();
+    } catch (requestError) {
+      setError(describeError(requestError));
+    } finally {
+      setSavingExemptIp(false);
+    }
+  };
+
+  const removeRateLimitExemption = async (exemption) => {
+    setDeletingExemptIpId(exemption.id);
+    setError('');
+    setNotice('');
+    try {
+      await apiRequest(`/rate-limit-exemptions/${encodeURIComponent(exemption.id)}`, { method: 'DELETE' });
+      setNotice(`${exemption.ipAddress} is subject to the NAS catalogue rate limit again.`);
+      await loadRateLimitExemptions();
+    } catch (requestError) {
+      setError(describeError(requestError));
+    } finally {
+      setDeletingExemptIpId(null);
+    }
+  };
 
   const loadIndexJobs = useCallback(async (connectorIds) => {
     const results = await Promise.all(connectorIds.map(async (connectorId) => {
@@ -361,7 +416,7 @@ function NasConnectorAdmin() {
           <h1>NAS Connectors</h1>
           <p>Monitor Windows connector installations that provide access to NAS-backed files.</p>
         </div>
-        <button className="nas-connector-button" type="button" onClick={() => { void loadConnectors(); void loadRecoveryJobs(); }} disabled={loading || recoveryLoading}>
+        <button className="nas-connector-button" type="button" onClick={() => { void loadConnectors(); void loadRecoveryJobs(); void loadRateLimitExemptions(); }} disabled={loading || recoveryLoading || rateLimitExemptionsLoading}>
           Refresh
         </button>
       </header>
@@ -375,6 +430,40 @@ function NasConnectorAdmin() {
 
       {error && <p className="nas-connector-message error" role="alert">{error}</p>}
       {notice && <p className="nas-connector-message success" role="status">{notice}</p>}
+
+      <section className="nas-connector-list-section" aria-labelledby="nas-rate-limit-title">
+        <div className="nas-connector-list-heading">
+          <div>
+            <h2 id="nas-rate-limit-title">NAS catalogue rate-limit exemptions</h2>
+            <p>Exempt an exact client IP from the NAS catalogue request limit. This does not affect other API limits.</p>
+          </div>
+        </div>
+        <form className="nas-connector-enrollment-form" onSubmit={(event) => void addRateLimitExemption(event)}>
+          <label>
+            IPv4 or IPv6 address
+            <input value={exemptIpAddress} onChange={(event) => setExemptIpAddress(event.target.value)} placeholder="203.0.113.42" inputMode="text" />
+          </label>
+          <button className="nas-connector-button primary" type="submit" disabled={savingExemptIp || !exemptIpAddress.trim()}>
+            {savingExemptIp ? 'Adding...' : 'Add exemption'}
+          </button>
+        </form>
+        {rateLimitExemptionsLoading ? (
+          <p className="nas-connector-empty">Loading exemptions...</p>
+        ) : rateLimitExemptions.length === 0 ? (
+          <p className="nas-connector-empty">No IP addresses are exempt.</p>
+        ) : (
+          <div className="nas-connector-rate-limit-list">
+            {rateLimitExemptions.map((exemption) => (
+              <div className="nas-connector-rate-limit-item" key={exemption.id}>
+                <code>{exemption.ipAddress}</code>
+                <button className="nas-connector-button danger compact" type="button" onClick={() => void removeRateLimitExemption(exemption)} disabled={deletingExemptIpId === exemption.id}>
+                  {deletingExemptIpId === exemption.id ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="nas-connector-list-section nas-connector-recovery" aria-labelledby="nas-recovery-title">
         <div className="nas-connector-list-heading">
