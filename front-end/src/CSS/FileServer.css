@@ -84,8 +84,11 @@
 .file-server-browser { margin-top: 18px; overflow: hidden; border: 1px solid #d7dfe8; border-radius: 8px; background: #fff; }
 .file-server-browser-heading, .file-server-row { display: grid; grid-template-columns: minmax(180px, 1fr) 100px 170px minmax(310px, max-content); gap: 12px; align-items: center; }
 .file-server-browser-heading { padding: 10px 14px; background: #f3f6f9; color: #5d6b7b; font-size: 12px; font-weight: 700; }
-.file-server-row { min-height: 48px; padding: 8px 14px; border-top: 1px solid #edf0f4; }
+.file-server-row { min-height: 48px; padding: 8px 14px; border-top: 1px solid #edf0f4; transition: background-color .15s ease; }
 .file-server-row.folder { background: #fbfcfe; }
+.file-server-row:hover { background: #f2f7fc; }
+.file-server-row.image-file { cursor: pointer; }
+.file-server-row.image-file .file-server-row-actions { cursor: default; }
 .file-server-file-name, .file-server-name-button { overflow: hidden; color: #263648; font-weight: 600; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .nas-file-name-cell { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .nas-file-name-cell .file-server-file-name { min-width: 0; }

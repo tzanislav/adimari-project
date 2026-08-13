@@ -884,7 +884,15 @@ function NasFileBrowser() {
         {loading ? <p className="file-server-empty">Loading catalogue…</p> : (
           <>
             {visibleEntries.map((entry) => (
-              <article className={`file-server-row ${entry.entryType === 'folder' ? 'folder' : ''}`} key={entry.id}>
+              <article
+                className={`file-server-row ${entry.entryType === 'folder' ? 'folder' : ''} ${entry.previewKind === 'image' ? 'image-file' : ''}`}
+                key={entry.id}
+                onClick={() => {
+                  if (entry.previewKind === 'image' && !deliveringEntryId && !sharingEntryId) {
+                    void openImageLightbox(entry);
+                  }
+                }}
+              >
                 {entry.entryType === 'folder' ? (
                   <button className="file-server-name-button" onClick={() => setFolder(entry.relativePath)}>
                     {renderNasEntryIcon(entry)}
@@ -903,20 +911,20 @@ function NasFileBrowser() {
                 )}
                 <span>{entry.entryType === 'folder' ? 'Folder' : formatBytes(entry.sizeBytes)}</span>
                 <span>{formatDate(entry.modifiedAt)}</span>
-                <div className="file-server-row-actions">
+                <div className="file-server-row-actions" onClick={(event) => event.stopPropagation()}>
                   {searchState && <button className="file-server-button compact" onClick={() => openEntryLocation(entry)}>Show location</button>}
                   {entry.entryType === 'file' && (
                     <>
-                    <button
-                      className="file-server-button compact"
-                      type="button"
-                      disabled={Boolean(deliveringEntryId) || Boolean(sharingEntryId)}
-                      onClick={() => (entry.previewKind === 'image'
-                        ? void openImageLightbox(entry)
-                        : void requestDelivery(entry, 'inline'))}
-                    >
-                      {deliveringEntryId === entry.id ? 'Preparing...' : (entry.previewKind === 'image' ? 'View' : 'Open')}
-                    </button>
+                    {entry.previewKind !== 'image' && (
+                      <button
+                        className="file-server-button compact"
+                        type="button"
+                        disabled={Boolean(deliveringEntryId) || Boolean(sharingEntryId)}
+                        onClick={() => void requestDelivery(entry, 'inline')}
+                      >
+                        {deliveringEntryId === entry.id ? 'Preparing...' : 'Open'}
+                      </button>
+                    )}
                     <button
                       className="file-server-button compact"
                       type="button"

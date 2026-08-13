@@ -25,6 +25,18 @@
     margin-top: 100px;
 }
 
+.admin-panel-link
+{
+    margin-top: 8px;
+    color: #1b5c9d;
+    font-weight: 600;
+}
+
+.admin-panel-link:hover
+{
+    color: #124a82;
+}
+
 .admin-panel form
 {
     display: flex;
