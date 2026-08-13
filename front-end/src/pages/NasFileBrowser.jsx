@@ -100,6 +100,11 @@ const clampImagePosition = ({ x, y, scale }, viewport) => ({
   scale,
 });
 
+const sortEntriesNaturally = (entries) => [...entries].sort((left, right) => {
+  if (left.entryType !== right.entryType) return left.entryType === 'folder' ? -1 : 1;
+  return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' });
+});
+
 function NasFileBrowser() {
   const [roots, setRoots] = useState([]);
   const [rootId, setRootId] = useState('');
@@ -159,8 +164,11 @@ function NasFileBrowser() {
       const result = await apiRequest(`/roots/${encodeURIComponent(rootId)}/entries?${query.toString()}`);
       setListing((previous) => (append ? {
         ...result,
-        entries: [...previous.entries, ...(result.entries || [])],
-      } : result));
+        entries: sortEntriesNaturally([...previous.entries, ...(result.entries || [])]),
+      } : {
+        ...result,
+        entries: sortEntriesNaturally(result.entries || []),
+      }));
     } catch (requestError) {
       setError(requestError.message);
     } finally {
