@@ -3,22 +3,23 @@ import { useAuth } from '../context/AuthContext';
 import '../CSS/Projects.css';
 
 const projectLinks = [
-  {
-    title: 'File Server',
-    description: 'Manage private files and create download-only share links.',
-    to: '/projects/file-server',
-    thumbnail: '/file.png',
-    thumbnailPlaceholder: 'Files',
-    requiresEditor: true,
-  },
-  {
-    title: 'NAS Files',
+    {
+    title: 'Database',
     description: 'Browse the indexed company NAS. File delivery and sharing are prepared on demand.',
     to: '/projects/nas-files',
     thumbnail: '/file.png',
     thumbnailPlaceholder: 'NAS',
     requiresEditor: true,
   },
+  {
+    title: 'File Sharing',
+    description: 'Manage private files and create download-only share links.',
+    to: '/projects/file-server',
+    thumbnail: '/send.png',
+    thumbnailPlaceholder: 'Files',
+    requiresEditor: true,
+  },
+
   {
     title: '3D Models',
     description: 'Browse and manage the library of 3D models.',

@@ -728,6 +728,35 @@ function NasFileBrowser() {
     createImageGesture();
   };
 
+  const closeLightboxFromBackdrop = (event) => {
+    const image = event.target;
+    const viewport = imageViewportRef.current?.getBoundingClientRect();
+    if (!(image instanceof HTMLImageElement) || !image.classList.contains('nas-image-lightbox-image') || !viewport) {
+      closeLightbox();
+      return;
+    }
+    if (!image.naturalWidth || !image.naturalHeight) return;
+
+    const imageRatio = image.naturalWidth / image.naturalHeight;
+    const viewportRatio = viewport.width / viewport.height;
+    const displayedWidth = imageRatio >= viewportRatio ? viewport.width : viewport.height * imageRatio;
+    const displayedHeight = imageRatio >= viewportRatio ? viewport.width / imageRatio : viewport.height;
+    const offsetX = (viewport.width - displayedWidth) / 2;
+    const offsetY = (viewport.height - displayedHeight) / 2;
+    const imageViewAtClick = imageViewRef.current;
+    const imageLeft = viewport.left + imageViewAtClick.x + (offsetX * imageViewAtClick.scale);
+    const imageTop = viewport.top + imageViewAtClick.y + (offsetY * imageViewAtClick.scale);
+    const imageRight = imageLeft + (displayedWidth * imageViewAtClick.scale);
+    const imageBottom = imageTop + (displayedHeight * imageViewAtClick.scale);
+    const clickedImage = (
+      event.clientX >= imageLeft
+      && event.clientX <= imageRight
+      && event.clientY >= imageTop
+      && event.clientY <= imageBottom
+    );
+    if (!clickedImage) closeLightbox();
+  };
+
   const breadcrumbs = folder ? folder.split('/') : [];
   const visibleEntries = searchState ? searchState.entries : listing.entries;
 
@@ -922,12 +951,10 @@ function NasFileBrowser() {
       {lightbox && (
         <section className="nas-image-lightbox" role="dialog" aria-modal="true" aria-label={`Image preview: ${lightbox.entry.name}`}>
           <header className="nas-image-lightbox-header">
-            <div className="nas-image-lightbox-actions">
-              <button className="nas-image-icon-button" type="button" onClick={downloadLightboxImage} title="Download image" aria-label="Download image">&#8595;</button>
-              <button className="nas-image-icon-button" type="button" onClick={closeLightbox} autoFocus title="Close image viewer" aria-label="Close image viewer">&#215;</button>
-            </div>
+            <button className="nas-image-text-button" type="button" onClick={downloadLightboxImage}>Download</button>
+            <button className="nas-image-text-button" type="button" onClick={closeLightbox} autoFocus>Close</button>
           </header>
-          <div className="nas-image-lightbox-content" ref={imageViewportRef} onClick={closeLightbox}>
+          <div className="nas-image-lightbox-content" ref={imageViewportRef} onClick={closeLightboxFromBackdrop}>
             {lightbox.loading && <p className="nas-image-lightbox-loading" role="status">{lightbox.loadingLabel || 'Loading image...'}</p>}
             {lightbox.error && <p className="nas-image-lightbox-error" role="alert">{lightbox.error}</p>}
             {!lightbox.error && lightbox.imageUrl && (
@@ -941,7 +968,6 @@ function NasFileBrowser() {
                 onPointerMove={moveImageGesture}
                 onPointerUp={endImageGesture}
                 onPointerCancel={endImageGesture}
-                onClick={(event) => event.stopPropagation()}
               />
             )}
           </div>
