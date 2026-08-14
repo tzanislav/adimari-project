@@ -1055,10 +1055,10 @@ function NasFileBrowser() {
         <section className="nas-image-lightbox" role="dialog" aria-modal="true" aria-label={`Image preview: ${lightbox.entry.name}`}>
           <header className="nas-image-lightbox-header">
             <button className="nas-image-text-button" type="button" onClick={downloadLightboxImage}>Download</button>
+            {lightbox.loading && <p className="nas-image-lightbox-status" role="status">{lightbox.loadingLabel || 'Loading image...'}</p>}
             <button className="nas-image-text-button" type="button" onClick={closeLightbox} autoFocus>Close</button>
           </header>
           <div className="nas-image-lightbox-content" ref={imageViewportRef} onClick={closeLightboxFromBackdrop}>
-            {lightbox.loading && <p className="nas-image-lightbox-loading" role="status">{lightbox.loadingLabel || 'Loading image...'}</p>}
             {lightbox.error && <p className="nas-image-lightbox-error" role="alert">{lightbox.error}</p>}
             {!lightbox.error && lightbox.imageUrl && (
               <img
