@@ -631,8 +631,10 @@ function NasFileBrowser() {
   };
 
   const closeLightbox = (fromHistory = false) => {
-    cancelImageRequest(lightboxRequestRef.current);
+    const activeRequest = lightboxRequestRef.current;
+    cancelImageRequest(activeRequest);
     lightboxRequestRef.current = null;
+    setDeliveringEntryId((current) => (current === activeRequest?.entryId ? '' : current));
     releaseLightboxObjectUrl();
     setLightbox(null);
     if (!fromHistory && getNasBrowserHistoryState()?.lightboxEntry) {
@@ -647,6 +649,7 @@ function NasFileBrowser() {
     releaseLightboxObjectUrl();
     const request = {
       traceId,
+      entryId: entry.id,
       controller: new AbortController(),
       deliveryId: '',
       cancelSent: false,
@@ -724,7 +727,9 @@ function NasFileBrowser() {
         error: requestError.message,
       } : current));
     } finally {
-      if (lightboxRequestRef.current === request) setDeliveringEntryId('');
+      if (lightboxRequestRef.current === request) {
+        setDeliveringEntryId((current) => (current === request.entryId ? '' : current));
+      }
     }
   };
   openImageLightboxRef.current = openImageLightbox;
