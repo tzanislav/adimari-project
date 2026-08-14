@@ -9,6 +9,8 @@ const UPLOAD_URL_BATCH_SIZE = 20;
 const UPLOAD_CONCURRENCY = 3;
 const MIN_IMAGE_ZOOM = 1;
 const MAX_IMAGE_ZOOM = 5;
+const IMAGE_SWIPE_THRESHOLD = 56;
+const NAS_BROWSER_HISTORY_KEY = 'nasFileBrowser';
 
 class NasCatalogueApiError extends Error {
   constructor(message) {
@@ -125,6 +127,21 @@ const clampImagePosition = ({ x, y, scale }, viewport) => ({
   scale,
 });
 
+const getNasBrowserHistoryState = (state = window.history.state) => {
+  const browserState = state?.[NAS_BROWSER_HISTORY_KEY];
+  if (!browserState || typeof browserState !== 'object') return null;
+  return {
+    rootId: typeof browserState.rootId === 'string' ? browserState.rootId : '',
+    folder: typeof browserState.folder === 'string' ? browserState.folder : '',
+    lightboxEntry: browserState.lightboxEntry || null,
+  };
+};
+
+const createNasBrowserHistoryState = ({ rootId, folder, lightboxEntry = null }) => ({
+  ...(window.history.state || {}),
+  [NAS_BROWSER_HISTORY_KEY]: { rootId, folder, lightboxEntry },
+});
+
 const sortEntriesNaturally = (entries) => [...entries].sort((left, right) => {
   if (left.entryType !== right.entryType) return left.entryType === 'folder' ? -1 : 1;
   return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' });
@@ -149,18 +166,37 @@ function NasFileBrowser() {
   const [thumbnails, setThumbnails] = useState({});
   const [uploadState, setUploadState] = useState(null);
   const fileInputRef = useRef(null);
+  const photoInputRef = useRef(null);
   const imageViewportRef = useRef(null);
   const imageDragRef = useRef(null);
   const imagePointersRef = useRef(new Map());
   const imageViewRef = useRef({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
   const lightboxRequestRef = useRef(null);
   const lightboxObjectUrlRef = useRef('');
+  const closeLightboxRef = useRef(null);
+  const openImageLightboxRef = useRef(null);
+  const showImageLightboxRef = useRef(null);
   const [imageView, setImageView] = useState({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
 
   const activeRoot = useMemo(
     () => roots.find((root) => root.id === rootId) || listing.root || null,
     [roots, rootId, listing.root],
   );
+
+  const navigateBrowserLocation = (nextRootId, nextFolder) => {
+    if (!nextRootId) return;
+    const current = getNasBrowserHistoryState();
+    if (current?.rootId === nextRootId && current.folder === nextFolder && !current.lightboxEntry) return;
+    window.history.pushState(
+      createNasBrowserHistoryState({ rootId: nextRootId, folder: nextFolder }),
+      '',
+      window.location.href,
+    );
+    setSearchText('');
+    setSearchState(null);
+    setRootId(nextRootId);
+    setFolder(nextFolder);
+  };
 
   const loadRoots = useCallback(async () => {
     try {
@@ -213,6 +249,20 @@ function NasFileBrowser() {
     if (rootId) void loadFolder({ targetFolder: folder });
   }, [folder, rootId, loadFolder]);
 
+  useEffect(() => {
+    if (!rootId) return;
+    const current = getNasBrowserHistoryState();
+    if (
+      current?.lightboxEntry
+      || (current?.rootId === rootId && current.folder === folder)
+    ) return;
+    window.history.replaceState(
+      createNasBrowserHistoryState({ rootId, folder }),
+      '',
+      window.location.href,
+    );
+  }, [folder, rootId]);
+
   // The connector now sends incremental watcher updates shortly after a NAS
   // edit. Quietly refresh the visible folder so ordinary changes appear
   // without requiring the operator to press the manual Refresh button.
@@ -227,10 +277,7 @@ function NasFileBrowser() {
   }, [folder, loadFolder, rootId, searchState]);
 
   const selectRoot = (nextRootId) => {
-    setRootId(nextRootId);
-    setFolder('');
-    setSearchText('');
-    setSearchState(null);
+    navigateBrowserLocation(nextRootId, '');
   };
 
   const runSearch = async (event) => {
@@ -258,7 +305,7 @@ function NasFileBrowser() {
     setSearchState(null);
   };
 
-  const uploadFileToCurrentFolder = async (file) => {
+  const uploadFileToCurrentFolder = async (file, { fileIndex = 1, fileCount = 1 } = {}) => {
     let uploadId = '';
     let stagingCompleted = false;
     try {
@@ -266,6 +313,8 @@ function NasFileBrowser() {
       setError('');
       setUploadState({
         fileName: file.name,
+        fileIndex,
+        fileCount,
         totalBytes: file.size,
         uploadedBytes: 0,
         status: 'Preparing secure temporary upload...',
@@ -338,8 +387,8 @@ function NasFileBrowser() {
             finished: true,
           }));
           void loadFolder({ quiet: true, targetFolder: folder });
-          window.setTimeout(() => setUploadState(null), 8_000);
-          return;
+          if (fileIndex === fileCount) window.setTimeout(() => setUploadState(null), 8_000);
+          return true;
         }
         if (job.status === 'failed' || job.status === 'cancelled') {
           throw new NasCatalogueApiError('The connector could not write this file to the NAS folder.');
@@ -355,7 +404,8 @@ function NasFileBrowser() {
         status: 'The upload is still queued for the NAS connector. You can safely leave this page.',
         finished: true,
       }));
-      return;
+      if (fileIndex === fileCount) window.setTimeout(() => setUploadState(null), 8_000);
+      return true;
     } catch (requestError) {
       console.error('[NAS upload]', { step: 'browser_upload_failed', uploadId, message: requestError.message });
       if (uploadId && !stagingCompleted) {
@@ -363,6 +413,7 @@ function NasFileBrowser() {
       }
       setUploadState((current) => (current ? { ...current, status: 'Upload failed', finished: true } : null));
       setError(requestError.message || 'The NAS upload failed.');
+      return false;
     }
   };
 
@@ -370,12 +421,19 @@ function NasFileBrowser() {
     const files = Array.from(event.target.files || []);
     event.target.value = '';
     if (!files.length || uploadState || searchState || !activeRoot?.uploadsEnabled) return;
-    void uploadFileToCurrentFolder(files[0]);
+    void (async () => {
+      for (let index = 0; index < files.length; index += 1) {
+        const completed = await uploadFileToCurrentFolder(files[index], {
+          fileIndex: index + 1,
+          fileCount: files.length,
+        });
+        if (!completed) break;
+      }
+    })();
   };
 
   const openEntryLocation = (entry) => {
-    setSearchState(null);
-    setFolder(entry.entryType === 'folder' ? entry.relativePath : entry.parentPath);
+    navigateBrowserLocation(rootId, entry.entryType === 'folder' ? entry.relativePath : entry.parentPath);
   };
 
   const createShare = async (entry) => {
@@ -572,12 +630,16 @@ function NasFileBrowser() {
       });
   };
 
-  const closeLightbox = () => {
+  const closeLightbox = (fromHistory = false) => {
     cancelImageRequest(lightboxRequestRef.current);
     lightboxRequestRef.current = null;
     releaseLightboxObjectUrl();
     setLightbox(null);
+    if (!fromHistory && getNasBrowserHistoryState()?.lightboxEntry) {
+      window.history.back();
+    }
   };
+  closeLightboxRef.current = closeLightbox;
 
   const openImageLightbox = async (entry) => {
     const traceId = crypto.randomUUID();
@@ -665,6 +727,40 @@ function NasFileBrowser() {
       if (lightboxRequestRef.current === request) setDeliveringEntryId('');
     }
   };
+  openImageLightboxRef.current = openImageLightbox;
+
+  const showImageLightbox = (entry) => {
+    if (!entry) return;
+    const nextHistoryState = { rootId, folder, lightboxEntry: entry };
+    if (getNasBrowserHistoryState()?.lightboxEntry) {
+      window.history.replaceState(createNasBrowserHistoryState(nextHistoryState), '', window.location.href);
+    } else {
+      window.history.pushState(createNasBrowserHistoryState(nextHistoryState), '', window.location.href);
+    }
+    void openImageLightbox(entry);
+  };
+  showImageLightboxRef.current = showImageLightbox;
+
+  useEffect(() => {
+    const onPopState = (event) => {
+      const next = getNasBrowserHistoryState(event.state);
+      if (!next) {
+        closeLightboxRef.current?.(true);
+        return;
+      }
+      setSearchText('');
+      setSearchState(null);
+      setRootId(next.rootId);
+      setFolder(next.folder);
+      if (next.lightboxEntry) {
+        void openImageLightboxRef.current?.(next.lightboxEntry);
+      } else {
+        closeLightboxRef.current?.(true);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const downloadLightboxImage = () => {
     if (lightbox?.entry) void requestDelivery(lightbox.entry, 'attachment');
@@ -675,13 +771,13 @@ function NasFileBrowser() {
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        closeLightbox();
+        closeLightboxRef.current?.();
       } else if (event.key === 'ArrowLeft' && lightbox.previous) {
         event.preventDefault();
-        void openImageLightbox(lightbox.previous);
+        showImageLightboxRef.current?.(lightbox.previous);
       } else if (event.key === 'ArrowRight' && lightbox.next) {
         event.preventDefault();
-        void openImageLightbox(lightbox.next);
+        showImageLightboxRef.current?.(lightbox.next);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -721,6 +817,7 @@ function NasFileBrowser() {
         startY: pointers[0].clientY,
         originX: imageViewAtStart.x,
         originY: imageViewAtStart.y,
+        originScale: imageViewAtStart.scale,
       };
       return;
     }
@@ -767,13 +864,21 @@ function NasFileBrowser() {
     event.stopPropagation();
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    imagePointersRef.current.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+    imagePointersRef.current.set(event.pointerId, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pointerType: event.pointerType,
+    });
     createImageGesture();
   };
 
   const moveImageGesture = (event) => {
     if (!imagePointersRef.current.has(event.pointerId)) return;
-    imagePointersRef.current.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+    imagePointersRef.current.set(event.pointerId, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pointerType: event.pointerType,
+    });
     const gesture = imageDragRef.current;
     const viewport = imageViewportRef.current?.getBoundingClientRect();
     if (!gesture || !viewport) return;
@@ -816,9 +921,27 @@ function NasFileBrowser() {
 
   const endImageGesture = (event) => {
     if (!imagePointersRef.current.has(event.pointerId)) return;
+    const gesture = imageDragRef.current;
+    const horizontalDistance = gesture?.type === 'pan' ? event.clientX - gesture.startX : 0;
+    const verticalDistance = gesture?.type === 'pan' ? event.clientY - gesture.startY : 0;
+    const isImageSwipe = (
+      event.pointerType === 'touch'
+      && gesture?.type === 'pan'
+      && gesture.pointerId === event.pointerId
+      && gesture.originScale <= MIN_IMAGE_ZOOM
+      && Math.abs(horizontalDistance) >= IMAGE_SWIPE_THRESHOLD
+      && Math.abs(horizontalDistance) > Math.abs(verticalDistance)
+    );
     imagePointersRef.current.delete(event.pointerId);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (isImageSwipe) {
+      if (horizontalDistance < 0 && lightbox?.next) {
+        showImageLightbox(lightbox.next);
+      } else if (horizontalDistance > 0 && lightbox?.previous) {
+        showImageLightbox(lightbox.previous);
+      }
     }
     createImageGesture();
   };
@@ -895,6 +1018,15 @@ function NasFileBrowser() {
       <input
         ref={fileInputRef}
         type="file"
+        multiple
+        hidden
+        onChange={chooseUploadFiles}
+      />
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        multiple
         hidden
         onChange={chooseUploadFiles}
       />
@@ -906,14 +1038,24 @@ function NasFileBrowser() {
         </div>
         <div className="file-server-header-actions">
           {activeRoot?.uploadsEnabled && !searchState && (
-            <button
-              className="file-server-button primary"
-              type="button"
-              disabled={Boolean(uploadState && !uploadState.finished) || !rootId}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Upload here
-            </button>
+            <>
+              <button
+                className="file-server-button primary"
+                type="button"
+                disabled={Boolean(uploadState && !uploadState.finished) || !rootId}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Upload here
+              </button>
+              <button
+                className="file-server-button"
+                type="button"
+                disabled={Boolean(uploadState && !uploadState.finished) || !rootId}
+                onClick={() => photoInputRef.current?.click()}
+              >
+                Upload photos
+              </button>
+            </>
           )}
           <button className="file-server-button" onClick={() => { void loadRoots(); void loadFolder(); }} disabled={loading || loadingRoots}>
             Refresh
@@ -927,7 +1069,7 @@ function NasFileBrowser() {
       {uploadState && (
         <div className="file-server-upload-progress" role="status">
           <strong>{uploadState.fileName}</strong>
-          <span>{uploadState.status}</span>
+          <span>{uploadState.fileCount > 1 ? `File ${uploadState.fileIndex} of ${uploadState.fileCount}: ` : ''}{uploadState.status}</span>
           <progress value={uploadState.uploadedBytes} max={uploadState.totalBytes || 1} />
           <span>{formatBytes(uploadState.uploadedBytes)} of {formatBytes(uploadState.totalBytes)}</span>
         </div>
@@ -959,13 +1101,13 @@ function NasFileBrowser() {
 
       {!searchState && (
         <nav className="file-server-breadcrumbs" aria-label="NAS file location">
-          <button className="file-server-crumb" onClick={() => setFolder('')}>NAS Files</button>
+          <button className="file-server-crumb" onClick={() => navigateBrowserLocation(rootId, '')}>NAS Files</button>
           {breadcrumbs.map((segment, index) => {
             const path = breadcrumbs.slice(0, index + 1).join('/');
             return (
               <span key={path}>
                 <span aria-hidden="true">/</span>
-                <button className="file-server-crumb" onClick={() => setFolder(path)}>{segment}</button>
+                <button className="file-server-crumb" onClick={() => navigateBrowserLocation(rootId, path)}>{segment}</button>
               </span>
             );
           })}
@@ -984,12 +1126,12 @@ function NasFileBrowser() {
                 key={entry.id}
                 onClick={() => {
                   if (entry.previewKind === 'image' && !deliveringEntryId && !sharingEntryId) {
-                    void openImageLightbox(entry);
+                    showImageLightbox(entry);
                   }
                 }}
               >
                 {entry.entryType === 'folder' ? (
-                  <button className="file-server-name-button" onClick={() => setFolder(entry.relativePath)}>
+                  <button className="file-server-name-button" onClick={() => navigateBrowserLocation(rootId, entry.relativePath)}>
                     {renderNasEntryIcon(entry)}
                     <span className="file-server-file-name">{entry.name}</span>
                   </button>
@@ -1075,9 +1217,9 @@ function NasFileBrowser() {
             )}
           </div>
           <footer className="nas-image-lightbox-nav">
-            <button type="button" onClick={() => void openImageLightbox(lightbox.previous)} disabled={!lightbox.previous}>Previous</button>
+            <button type="button" onClick={() => showImageLightbox(lightbox.previous)} disabled={!lightbox.previous}>Previous</button>
             <span>{lightbox.entry.name}</span>
-            <button type="button" onClick={() => void openImageLightbox(lightbox.next)} disabled={!lightbox.next}>Next</button>
+            <button type="button" onClick={() => showImageLightbox(lightbox.next)} disabled={!lightbox.next}>Next</button>
           </footer>
         </section>
       )}
