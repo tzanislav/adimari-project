@@ -754,6 +754,14 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
         return res.json({ thumbnailStatus: 'ready', thumbnailUrl });
       }
 
+      // A connector failure or an administrator cancellation is terminal for
+      // this image version.  The file browser polls this endpoint while a
+      // thumbnail is being prepared, so immediately treating a failed entry
+      // as a fresh request would recreate the cancelled job forever.
+      if (entry.thumbnailStatus === 'failed') {
+        return res.json({ thumbnailStatus: 'failed' });
+      }
+
       await NasFileEntryModel.findOneAndUpdate(
         { _id: entryId, versionFingerprint: entry.versionFingerprint, deletedAt: null },
         { $set: { thumbnailStatus: 'preparing' } },
@@ -768,11 +776,12 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
           versionFingerprint: entry.versionFingerprint,
           requestedBy: actorUid,
         });
-        console.info('[NAS thumbnail] queued', {
-          entryId,
-          jobId: String(queued.job?._id || queued.job?.id || ''),
-          created: queued.created,
-        });
+        if (queued.created) {
+          console.info('[NAS thumbnail] queued', {
+            entryId,
+            jobId: String(queued.job?._id || queued.job?.id || ''),
+          });
+        }
         return res.status(202).json({ thumbnailStatus: 'preparing', retryAfterSeconds: 3 });
       } catch (error) {
         await NasFileEntryModel.findOneAndUpdate(

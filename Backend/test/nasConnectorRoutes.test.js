@@ -374,7 +374,7 @@ test('a shared connector key creates or reconnects an installation', async () =>
     const connectorId = connected.body.connector.id;
     const heartbeat = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify({ ...payload, state: 'ready', queueLength: 0 }),
     });
     assert.equal(heartbeat.response.status, 200);
@@ -418,7 +418,7 @@ test('an authenticated connector receives and acknowledges one job over HTTPS po
 
     const polled = await json(`${app.url}/api/nas-connectors/control/jobs/poll`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify({ waitSeconds: 0 }),
     });
     assert.equal(polled.response.status, 200);
@@ -428,7 +428,7 @@ test('an authenticated connector receives and acknowledges one job over HTTPS po
 
     const acknowledged = await json(`${app.url}/api/nas-connectors/control/jobs/ack`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify({
         jobId: polled.body.assignment.jobId,
         deliveryId: polled.body.assignment.deliveryId,
@@ -471,7 +471,7 @@ test('an administrator can re-enable a disabled shared-key connector without iss
 
     const heartbeat = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify({ ...payload, state: 'ready', queueLength: 0 }),
     });
     assert.equal(heartbeat.response.status, 200);
@@ -481,7 +481,7 @@ test('an administrator can re-enable a disabled shared-key connector without iss
   }
 });
 
-test('heartbeat authenticates the connector credential and is refused after admin revocation', async () => {
+test('heartbeat authenticates an enrolled connector ID and is refused after admin revocation', async () => {
   const models = createInMemoryModels();
   const app = await startApp({
     models,
@@ -499,7 +499,7 @@ test('heartbeat authenticates the connector credential and is refused after admi
     };
     const heartbeat = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify(heartbeatPayload),
     });
     assert.equal(heartbeat.response.status, 200);
@@ -523,7 +523,7 @@ test('heartbeat authenticates the connector credential and is refused after admi
 
     const afterRevocation = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify(heartbeatPayload),
     });
     assert.equal(afterRevocation.response.status, 401);
@@ -610,7 +610,7 @@ test('admin listing persists a stale active connector as offline and a valid hea
 
     const recovered = await json(`${app.url}/api/nas-connectors/control/heartbeat`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify({
         installationId: INSTALLATION_ID,
         agentVersion: '0.1.1',
@@ -698,6 +698,41 @@ test('admin can queue one idempotent index-root delivery job for an enabled conn
   }
 });
 
+test('admin can cancel an active thumbnail job without letting browser polling recreate it', async () => {
+  const models = createInMemoryModels();
+  const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
+  try {
+    const connector = await connectSharedConnector(app);
+    const fileEntryId = '6'.repeat(24);
+    const storageRootId = models.state.roots[0]._id;
+    models.state.fileEntries.push({
+      _id: fileEntryId,
+      storageRootId,
+      thumbnailStatus: 'preparing',
+    });
+    const thumbnail = await models.TransferJobModel.create({
+      type: 'generate_thumbnail',
+      status: 'in_progress',
+      connectorId: connector.id,
+      storageRootId,
+      connectorRootId: ROOT.connectorRootId,
+      idempotencyKey: `generate_thumbnail:${fileEntryId}:version-1`,
+      payload: { fileEntryId },
+    });
+
+    const cancelled = await json(`${app.url}/api/nas-connectors/${connector.id}/jobs/${thumbnail._id}/cancel`, {
+      method: 'POST', headers: { authorization: 'Bearer admin' }, body: '{}',
+    });
+    assert.equal(cancelled.response.status, 200);
+    assert.equal(cancelled.body.job.status, 'cancelled');
+    assert.equal(models.state.jobs[0].idempotencyKey, undefined);
+    assert.equal(models.state.fileEntries[0].thumbnailStatus, 'failed');
+    assert.equal(models.state.audits.at(-1).action, 'thumbnail_cancelled');
+  } finally {
+    await close(app.server);
+  }
+});
+
 test('a shared-key connector can request and immediately accept its own local index scan', async () => {
   const models = createInMemoryModels();
   const app = await startApp({ models, requireHttpsMiddleware: (req, res, next) => next() });
@@ -706,7 +741,7 @@ test('a shared-key connector can request and immediately accept its own local in
     const connectorId = connector.id;
     const request = () => json(`${app.url}/api/nas-connectors/control/index-requests`, {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify({ connectorRootId: ROOT.connectorRootId }),
     });
 
@@ -741,7 +776,7 @@ test('an authenticated connector turns an accepted index job into a completed re
     // Durable polling acknowledgement is separately covered; this route test
     // starts at the point where that acknowledgement has committed.
     models.state.jobs[0].status = 'accepted';
-    const connectorHeaders = { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` };
+    const connectorHeaders = { authorization: `Connector ${connectorId}` };
 
     const started = await json(`${app.url}/api/nas-connectors/control/jobs/${jobId}/index/start`, {
       method: 'POST', headers: connectorHeaders, body: JSON.stringify({ scanId }),
@@ -864,7 +899,7 @@ test('cache completion replays after the share became ready but the entry update
     };
     const request = {
       method: 'POST',
-      headers: { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` },
+      headers: { authorization: `Connector ${connectorId}` },
       body: JSON.stringify({ versionFingerprint: 'version-1', sizeBytes: 42 }),
     };
 
@@ -889,7 +924,7 @@ test('an authenticated connector applies small relative watcher updates without 
   try {
     const connector = await connectSharedConnector(app);
     const connectorId = connector.id;
-    const headers = { authorization: `Connector ${connectorId}.${SHARED_ACCESS_KEY}` };
+    const headers = { authorization: `Connector ${connectorId}` };
     const send = (changes) => json(app.url + '/api/nas-connectors/control/catalogue/changes', {
       method: 'POST',
       headers,

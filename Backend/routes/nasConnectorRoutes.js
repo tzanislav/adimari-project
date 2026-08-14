@@ -137,6 +137,15 @@ const indexJobUnavailable = () => new NasConnectorApiError({
   status: 409,
 });
 
+// A cancelled thumbnail is equivalent to a cancelled index scan from the
+// connector's point of view: it must clear the matching durable local record
+// rather than retrying an operation the server deliberately stopped.
+const thumbnailJobUnavailable = () => new NasConnectorApiError({
+  code: 'NAS_CONNECTOR_JOB_UNAVAILABLE',
+  message: 'The thumbnail job is no longer active.',
+  status: 409,
+});
+
 const connectorRootUnavailable = () => new NasConnectorApiError({
   code: 'NAS_CONNECTOR_ROOT_UNAVAILABLE',
   message: 'The configured connector root is no longer active.',
@@ -275,7 +284,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     now: dependencies.now || (() => new Date()),
   });
   const connectorAuthenticateMiddleware = dependencies.connectorAuthenticateMiddleware
-    || createConnectorAuthenticateMiddleware({ NasConnectorModel, sharedSecret: config.sharedSecret });
+    || createConnectorAuthenticateMiddleware({ NasConnectorModel });
   const now = dependencies.now || (() => new Date());
   const suppliedFileServerConfig = dependencies.fileServerConfig || null;
   const storageSet = dependencies.storageSet || null;
@@ -416,10 +425,9 @@ const createNasConnectorRoutes = (dependencies = {}) => {
   // Connector shared access keys are never accepted over cleartext HTTP.
   router.use(requireHttpsMiddleware);
 
-  // Trusted small-installation connection flow. It creates or reuses the
-  // connector record identified by the local installation ID, while all later
-  // heartbeat/job requests are bound to the returned connector ID plus the
-  // same shared key. No token or per-device credential rotation is involved.
+  // The shared key is validated exactly once here. This creates or reuses the
+  // connector record identified by the local installation ID; all later
+  // heartbeat and job requests use only the returned connector ID.
   router.post('/connect', requireSharedConnectorKey, async (req, res) => {
     try {
       const request = normalizeSharedConnectionRequest(req.body);
@@ -1170,7 +1178,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         type: GENERATE_THUMBNAIL_JOB_TYPE,
         status: { $in: ['accepted', 'in_progress'] },
       });
-      if (!job || !isPlainObject(job.payload)) throw genericConnectorFailure();
+      if (!job || !isPlainObject(job.payload)) throw thumbnailJobUnavailable();
       const fileEntryId = assertObjectId(job.payload.fileEntryId, 'File entry ID');
       const [entry, root] = await Promise.all([
         NasFileEntryModel.findOne({
@@ -1227,7 +1235,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         type: GENERATE_THUMBNAIL_JOB_TYPE,
         status: { $in: ['in_progress', 'completed'] },
       });
-      if (!job || !isPlainObject(job.payload)) throw genericConnectorFailure();
+      if (!job || !isPlainObject(job.payload)) throw thumbnailJobUnavailable();
       if (job.status === 'completed') return res.json({ job: serializeTransferJob(job) });
       const fileEntryId = assertObjectId(job.payload.fileEntryId, 'File entry ID');
       const entry = await NasFileEntryModel.findOne({
@@ -1259,7 +1267,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         { $set: { status: 'completed', completedAt, progressStage: null, progressBytes: completion.sizeBytes, progressTotalBytes: completion.sizeBytes, progressUpdatedAt: completedAt }, $unset: { idempotencyKey: 1 } },
         { new: true },
       );
-      if (!completed) throw genericConnectorFailure();
+      if (!completed) throw thumbnailJobUnavailable();
       await audit({ action: 'thumbnail_completed', result: 'success', connectorId, storageRootId: job.storageRootId, fileEntryId, transferJobId: jobId, details: {} });
       if (previousThumbnailKey && previousThumbnailKey !== thumbnailKey) {
         await getThumbnailStorage().deleteFile({ key: previousThumbnailKey }).catch((error) => {
@@ -1286,14 +1294,14 @@ const createNasConnectorRoutes = (dependencies = {}) => {
       const failure = normalizeDeliveryFailure(req.body);
       const connectorId = connectorIdOf(req.connector);
       const existing = await NasTransferJobModel.findOne({ _id: jobId, connectorId, type: GENERATE_THUMBNAIL_JOB_TYPE, status: { $in: ['accepted', 'in_progress', 'failed'] } });
-      if (!existing || !isPlainObject(existing.payload)) throw connectorRootUnavailable();
+      if (!existing || !isPlainObject(existing.payload)) throw thumbnailJobUnavailable();
       if (existing.status === 'failed') return res.json({ job: serializeTransferJob(existing) });
       const job = await NasTransferJobModel.findOneAndUpdate(
         { _id: jobId, connectorId, type: GENERATE_THUMBNAIL_JOB_TYPE, status: { $in: ['accepted', 'in_progress'] } },
         { $set: { status: 'failed', completedAt: now(), errorCode: failure.code, errorMessage: 'The connector could not prepare the image thumbnail.' }, $unset: { idempotencyKey: 1 } },
         { new: true },
       );
-      if (!job) throw connectorRootUnavailable();
+      if (!job) throw thumbnailJobUnavailable();
       if (job.payload.fileEntryId) await NasFileEntryModel.findOneAndUpdate(
         { _id: job.payload.fileEntryId, storageRootId: job.storageRootId, thumbnailStatus: 'preparing' },
         { $set: { thumbnailStatus: 'failed' } },
@@ -1739,9 +1747,9 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     }
   });
 
-  // An administrator can stop an index scan at any active queue stage. The
-  // connector sees the cancelled state on its next bounded API call and clears
-  // its matching local job before it can send further metadata.
+  // An administrator can stop an index scan or thumbnail at any active queue
+  // stage. The connector sees the cancelled state on its next bounded API
+  // call and clears its matching local job before it retries the operation.
   router.post('/:id/jobs/:jobId/cancel', authenticateMiddleware, authorizeAdminMiddleware, async (req, res) => {
     const actorUid = currentActorUid(req.user);
     try {
@@ -1760,7 +1768,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         {
           _id: jobId,
           connectorId,
-          type: INDEX_ROOT_JOB_TYPE,
+          type: { $in: [INDEX_ROOT_JOB_TYPE, GENERATE_THUMBNAIL_JOB_TYPE] },
           status: { $in: ['queued', 'assigned', 'accepted', 'in_progress'] },
         },
         {
@@ -1781,19 +1789,26 @@ const createNasConnectorRoutes = (dependencies = {}) => {
       if (!job) {
         throw new NasConnectorApiError({
           code: 'NAS_CONNECTOR_JOB_CANNOT_CANCEL',
-          message: 'The index scan is no longer active and cannot be cancelled.',
+          message: 'The connector job is no longer active and cannot be cancelled.',
           status: 409,
         });
       }
 
+      if (job.type === GENERATE_THUMBNAIL_JOB_TYPE && job.payload?.fileEntryId) {
+        await NasFileEntryModel.findOneAndUpdate(
+          { _id: job.payload.fileEntryId, storageRootId: job.storageRootId, thumbnailStatus: 'preparing' },
+          { $set: { thumbnailStatus: 'failed' } },
+          { new: false },
+        );
+      }
       await audit({
-        action: 'scan_cancelled',
+        action: job.type === GENERATE_THUMBNAIL_JOB_TYPE ? 'thumbnail_cancelled' : 'scan_cancelled',
         result: 'success',
         actorUid,
         connectorId,
         storageRootId: job.storageRootId,
         transferJobId: job._id || job.id,
-        details: { jobType: INDEX_ROOT_JOB_TYPE },
+        details: { jobType: job.type },
       });
       return res.json({ job: serializeTransferJob(job) });
     } catch (error) {

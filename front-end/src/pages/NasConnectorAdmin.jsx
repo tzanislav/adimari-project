@@ -72,6 +72,25 @@ const describeIndexJob = (job) => {
   }
 };
 
+const ACTIVE_JOB_STATUSES = new Set(['queued', 'assigned', 'accepted', 'in_progress']);
+
+const describeThumbnailJob = (job) => {
+  switch (job.status) {
+    case 'queued':
+      return 'Queued — waiting for the connector.';
+    case 'assigned':
+      return 'Sent to connector — awaiting receipt.';
+    case 'accepted':
+      return 'Accepted by connector — waiting to start.';
+    case 'in_progress':
+      return job.progressStage === 'uploading_thumbnail'
+        ? 'Uploading generated thumbnail.'
+        : 'Generating thumbnail.';
+    default:
+      return `Thumbnail status: ${job.status || 'unknown'}.`;
+  }
+};
+
 const describeError = (error) => {
   if (error instanceof NasConnectorApiError && error.status === 404) {
     return 'The NAS connector API is unavailable. Check that it is enabled on the server.';
@@ -84,9 +103,9 @@ function NasConnectorAdmin() {
   const [connectors, setConnectors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [queueingIndexConnectorId, setQueueingIndexConnectorId] = useState(null);
-  const [cancellingIndexConnectorId, setCancellingIndexConnectorId] = useState(null);
+  const [cancellingJobId, setCancellingJobId] = useState(null);
   const [testingConnectorId, setTestingConnectorId] = useState(null);
-  const [indexJobsByConnector, setIndexJobsByConnector] = useState({});
+  const [jobsByConnector, setJobsByConnector] = useState({});
   const [recoveryJobs, setRecoveryJobs] = useState([]);
   const [recoveryLoading, setRecoveryLoading] = useState(true);
   const [recoveryError, setRecoveryError] = useState('');
@@ -186,34 +205,34 @@ function NasConnectorAdmin() {
     }
   };
 
-  const loadIndexJobs = useCallback(async (connectorIds) => {
+  const loadConnectorJobs = useCallback(async (connectorIds) => {
     const results = await Promise.all(connectorIds.map(async (connectorId) => {
       try {
         const data = await apiRequest(`/${encodeURIComponent(connectorId)}/jobs`);
         const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
-        return [connectorId, jobs.find((job) => job.type === 'index_root') || null];
+        return [connectorId, jobs];
       } catch {
         // Connector listing must remain useful if a single job-status request
         // is temporarily unavailable.
-        return [connectorId, null];
+        return [connectorId, []];
       }
     }));
 
-    setIndexJobsByConnector(Object.fromEntries(results));
+    setJobsByConnector(Object.fromEntries(results));
   }, []);
 
   useEffect(() => {
     const connectorIds = connectors.map((connector) => connector.id).filter(Boolean);
     if (connectorIds.length === 0) {
-      setIndexJobsByConnector({});
+      setJobsByConnector({});
       return undefined;
     }
 
-    const refresh = () => { void loadIndexJobs(connectorIds); };
+    const refresh = () => { void loadConnectorJobs(connectorIds); };
     refresh();
     const timer = window.setInterval(refresh, 3000);
     return () => window.clearInterval(timer);
-  }, [connectors, loadIndexJobs]);
+  }, [connectors, loadConnectorJobs]);
 
   const revokeConnector = async (connector) => {
     const confirmed = window.confirm(
@@ -318,7 +337,10 @@ function NasConnectorAdmin() {
         attempts: queued?.job?.attemptCount,
       });
       if (queued?.job) {
-        setIndexJobsByConnector((current) => ({ ...current, [connector.id]: queued.job }));
+        setJobsByConnector((current) => ({
+          ...current,
+          [connector.id]: [queued.job, ...(current[connector.id] || []).filter((job) => job.id !== queued.job.id)],
+        }));
       }
       setNotice(queued?.created
         ? `Index scan queued for “${root.name}”. ${describeIndexJob(queued.job)}`
@@ -336,16 +358,16 @@ function NasConnectorAdmin() {
     }
   };
 
-  const cancelIndexScan = async (connector) => {
-    const job = indexJobsByConnector[connector.id];
-    if (!job) return;
+  const cancelJob = async (connector, job) => {
+    if (!job?.id) return;
 
+    const noun = job.type === 'generate_thumbnail' ? 'thumbnail job' : 'index scan';
     const confirmed = window.confirm(
-      'Cancel this index scan? This stops queued, accepted, or currently running scans. You can queue a fresh scan afterwards.',
+      `Cancel this ${noun}? The connector will stop it at its next safe checkpoint.`,
     );
     if (!confirmed) return;
 
-    setCancellingIndexConnectorId(connector.id);
+    setCancellingJobId(job.id);
     setError('');
     setNotice('');
     try {
@@ -354,13 +376,18 @@ function NasConnectorAdmin() {
         body: {},
       });
       if (cancelled?.job) {
-        setIndexJobsByConnector((current) => ({ ...current, [connector.id]: cancelled.job }));
+        setJobsByConnector((current) => ({
+          ...current,
+          [connector.id]: (current[connector.id] || []).map((entry) => (
+            entry.id === cancelled.job.id ? cancelled.job : entry
+          )),
+        }));
       }
-      setNotice('The index scan was cancelled. You can now queue a fresh scan.');
+      setNotice(`The ${noun} was cancelled.`);
     } catch (requestError) {
       setError(describeError(requestError));
     } finally {
-      setCancellingIndexConnectorId(null);
+      setCancellingJobId(null);
     }
   };
 
@@ -539,6 +566,7 @@ function NasConnectorAdmin() {
                   <th scope="col">Name</th>
                   <th scope="col">Status</th>
                   <th scope="col">Index scan</th>
+                  <th scope="col">Active thumbnail jobs</th>
                   <th scope="col">Version</th>
                   <th scope="col">Last seen</th>
                   <th scope="col">Connected</th>
@@ -550,10 +578,13 @@ function NasConnectorAdmin() {
                   const isRevoked = connector.status === 'revoked';
                   const isRevoking = revokingId === connector.id;
                   const isQueueingIndex = queueingIndexConnectorId === connector.id;
-                  const isCancellingIndex = cancellingIndexConnectorId === connector.id;
                   const isTesting = testingConnectorId === connector.id;
                   const canQueueIndex = connector.status === 'active' || connector.status === 'offline';
-                  const indexJob = indexJobsByConnector[connector.id];
+                  const connectorJobs = jobsByConnector[connector.id] || [];
+                  const indexJob = connectorJobs.find((job) => job.type === 'index_root') || null;
+                  const thumbnailJobs = connectorJobs.filter((job) => (
+                    job.type === 'generate_thumbnail' && ACTIVE_JOB_STATUSES.has(job.status)
+                  ));
                   const canCancelIndex = indexJob && ['queued', 'assigned', 'accepted', 'in_progress'].includes(indexJob.status);
                   return (
                     <tr key={connector.id}>
@@ -565,6 +596,25 @@ function NasConnectorAdmin() {
                       <td data-label="Index scan">
                         <span className={`nas-connector-index-status ${indexJob?.status || 'none'}`}>{describeIndexJob(indexJob)}</span>
                         {indexJob && <span className="nas-connector-index-updated">Updated {formatDate(indexJob.progressUpdatedAt || indexJob.completedAt || indexJob.updatedAt || indexJob.createdAt)}</span>}
+                      </td>
+                      <td data-label="Active thumbnail jobs">
+                        {thumbnailJobs.length === 0 ? (
+                          <span className="nas-connector-index-status none">None active.</span>
+                        ) : (
+                          <div className="nas-connector-thumbnail-jobs">
+                            {thumbnailJobs.map((job) => (
+                              <div className="nas-connector-thumbnail-job" key={job.id}>
+                                <span className={`nas-connector-index-status ${job.status}`}>{describeThumbnailJob(job)}</span>
+                                <span className="nas-connector-index-updated">
+                                  Job {job.id.slice(-6)} · attempt {job.attemptCount || 0} · updated {formatDate(job.progressUpdatedAt || job.updatedAt || job.acceptedAt || job.createdAt)}
+                                </span>
+                                <button className="nas-connector-button danger compact" type="button" onClick={() => void cancelJob(connector, job)} disabled={cancellingJobId === job.id}>
+                                  {cancellingJobId === job.id ? 'Cancelling…' : 'Cancel thumbnail'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td data-label="Version">{connector.agentVersion || '—'}</td>
                       <td data-label="Last seen">{formatDate(connector.lastSeenAt)}</td>
@@ -582,8 +632,8 @@ function NasConnectorAdmin() {
                             </button>
                           )}
                           {canCancelIndex && (
-                            <button className="nas-connector-button danger compact" type="button" onClick={() => void cancelIndexScan(connector)} disabled={isCancellingIndex}>
-                              {isCancellingIndex ? 'Cancelling scan…' : 'Cancel index scan'}
+                            <button className="nas-connector-button danger compact" type="button" onClick={() => void cancelJob(connector, indexJob)} disabled={cancellingJobId === indexJob.id}>
+                              {cancellingJobId === indexJob.id ? 'Cancelling scan…' : 'Cancel index scan'}
                             </button>
                           )}
                           {isRevoked ? (

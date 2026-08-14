@@ -153,6 +153,10 @@
 .nas-connector-index-status.cancelled,
 .nas-connector-index-status.conflict { color: #9e242d; }
 .nas-connector-index-updated { display: block; margin-top: 3px; color: #718093; font-size: 11px; }
+.nas-connector-thumbnail-jobs { display: grid; gap: 10px; min-width: 260px; }
+.nas-connector-thumbnail-job { display: grid; gap: 5px; padding-bottom: 10px; border-bottom: 1px solid #e7ecf1; }
+.nas-connector-thumbnail-job:last-child { padding-bottom: 0; border-bottom: 0; }
+.nas-connector-thumbnail-job .nas-connector-button { justify-self: start; }
 
 .nas-connector-status {
   display: inline-block;

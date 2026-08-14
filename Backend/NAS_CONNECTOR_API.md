@@ -10,7 +10,7 @@ or S3 credentials.
 The deployment has one manually distributed 32-byte base64url key:
 `NAS_CONNECTOR_SHARED_SECRET`.
 
-The first request from a Connector is:
+The shared key is used only for the initial connector enrollment:
 
 ```text
 POST /api/nas-connectors/connect
@@ -29,14 +29,16 @@ Authorization: ConnectorKey <NAS_CONNECTOR_SHARED_SECRET>
 }
 ```
 
-It creates or reconnects the stable installation and returns the redacted
-connector plus `heartbeatIntervalSeconds`.
-
-All later Connector requests use:
+After a successful response, every connector control request uses only the
+returned connector ID. The shared key is not stored or revalidated during
+heartbeats, polling, job execution, or catalogue updates:
 
 ```text
-Authorization: Connector <connectorId>.<NAS_CONNECTOR_SHARED_SECRET>
+Authorization: Connector <connectorId>
 ```
+
+It creates or reconnects the stable installation and returns the redacted
+connector plus `heartbeatIntervalSeconds`.
 
 Administrator routes use a Firebase ID token with the `admin` role:
 
@@ -122,9 +124,10 @@ NAS_CONNECTOR_RECOVERY_STUCK_AFTER_MINUTES=30
 ```
 
 `NAS_CONNECTOR_SHARED_SECRET` is 32 random bytes encoded as unpadded base64url
-(43 characters). Store it outside source control and enter the same value in
-each trusted Connector Control Center. If it changes, deploy the backend first
-and reconnect each Connector with the new key.
+(43 characters). Store it outside source control and enter it only when
+enrolling a Connector. It is not retained or revalidated by an already
+enrolled Connector. If it changes, only newly enrolled Connectors need the new
+key.
 
 The NAS bucket and prefix settings in `.env.example` remain required for the
 catalogue, cache, thumbnail, and browser-to-NAS upload work.
@@ -143,9 +146,9 @@ They now return `404`. The backend no longer reads
 `NAS_CONNECTOR_ENROLLMENT_RECOVERY_TTL_SECONDS`.
 
 The Control Center/service IPC contract is version 2 and must be upgraded as a
-matched pair. The Connector reads an existing DPAPI-protected shared key from
-the previous local state shape and continues using it under the new connection
-contract.
+matched pair. This release does not retain or migrate the old persisted shared
+key: after **Reset all**, enter it once to create a fresh enrollment. The
+connector then retains only its server-issued connector ID.
 
 After deploying this release and confirming no old Connector installation is
 still in use, operators may remove the unused `nas_enrollment_tokens` MongoDB

@@ -348,6 +348,44 @@ test('opening a folder can queue one persistent thumbnail without exposing an im
   }
 });
 
+test('a failed thumbnail is terminal for browser polling and is not queued again', async () => {
+  const queued = [];
+  const imageEntry = {
+    _id: 'b'.repeat(24),
+    storageRootId: ROOT_ID,
+    relativePath: 'Design/preview.jpg',
+    parentPath: 'Design',
+    name: 'preview.jpg',
+    entryType: 'file',
+    previewKind: 'image',
+    versionFingerprint: 'version-1',
+    thumbnailStatus: 'failed',
+    deletedAt: null,
+  };
+  const app = await startApp({
+    nasConfig: { cacheRetentionDays: 10, thumbnailPrefix: 'nas-thumbnails/' },
+    fileServerConfig: { publicBaseUrl: 'http://localhost:5173' },
+    NasFileEntryModel: {
+      findOne(filter) { return Promise.resolve(matches(imageEntry, filter) ? imageEntry : null); },
+      async findOneAndUpdate() { throw new Error('A failed thumbnail must not be reset by polling.'); },
+    },
+    jobQueue: {
+      async enqueueThumbnail(request) { queued.push(request); },
+    },
+  });
+  try {
+    const response = await fetch(`${app.url}/api/nas-catalogue/entries/${'b'.repeat(24)}/thumbnails`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer moderator' },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { thumbnailStatus: 'failed' });
+    assert.deepEqual(queued, []);
+  } finally {
+    await close(app.server);
+  }
+});
+
 test('a browser upload stages privately then queues one opaque NAS-write job', async () => {
   const jobs = [];
   const storageCalls = [];

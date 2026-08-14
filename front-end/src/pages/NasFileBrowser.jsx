@@ -783,7 +783,7 @@ function NasFileBrowser() {
             ...current,
             [entry.id]: { status: result.thumbnailStatus, url: result.thumbnailUrl || '' },
           }));
-          if (result.thumbnailStatus !== 'ready') pending.push(entry);
+          if (result.thumbnailStatus === 'preparing') pending.push(entry);
         } catch (thumbnailError) {
           console.info('[NAS thumbnail]', { step: 'thumbnail_unavailable', entryId: entry.id, message: thumbnailError.message });
           // A thumbnail is prepared asynchronously. Keep polling after a

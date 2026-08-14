@@ -3,7 +3,10 @@
 const NasConnector = require('../models/nasConnector');
 const { verifySharedSecret } = require('../services/nasConnectorSecrets');
 
-const CONNECTOR_AUTHORIZATION_PATTERN = /^Connector ([0-9a-fA-F]{24})\.([A-Za-z0-9_-]{43})$/;
+// The shared connector key is an enrollment-only secret. Once enrollment has
+// succeeded, connector API calls identify the already-registered connector by
+// its server-issued ID and do not repeatedly validate the shared key.
+const CONNECTOR_AUTHORIZATION_PATTERN = /^Connector ([0-9a-fA-F]{24})$/;
 const CONNECTOR_KEY_AUTHORIZATION_PATTERN = /^ConnectorKey ([A-Za-z0-9_-]{43})$/;
 
 const unauthorized = (res) => res.status(401).json({
@@ -17,8 +20,7 @@ const parseConnectorAuthorization = (authorization) => {
     : null;
   if (!matched) return null;
 
-  const [, connectorId, sharedSecret] = matched;
-  return { connectorId, sharedSecret };
+  return { connectorId: matched[1] };
 };
 
 const parseConnectorKeyAuthorization = (authorization) => {
@@ -28,17 +30,15 @@ const parseConnectorKeyAuthorization = (authorization) => {
   return matched ? { sharedSecret: matched[1] } : null;
 };
 
-// This authentication primitive is shared by connector HTTPS routes. It
-// deliberately returns only the selected connector document or null. The
-// supplied shared key is compared only to the server configuration; it is
-// never logged or stored in MongoDB.
+// This enrollment lookup is shared by connector HTTPS routes. It deliberately
+// returns only the selected active connector document or null. The shared key
+// is verified exclusively by the /connect enrollment endpoint.
 const authenticateConnectorAuthorization = async ({
   authorization,
   NasConnectorModel = NasConnector,
-  sharedSecret,
 } = {}) => {
   const parsed = parseConnectorAuthorization(authorization);
-  if (!parsed || !verifySharedSecret({ sharedSecret: parsed.sharedSecret, expectedSecret: sharedSecret })) return null;
+  if (!parsed) return null;
 
   try {
     const query = NasConnectorModel.findOne({
@@ -66,13 +66,11 @@ const authenticateConnectorKeyAuthorization = ({ authorization, sharedSecret } =
 
 const createConnectorAuthenticateMiddleware = ({
   NasConnectorModel = NasConnector,
-  sharedSecret,
 } = {}) => async (req, res, next) => {
   const authorization = req.header('authorization');
   const connector = await authenticateConnectorAuthorization({
     authorization,
     NasConnectorModel,
-    sharedSecret,
   });
   if (!connector) return unauthorized(res);
 
