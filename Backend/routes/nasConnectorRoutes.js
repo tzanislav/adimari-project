@@ -764,51 +764,66 @@ const createNasConnectorRoutes = (dependencies = {}) => {
       if (!root) throw genericConnectorFailure();
 
       const observedAt = now();
-      for (const change of request.changes) {
+      const upsertPaths = request.changes
+        .filter((change) => change.operation === 'upsert')
+        .map((change) => change.entry.relativePath);
+      const existingEntries = upsertPaths.length
+        ? await queryAsPlainArray(NasFileEntryModel.find({
+          storageRootId: root._id,
+          relativePath: { $in: upsertPaths },
+        }))
+        : [];
+      const existingByPath = new Map(existingEntries.map((entry) => [entry.relativePath, entry]));
+      const writes = request.changes.map((change) => {
         if (change.operation === 'delete') {
           const escaped = change.relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const filter = change.recursive
             ? { storageRootId: root._id, relativePath: { $regex: `^${escaped}(?:/|$)` }, deletedAt: null }
             : { storageRootId: root._id, relativePath: change.relativePath, deletedAt: null };
-          await NasFileEntryModel.updateMany(
-            filter,
-            { $set: { deletedAt: observedAt, availabilityStatus: 'unavailable', thumbnailStatus: 'stale', lastIndexedAt: observedAt } },
-          );
-          continue;
+          return {
+            updateMany: {
+              filter,
+              update: { $set: { deletedAt: observedAt, availabilityStatus: 'unavailable', thumbnailStatus: 'stale', lastIndexedAt: observedAt } },
+            },
+          };
         }
 
-        const existing = await NasFileEntryModel.findOne({
-          storageRootId: root._id,
-          relativePath: change.entry.relativePath,
-        });
+        const existing = existingByPath.get(change.entry.relativePath);
         const versionChanged = Boolean(existing && existing.versionFingerprint !== change.entry.versionFingerprint);
-        const update = {
-          $set: {
-            ...change.entry,
-            lastIndexedAt: observedAt,
-            deletedAt: null,
-            ...(versionChanged ? {
-              availabilityStatus: 'stale',
-              thumbnailStatus: 'stale',
-            } : {}),
-          },
-          $setOnInsert: {
-            storageRootId: root._id,
-            // MongoDB rejects an upsert that changes the same path through
-            // both $set and $setOnInsert. A changed existing version sets
-            // stale in $set, while a first observation receives its initial
-            // offline/not-requested state here.
-            ...(!versionChanged ? {
-              availabilityStatus: 'offline',
-              thumbnailStatus: 'not_requested',
-            } : {}),
+        return {
+          updateOne: {
+            filter: { storageRootId: root._id, relativePath: change.entry.relativePath },
+            update: {
+              $set: {
+                ...change.entry,
+                lastIndexedAt: observedAt,
+                deletedAt: null,
+                ...(versionChanged ? {
+                  availabilityStatus: 'stale',
+                  thumbnailStatus: 'stale',
+                } : {}),
+              },
+              $setOnInsert: {
+                storageRootId: root._id,
+                // MongoDB rejects an upsert that changes the same path through
+                // both $set and $setOnInsert. A changed existing version sets
+                // stale in $set, while a first observation receives its initial
+                // offline/not-requested state here.
+                ...(!versionChanged ? {
+                  availabilityStatus: 'offline',
+                  thumbnailStatus: 'not_requested',
+                } : {}),
+              },
+            },
+            upsert: true,
           },
         };
-        await NasFileEntryModel.findOneAndUpdate(
-          { storageRootId: root._id, relativePath: change.entry.relativePath },
-          update,
-          { upsert: true, new: false },
-        );
+      });
+      if (writes.length) {
+        // A watcher flush can contain 200 paths. Sending every indexed update
+        // to Mongo in one ordered bulk request avoids hundreds of network
+        // round trips while retaining the caller's change ordering.
+        await NasFileEntryModel.bulkWrite(writes, { ordered: true });
       }
 
       await NasStorageRootModel.findOneAndUpdate(

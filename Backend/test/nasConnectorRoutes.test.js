@@ -34,6 +34,7 @@ const createInMemoryModels = () => {
   const roots = [];
   const jobs = [];
   const fileEntries = [];
+  const fileEntryBulkWrites = [];
   const shares = [];
   const audits = [];
   let connectorSequence = 1;
@@ -205,14 +206,23 @@ const createInMemoryModels = () => {
         },
       };
     },
-    async bulkWrite(operations) {
-      operations.forEach(({ updateOne }) => {
-        let record = fileEntries.find((entry) => matchesFilter(entry, updateOne.filter));
-        if (!record) {
-          record = { ...updateOne.filter, ...(updateOne.update.$setOnInsert || {}) };
-          fileEntries.push(record);
+    async bulkWrite(operations, options) {
+      fileEntryBulkWrites.push({ operations: clone(operations), options: clone(options) });
+      operations.forEach((operation) => {
+        if (operation.updateOne) {
+          const { updateOne } = operation;
+          let record = fileEntries.find((entry) => matchesFilter(entry, updateOne.filter));
+          if (!record) {
+            record = { ...updateOne.filter, ...(updateOne.update.$setOnInsert || {}) };
+            fileEntries.push(record);
+          }
+          Object.assign(record, updateOne.update.$set || {});
+          return;
         }
-        Object.assign(record, updateOne.update.$set || {});
+
+        const { updateMany } = operation;
+        const matching = fileEntries.filter((entry) => matchesFilter(entry, updateMany.filter));
+        matching.forEach((entry) => applyUpdate(entry, updateMany.update));
       });
       return { modifiedCount: operations.length };
     },
@@ -262,7 +272,7 @@ const createInMemoryModels = () => {
     FileEntryModel,
     FileShareModel,
     AuditEventModel: { async create(event) { audits.push(clone(event)); return event; } },
-    state: { connectors, roots, jobs, fileEntries, shares, audits },
+    state: { connectors, roots, jobs, fileEntries, fileEntryBulkWrites, shares, audits },
   };
 };
 
@@ -930,10 +940,10 @@ test('an authenticated connector applies small relative watcher updates without 
       headers,
       body: JSON.stringify({ connectorRootId: ROOT.connectorRootId, changes }),
     });
-    const entry = (fingerprint, sizeBytes) => ({
-      relativePath: 'design/live.txt',
-      parentPath: 'design',
-      name: 'live.txt',
+    const entry = (fingerprint, sizeBytes, relativePath = 'design/live.txt') => ({
+      relativePath,
+      parentPath: relativePath.split('/').slice(0, -1).join('/'),
+      name: relativePath.split('/').at(-1),
       entryType: 'file',
       sizeBytes,
       modifiedAt: '2026-08-12T12:00:00.000Z',
@@ -942,10 +952,16 @@ test('an authenticated connector applies small relative watcher updates without 
       previewKind: 'none',
     });
 
-    const created = await send([{ operation: 'upsert', entry: entry('100:1', 1) }]);
+    const created = await send([
+      { operation: 'upsert', entry: entry('100:1', 1) },
+      { operation: 'upsert', entry: entry('200:2', 2, 'design/extra.txt') },
+    ]);
     assert.equal(created.response.status, 204);
-    assert.equal(models.state.fileEntries.length, 1);
+    assert.equal(models.state.fileEntries.length, 2);
     assert.equal(models.state.fileEntries[0].availabilityStatus, 'offline');
+    assert.equal(models.state.fileEntryBulkWrites.length, 1);
+    assert.equal(models.state.fileEntryBulkWrites[0].operations.length, 2);
+    assert.deepEqual(models.state.fileEntryBulkWrites[0].options, { ordered: true });
 
     const modified = await send([{ operation: 'upsert', entry: entry('101:2', 2) }]);
     assert.equal(modified.response.status, 204);
