@@ -15,7 +15,11 @@ const {
   normalizeContentType,
   normalizeFileName,
 } = require('../services/fileStorageValidation');
-const { WRITE_UPLOAD_TO_NAS_JOB_TYPE, serializeTransferJob } = require('../services/nasConnectorJobQueue');
+const {
+  CACHE_FOR_DOWNLOAD_JOB_TYPE,
+  WRITE_UPLOAD_TO_NAS_JOB_TYPE,
+  serializeTransferJob,
+} = require('../services/nasConnectorJobQueue');
 const {
   NasConnectorValidationError,
   assertObjectId,
@@ -894,6 +898,53 @@ const createNasCatalogueRoutes = (dependencies = {}) => {
         disposition,
       });
       return res.json({ delivery, downloadUrl });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
+  // A lightbox navigation request is intentionally disposable. Cancelling its
+  // owned, still-preparing delivery removes the corresponding cache job so a
+  // large skipped image cannot monopolize the connector's serial file lane.
+  router.delete('/deliveries/:shareId', async (req, res) => {
+    try {
+      const actorUid = currentActorUid(req.user);
+      if (!actorUid) {
+        throw new NasCatalogueApiError('NAS_CATALOGUE_ACTOR_REQUIRED', 'Authenticated user identity is required.', 401);
+      }
+      const shareId = assertObjectId(req.params.shareId, 'Delivery ID');
+      const share = await findOwnedDelivery({ shareId, actorUid });
+      if (!share) {
+        throw new NasCatalogueApiError('NAS_DELIVERY_NOT_FOUND', 'The requested delivery is unavailable.', 404);
+      }
+      if (share.deliveryStatus !== 'preparing') {
+        return res.status(204).end();
+      }
+
+      await NasTransferJobModel.findOneAndUpdate(
+        {
+          type: CACHE_FOR_DOWNLOAD_JOB_TYPE,
+          'payload.fileShareId': shareId,
+          status: { $in: ['queued', 'assigned', 'accepted', 'in_progress'] },
+        },
+        {
+          $set: {
+            status: 'cancelled',
+            completedAt: new Date(),
+            progressStage: null,
+            errorCode: 'cancelled',
+            errorMessage: 'The browser no longer needs this cache delivery.',
+          },
+          $unset: { idempotencyKey: 1 },
+        },
+        { new: false },
+      );
+      await FileShareModel.findOneAndUpdate(
+        { _id: shareId, sourceType: 'nas_file', status: 'active', deliveryStatus: 'preparing', createdBy: actorUid },
+        { $set: { deliveryStatus: 'failed' } },
+        { new: false },
+      );
+      return res.status(204).end();
     } catch (error) {
       return sendError(res, error);
     }

@@ -146,6 +146,12 @@ const thumbnailJobUnavailable = () => new NasConnectorApiError({
   status: 409,
 });
 
+const cacheJobUnavailable = () => new NasConnectorApiError({
+  code: 'NAS_CONNECTOR_JOB_UNAVAILABLE',
+  message: 'The cache delivery job is no longer active.',
+  status: 409,
+});
+
 const connectorRootUnavailable = () => new NasConnectorApiError({
   code: 'NAS_CONNECTOR_ROOT_UNAVAILABLE',
   message: 'The configured connector root is no longer active.',
@@ -831,7 +837,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         type: CACHE_FOR_DOWNLOAD_JOB_TYPE,
         status: { $in: ['accepted', 'in_progress'] },
       });
-      if (!job || !isPlainObject(job.payload)) throw genericConnectorFailure();
+      if (!job || !isPlainObject(job.payload)) throw cacheJobUnavailable();
       const fileEntryId = assertObjectId(job.payload.fileEntryId, 'File entry ID');
       const fileShareId = assertObjectId(job.payload.fileShareId, 'File share ID');
       const [entry, share, root] = await Promise.all([
@@ -889,6 +895,25 @@ const createNasConnectorRoutes = (dependencies = {}) => {
     }
   });
 
+  // The browser can abandon a large image while its cache upload is in
+  // progress. This compact status probe lets the cache worker cancel its
+  // pre-signed PUT quickly instead of occupying the serial file-delivery lane.
+  router.get('/control/jobs/:jobId/cache/active', connectorAuthenticateMiddleware, async (req, res) => {
+    try {
+      const jobId = assertObjectId(req.params.jobId, 'Job ID');
+      const connectorId = connectorIdOf(req.connector);
+      const job = await NasTransferJobModel.findOne({
+        _id: jobId,
+        connectorId,
+        type: CACHE_FOR_DOWNLOAD_JOB_TYPE,
+        status: { $in: ['accepted', 'in_progress'] },
+      });
+      return res.json({ active: Boolean(job) });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  });
+
   router.post('/control/jobs/:jobId/cache/complete', connectorAuthenticateMiddleware, async (req, res) => {
     try {
       const jobId = assertObjectId(req.params.jobId, 'Job ID');
@@ -900,7 +925,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         type: CACHE_FOR_DOWNLOAD_JOB_TYPE,
         status: { $in: ['in_progress', 'completed'] },
       });
-      if (!job || !isPlainObject(job.payload)) throw genericConnectorFailure();
+      if (!job || !isPlainObject(job.payload)) throw cacheJobUnavailable();
       const fileEntryId = assertObjectId(job.payload.fileEntryId, 'File entry ID');
       const fileShareId = assertObjectId(job.payload.fileShareId, 'File share ID');
       if (job.status === 'completed') return res.json({ job: serializeTransferJob(job) });
@@ -963,7 +988,7 @@ const createNasConnectorRoutes = (dependencies = {}) => {
         },
         { new: true },
       );
-      if (!completed) throw genericConnectorFailure();
+      if (!completed) throw cacheJobUnavailable();
       console.info('[NAS cache] upload_completed', { connectorId, jobId, fileEntryId, fileShareId });
       return res.json({ job: serializeTransferJob(completed) });
     } catch (error) {

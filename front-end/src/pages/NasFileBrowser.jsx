@@ -94,6 +94,31 @@ const renderNasEntryIcon = (entry) => (
 
 const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
 
+const isAbortError = (error) => error?.name === 'AbortError';
+
+const createAbortError = () => new DOMException('The request was cancelled.', 'AbortError');
+
+const waitForDeliveryRetry = (milliseconds, signal) => new Promise((resolve, reject) => {
+  const timeout = window.setTimeout(complete, milliseconds);
+
+  const abort = () => {
+    window.clearTimeout(timeout);
+    signal?.removeEventListener('abort', abort);
+    reject(createAbortError());
+  };
+
+  function complete() {
+    signal?.removeEventListener('abort', abort);
+    resolve();
+  }
+
+  if (signal?.aborted) {
+    abort();
+    return;
+  }
+  signal?.addEventListener('abort', abort, { once: true });
+});
+
 const clampImagePosition = ({ x, y, scale }, viewport) => ({
   x: clamp(x, viewport.width * (1 - scale), 0),
   y: clamp(y, viewport.height * (1 - scale), 0),
@@ -128,6 +153,8 @@ function NasFileBrowser() {
   const imageDragRef = useRef(null);
   const imagePointersRef = useRef(new Map());
   const imageViewRef = useRef({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
+  const lightboxRequestRef = useRef(null);
+  const lightboxObjectUrlRef = useRef('');
   const [imageView, setImageView] = useState({ scale: MIN_IMAGE_ZOOM, x: 0, y: 0 });
 
   const activeRoot = useMemo(
@@ -396,10 +423,11 @@ function NasFileBrowser() {
     return Boolean(window.open(url, '_blank'));
   };
 
-  const waitForDelivery = async ({ disposition, deliveryId, traceId }) => {
+  const waitForDelivery = async ({ disposition, deliveryId, traceId, signal }) => {
     for (let attempt = 0; attempt < 120; attempt += 1) {
       const response = await apiRequest(
         `/deliveries/${encodeURIComponent(deliveryId)}?${new URLSearchParams({ disposition }).toString()}`,
+        { signal },
       );
       console.info('[NAS delivery]', {
         traceId,
@@ -413,12 +441,12 @@ function NasFileBrowser() {
       if (response.delivery?.deliveryStatus === 'failed') {
         throw new NasCatalogueApiError('The connector could not prepare this file.');
       }
-      await new Promise((resolve) => window.setTimeout(resolve, (response.retryAfterSeconds || 3) * 1_000));
+      await waitForDeliveryRetry((response.retryAfterSeconds || 3) * 1_000, signal);
     }
     throw new NasCatalogueApiError('File preparation is taking longer than expected. Please try again shortly.');
   };
 
-  const prepareDeliveryUrl = async ({ entry, disposition, traceId, onPreparing }) => {
+  const prepareDeliveryUrl = async ({ entry, disposition, traceId, onPreparing, onDeliveryCreated, signal }) => {
     console.info('[NAS delivery]', { traceId, step: 'delivery_requested', entryId: entry.id, disposition, name: entry.name });
     const response = await apiRequest(`/entries/${encodeURIComponent(entry.id)}/deliveries`, {
       method: 'POST',
@@ -435,11 +463,14 @@ function NasFileBrowser() {
     if (!response.delivery?.id) {
       throw new NasCatalogueApiError('The server did not create a file delivery.');
     }
+    onDeliveryCreated?.(response.delivery.id);
+    if (signal?.aborted) throw createAbortError();
     onPreparing?.();
     return waitForDelivery({
       disposition,
       deliveryId: response.delivery.id,
       traceId,
+      signal,
     });
   };
 
@@ -476,9 +507,9 @@ function NasFileBrowser() {
     }
   };
 
-  const fetchDisplayImage = async (url, entryId, traceId) => {
+  const fetchDisplayImage = async (url, entryId, traceId, signal, isCurrent) => {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       if (!response.ok) {
         throw new NasCatalogueApiError('The prepared image could not be displayed.');
       }
@@ -495,7 +526,7 @@ function NasFileBrowser() {
         chunks.push(value);
         received += value.byteLength;
         if (Number.isFinite(total) && total > 0) {
-          setLightbox((current) => (current?.entry.id === entryId ? {
+          setLightbox((current) => (isCurrent() && current?.entry.id === entryId ? {
             ...current,
             loadingLabel: `Loading ${Math.min(100, Math.round((received / total) * 100))}%`,
           } : current));
@@ -515,14 +546,52 @@ function NasFileBrowser() {
     }
   };
 
+  const releaseLightboxObjectUrl = () => {
+    if (lightboxObjectUrlRef.current) {
+      URL.revokeObjectURL(lightboxObjectUrlRef.current);
+      lightboxObjectUrlRef.current = '';
+    }
+  };
+
+  const cancelImageRequest = (request) => {
+    if (!request) return;
+    const wasCancelled = request.cancelled;
+    request.cancelled = true;
+    if (!wasCancelled) request.controller.abort();
+    if (!request.deliveryId || request.cancelSent) return;
+
+    request.cancelSent = true;
+    void apiRequest(`/deliveries/${encodeURIComponent(request.deliveryId)}`, { method: 'DELETE' })
+      .catch((requestError) => {
+        console.info('[NAS image]', {
+          traceId: request.traceId,
+          step: 'delivery_cancel_failed',
+          deliveryId: request.deliveryId,
+          message: requestError.message,
+        });
+      });
+  };
+
   const closeLightbox = () => {
-    if (lightbox?.objectUrl && lightbox.imageUrl) URL.revokeObjectURL(lightbox.imageUrl);
+    cancelImageRequest(lightboxRequestRef.current);
+    lightboxRequestRef.current = null;
+    releaseLightboxObjectUrl();
     setLightbox(null);
   };
 
   const openImageLightbox = async (entry) => {
     const traceId = crypto.randomUUID();
-    if (lightbox?.objectUrl && lightbox.imageUrl) URL.revokeObjectURL(lightbox.imageUrl);
+    cancelImageRequest(lightboxRequestRef.current);
+    releaseLightboxObjectUrl();
+    const request = {
+      traceId,
+      controller: new AbortController(),
+      deliveryId: '',
+      cancelSent: false,
+      cancelled: false,
+    };
+    lightboxRequestRef.current = request;
+    const isCurrent = () => lightboxRequestRef.current === request && !request.controller.signal.aborted;
     const thumbnailUrl = thumbnails[entry.id]?.url || '';
     setLightbox({
       entry,
@@ -535,23 +604,46 @@ function NasFileBrowser() {
       loadingLabel: thumbnailUrl ? 'Showing thumbnail while the full image is prepared...' : 'Preparing image...',
       error: '',
     });
+    void apiRequest(`/entries/${encodeURIComponent(entry.id)}/image-neighbors`, { signal: request.controller.signal })
+      .then((neighbors) => {
+        setLightbox((current) => (isCurrent() && current?.entry.id === entry.id ? {
+          ...current,
+          previous: neighbors.previous || null,
+          next: neighbors.next || null,
+        } : current));
+      })
+      .catch((requestError) => {
+        if (!isAbortError(requestError)) {
+          console.info('[NAS image]', { traceId, step: 'neighbors_failed', entryId: entry.id, message: requestError.message });
+        }
+      });
     try {
       setDeliveringEntryId(entry.id);
       const imageUrl = await prepareDeliveryUrl({
         entry,
         disposition: 'inline',
         traceId,
-        onPreparing: () => setLightbox((current) => (current?.entry.id === entry.id ? {
+        signal: request.controller.signal,
+        onDeliveryCreated: (deliveryId) => {
+          request.deliveryId = deliveryId;
+          if (request.cancelled) cancelImageRequest(request);
+        },
+        onPreparing: () => setLightbox((current) => (isCurrent() && current?.entry.id === entry.id ? {
           ...current,
           loadingLabel: 'Preparing image from the NAS...',
         } : current)),
       });
-      setLightbox((current) => (current?.entry.id === entry.id ? {
+      setLightbox((current) => (isCurrent() && current?.entry.id === entry.id ? {
         ...current,
         loadingLabel: 'Loading image...',
       } : current));
-      const display = await fetchDisplayImage(imageUrl, entry.id, traceId);
-      setLightbox((current) => (current?.entry.id === entry.id ? {
+      const display = await fetchDisplayImage(imageUrl, entry.id, traceId, request.controller.signal, isCurrent);
+      if (!isCurrent()) {
+        if (display.objectUrl) URL.revokeObjectURL(display.url);
+        return;
+      }
+      if (display.objectUrl) lightboxObjectUrlRef.current = display.url;
+      setLightbox((current) => (isCurrent() && current?.entry.id === entry.id ? {
         ...current,
         imageUrl: display.url,
         objectUrl: display.objectUrl,
@@ -559,23 +651,18 @@ function NasFileBrowser() {
         loading: false,
         loadingLabel: '',
       } : current));
-      const neighbors = await apiRequest(`/entries/${encodeURIComponent(entry.id)}/image-neighbors`);
-      setLightbox((current) => (current?.entry.id === entry.id ? {
-        ...current,
-        previous: neighbors.previous || null,
-        next: neighbors.next || null,
-      } : current));
       console.info('[NAS image]', { traceId, step: 'image_ready', entryId: entry.id });
     } catch (requestError) {
+      if (isAbortError(requestError)) return;
       console.error('[NAS image]', { traceId, step: 'image_failed', entryId: entry.id, message: requestError.message });
-      setLightbox((current) => (current?.entry.id === entry.id ? {
+      setLightbox((current) => (isCurrent() && current?.entry.id === entry.id ? {
         ...current,
         loading: false,
         loadingLabel: '',
         error: requestError.message,
       } : current));
     } finally {
-      setDeliveringEntryId('');
+      if (lightboxRequestRef.current === request) setDeliveringEntryId('');
     }
   };
 
@@ -589,10 +676,10 @@ function NasFileBrowser() {
       if (event.key === 'Escape') {
         event.preventDefault();
         closeLightbox();
-      } else if (event.key === 'ArrowLeft' && lightbox.previous && !lightbox.loading) {
+      } else if (event.key === 'ArrowLeft' && lightbox.previous) {
         event.preventDefault();
         void openImageLightbox(lightbox.previous);
-      } else if (event.key === 'ArrowRight' && lightbox.next && !lightbox.loading) {
+      } else if (event.key === 'ArrowRight' && lightbox.next) {
         event.preventDefault();
         void openImageLightbox(lightbox.next);
       }
@@ -988,9 +1075,9 @@ function NasFileBrowser() {
             )}
           </div>
           <footer className="nas-image-lightbox-nav">
-            <button type="button" onClick={() => void openImageLightbox(lightbox.previous)} disabled={!lightbox.previous || lightbox.loading}>Previous</button>
+            <button type="button" onClick={() => void openImageLightbox(lightbox.previous)} disabled={!lightbox.previous}>Previous</button>
             <span>{lightbox.entry.name}</span>
-            <button type="button" onClick={() => void openImageLightbox(lightbox.next)} disabled={!lightbox.next || lightbox.loading}>Next</button>
+            <button type="button" onClick={() => void openImageLightbox(lightbox.next)} disabled={!lightbox.next}>Next</button>
           </footer>
         </section>
       )}

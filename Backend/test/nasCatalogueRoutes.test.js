@@ -300,6 +300,68 @@ test('an authenticated Open action reuses a current NAS cache object and returns
   }
 });
 
+test('a user can cancel their still-preparing image delivery and release its cache job', async () => {
+  const shareId = 'e'.repeat(24);
+  const share = {
+    _id: shareId,
+    sourceType: 'nas_file',
+    nasFileEntryId: 'b'.repeat(24),
+    status: 'active',
+    deliveryStatus: 'preparing',
+    createdBy: 'user-id',
+  };
+  const job = {
+    _id: 'f'.repeat(24),
+    type: 'cache_for_download',
+    status: 'in_progress',
+    payload: { fileEntryId: 'b'.repeat(24), fileShareId: shareId },
+    idempotencyKey: `cache_for_download:${shareId}`,
+  };
+  const app = await startApp({
+    FileShareModel: {
+      findOne(filter) {
+        return Promise.resolve(
+          filter._id === shareId
+            && filter.sourceType === share.sourceType
+            && filter.status === share.status
+            && filter.createdBy === share.createdBy
+            ? share
+            : null,
+        );
+      },
+      async findOneAndUpdate(filter, update) {
+        if (filter._id !== shareId || share.deliveryStatus !== 'preparing') return null;
+        Object.assign(share, update.$set || {});
+        return share;
+      },
+    },
+    NasTransferJobModel: {
+      async findOneAndUpdate(filter, update) {
+        if (filter.type !== job.type
+          || filter['payload.fileShareId'] !== shareId
+          || !filter.status?.$in?.includes(job.status)) {
+          return null;
+        }
+        Object.assign(job, update.$set || {});
+        if (update.$unset?.idempotencyKey) delete job.idempotencyKey;
+        return job;
+      },
+    },
+  });
+  try {
+    const response = await fetch(`${app.url}/api/nas-catalogue/deliveries/${shareId}`, {
+      method: 'DELETE',
+      headers: { authorization: 'Bearer moderator' },
+    });
+    assert.equal(response.status, 204);
+    assert.equal(job.status, 'cancelled');
+    assert.equal(job.idempotencyKey, undefined);
+    assert.equal(share.deliveryStatus, 'failed');
+  } finally {
+    await close(app.server);
+  }
+});
+
 test('opening a folder can queue one persistent thumbnail without exposing an image path', async () => {
   const queued = [];
   const imageEntry = {
