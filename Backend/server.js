@@ -189,7 +189,7 @@ const normalizeRequestIp = (value) => {
 
 const nasCatalogueLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: isDevelopmentMode ? 500 : 100,
+  max: isDevelopmentMode ? 5_000 : 1_000,
   standardHeaders: true,
   legacyHeaders: false,
   // Database-backed exemptions are deliberately scoped to NAS browsing rather
