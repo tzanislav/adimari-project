@@ -24,21 +24,15 @@ function PublicFileDownload() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [deliveryStatus, setDeliveryStatus] = useState('ready');
 
   useEffect(() => {
     let active = true;
-    let retryTimer = null;
     const load = async () => {
       try {
         const response = await fetch(`${serverUrl}/download/${encodeURIComponent(token)}/info`);
         const result = await readResponse(response);
         if (!active) return;
         setFile(result.file);
-        setDeliveryStatus(result.deliveryStatus || 'ready');
-        if (result.deliveryStatus === 'preparing') {
-          retryTimer = window.setTimeout(() => { void load(); }, (result.retryAfterSeconds || 3) * 1000);
-        }
       } catch (requestError) {
         if (active) setError(requestError.message);
       } finally {
@@ -48,7 +42,6 @@ function PublicFileDownload() {
     void load();
     return () => {
       active = false;
-      if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, [token]);
 
@@ -82,15 +75,9 @@ function PublicFileDownload() {
             <h1 title={file.name}>{file.name}</h1>
             <p className="public-file-download-size">{formatBytes(file.size)}</p>
             {error && <p className="public-file-download-error">{error}</p>}
-            {deliveryStatus === 'preparing' ? (
-              <p className="public-file-download-size">Preparing the file from the NAS. This page will update automatically.</p>
-            ) : deliveryStatus === 'failed' || deliveryStatus === 'expired' ? (
-              <p className="public-file-download-error">This file is not currently available.</p>
-            ) : (
-              <button type="button" onClick={() => void startDownload()} disabled={downloading}>
-                {downloading ? 'Preparing download...' : 'Download'}
-              </button>
-            )}
+            <button type="button" onClick={() => void startDownload()} disabled={downloading}>
+              {downloading ? 'Preparing download...' : 'Download'}
+            </button>
           </>}
         </article>
       </section>

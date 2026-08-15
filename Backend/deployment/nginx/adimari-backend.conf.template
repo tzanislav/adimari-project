@@ -27,8 +27,7 @@ server {
     ssl_certificate_key __TLS_PRIVATE_KEY_PATH__;
 
     # Keep TLS policy/ciphers in the host's centrally managed include where
-    # possible. The certificate must chain to a CA trusted by the connector
-    # Windows machine; self-signed production certificates are not supported.
+    # possible. Self-signed production certificates are not supported.
     include __TLS_OPTIONS_INCLUDE_PATH__;
 
     # The API accepts only small JSON control-plane payloads. Browser file
@@ -41,8 +40,7 @@ server {
         proxy_http_version 1.1;
 
         # Overwrite, rather than relay, client-supplied forwarding headers.
-        # Backend/server.js uses req.secure for NAS connector routes, so
-        # X-Forwarded-Proto must reach it as "https" after TLS termination.
+        # Preserve the original scheme for HTTPS-aware backend routes.
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         # Replace rather than append client-supplied X-Forwarded-For values.

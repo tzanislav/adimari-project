@@ -314,22 +314,6 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
       }), expiresIn);
     },
 
-    // Used by the NAS connector for one temporary share-cache object. The
-    // caller receives no AWS credentials: it gets a narrowly scoped, short
-    // lived PUT URL for this already-managed key only.
-    async getUploadUrl({ key, contentType, expiresIn = config.uploadUrlTtlSeconds || config.downloadUrlTtlSeconds } = {}) {
-      const managedS3Key = managedKey(key);
-      if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > (config.uploadUrlTtlSeconds || config.downloadUrlTtlSeconds)) {
-        throw new FileStorageValidationError('Upload URL expiry is invalid.');
-      }
-      const normalizedType = normalizeContentType(contentType || 'application/octet-stream');
-      return sign(new PutObjectCommand({
-        Bucket: config.bucketName,
-        Key: managedS3Key,
-        ContentType: normalizedType,
-      }), expiresIn);
-    },
-
     async moveFile({ sourceKey, destinationFolder = '', destinationFileName } = {}) {
       const managedSourceKey = managedKey(sourceKey);
       const destinationKey = createManagedS3Key({

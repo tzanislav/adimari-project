@@ -20,8 +20,7 @@ import LogTest from './pages/Other/LogTest';
 import StairCalculator from './pages/StairCalculator';
 import FileServer from './pages/FileServer';
 import PublicFileDownload from './pages/PublicFileDownload';
-import NasConnectorAdmin from './pages/NasConnectorAdmin';
-import NasFileBrowser from './pages/NasFileBrowser';
+import FolderExplorer from './pages/FolderExplorer';
 
 import './App.css';
 
@@ -66,12 +65,8 @@ function AppContent() {
             element={<ProtectedRoute element={<FileServer />} />}
           />
           <Route
-            path="/projects/nas-files"
-            element={<ProtectedRoute element={<NasFileBrowser />} />}
-          />
-          <Route
-            path="/admin/nas-connectors"
-            element={<ProtectedRoute requiredRole="admin" element={<NasConnectorAdmin />} />}
+            path="/projects/folder-explorer"
+            element={<ProtectedRoute element={<FolderExplorer />} />}
           />
           <Route
             path="/projects/:id"

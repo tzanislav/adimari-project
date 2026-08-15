@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import GoogleButton from 'react-google-button';
 import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../CSS/SignUpWithGoogle.css';
 
@@ -111,7 +110,6 @@ const SignUpWithGoogle = () => {
             {role === 'admin' && (
                 <div className='admin-panel'>
                     <h2>Admin Panel</h2>
-                    <Link to="/admin/nas-connectors" className="admin-panel-link">NAS Connectors</Link>
                     <form onSubmit={handleUpdateRole}>
                         <label>
                             User ID:

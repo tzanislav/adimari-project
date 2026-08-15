@@ -90,14 +90,6 @@
 .file-server-row.image-file { cursor: pointer; }
 .file-server-row.image-file .file-server-row-actions { cursor: default; }
 .file-server-file-name, .file-server-name-button { overflow: hidden; color: #263648; font-weight: 600; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-.nas-file-name-cell { display: flex; min-width: 0; align-items: center; gap: 8px; }
-.nas-file-name-cell .file-server-file-name { min-width: 0; }
-.nas-file-thumbnail { width: 42px; height: 32px; flex: 0 0 auto; border-radius: 4px; background: #e7edf4; object-fit: cover; }
-.nas-file-thumbnail.placeholder { display: grid; place-items: center; color: #718096; font-size: 9px; font-weight: 700; text-transform: uppercase; }
-.nas-entry-icon { position: relative; display: inline-grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; }
-.nas-entry-icon-image, .nas-entry-icon-fallback { grid-area: 1 / 1; width: 100%; height: 100%; }
-.nas-entry-icon-image { position: relative; object-fit: contain; }
-.nas-entry-icon-fallback { box-sizing: border-box; width: 22px; height: 28px; border: 1.5px solid #8291a3; border-radius: 2px; background: linear-gradient(135deg, transparent 0 68%, #d7dfe8 69% 100%); }
 .file-server-name-button { display: flex; width: 100%; min-width: 0; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .file-server-name-button .file-server-file-name { min-width: 0; }
 .file-server-name-button:hover { color: #1b5c9d; background: transparent; }
@@ -126,36 +118,6 @@
 .file-server-share-row div { display: grid; gap: 4px; }
 .file-server-share-row span { color: #657487; font-size: 12px; }
 .file-server-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
-
-.nas-image-lightbox { position: fixed; z-index: 100; inset: 68px 0 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: rgba(8, 13, 22, .97); color: #f8fafc; }
-.nas-image-lightbox-header { display: grid; grid-template-columns: 1fr minmax(0, 1fr) 1fr; align-items: center; gap: 14px; padding: 12px 18px; background: rgba(20, 29, 42, .92); }
-.nas-image-lightbox-nav { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 18px; background: rgba(20, 29, 42, .92); }
-.nas-image-lightbox-header > :last-child { justify-self: end; }
-.nas-image-lightbox-status { min-width: 0; margin: 0; overflow: hidden; color: #cbd5e1; font-size: .875rem; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-.nas-image-lightbox-nav { min-width: 0; }
-.nas-image-lightbox-nav span { min-width: 0; flex: 1; overflow: hidden; font-weight: 600; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-.nas-image-text-button { margin: 0; padding: 6px 0; border: 0; background: transparent; color: #f8fafc; cursor: pointer; font-family: 'DM Sans', 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: .875rem; font-weight: 600; letter-spacing: normal; text-transform: none; }
-.nas-image-lightbox-nav button { min-width: 92px; margin: 0; padding: 9px 12px; border: 1px solid #64748b; border-radius: 6px; background: #1e293b; color: #f8fafc; cursor: pointer; }
-.nas-image-text-button:hover { color: #bfdbfe; text-decoration: underline; }
-.nas-image-lightbox-nav button:hover:not(:disabled) { background: #334155; }
-.nas-image-text-button:focus-visible, .nas-image-lightbox-nav button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
-.nas-image-lightbox-nav button:disabled { cursor: not-allowed; opacity: .45; }
-.nas-image-lightbox-content { display: grid; width: 100%; min-width: 0; min-height: 0; box-sizing: border-box; place-items: center; overflow: hidden; padding: 12px; cursor: zoom-out; }
-.nas-image-lightbox-content img, .nas-image-lightbox-error { grid-area: 1 / 1; }
-.nas-image-lightbox-content img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: 0 0; touch-action: none; cursor: grab; }
-.nas-image-lightbox-content img:active { cursor: grabbing; }
-.nas-image-lightbox-error { z-index: 1; margin: 0; padding: 14px 18px; border-radius: 8px; background: rgba(30, 41, 59, .88); }
-.nas-image-lightbox-error { background: #7f1d1d; }
-
-@media (max-width: 560px) {
-  .nas-image-lightbox-header, .nas-image-lightbox-nav { padding: 10px 12px; }
-  .nas-image-lightbox-nav button { min-width: 74px; padding: 8px; }
-  .nas-image-lightbox-content { padding: 8px; }
-}
-
-@media (max-width: 768px) {
-  .nas-image-lightbox { inset: 60px 0 0; }
-}
 
 @media (max-width: 760px) {
   .file-server-page { width: min(100% - 24px, 1180px); margin-top: 24px; }

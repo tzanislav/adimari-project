@@ -5,7 +5,6 @@ require('dotenv').config();
 const { getLicensePasswordCrypto } = require('./security/licensePasswordCrypto');
 const { getBackendBindHost } = require('./config/backendNetworkConfig');
 const { getFileServerConfig } = require('./config/fileServerConfig');
-const { getNasConnectorConfig, isNasConnectorEnabled } = require('./config/nasConnectorConfig');
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const brandRoutes = require('./routes/brandRoutes'); // Import brand routes
 const uploadRoutes = require('./routes/upload'); // Import upload route
@@ -21,21 +20,9 @@ const activityRoutes = require('./routes/activityRoute'); // Import activity rou
 const adminRoutes = require('./routes/adminRoutes'); // Import admin maintenance routes
 const { createFileRoutes } = require('./routes/fileRoutes'); // Private S3 file-manager routes
 const { createPublicDownloadRoutes } = require('./routes/publicDownloadRoutes'); // Anonymous share downloads
-const { createNasConnectorRoutes } = require('./routes/nasConnectorRoutes'); // Windows NAS connector control plane
-const { createNasCatalogueRoutes } = require('./routes/nasCatalogueRoutes'); // Indexed NAS browse API
-const NasConnector = require('./models/nasConnector');
-const NasStorageRoot = require('./models/nasStorageRoot');
-const NasTransferJob = require('./models/nasTransferJob');
-const NasFileEntry = require('./models/nasFileEntry');
-const NasAuditEvent = require('./models/nasAuditEvent');
-const NasRateLimitExemption = require('./models/nasRateLimitExemption');
-const { NasConnectorJobQueue } = require('./services/nasConnectorJobQueue');
-const { NasRetentionService } = require('./services/nasRetentionService');
-const { createNasStorageSet } = require('./services/nasStorageSet');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const net = require('net');
 const path = require('path');
 const { URL } = require('url');
 const app = express();
@@ -45,31 +32,6 @@ const { authenticate, authorizeRole } = require('./auth/authMiddleware');
 getLicensePasswordCrypto();
 // Fail closed before accepting requests if private file-server settings are incomplete or malformed.
 getFileServerConfig();
-// The NAS connector is introduced behind an explicit feature flag. When enabled,
-// validate all NAS storage settings before accepting requests.
-const nasConnectorConfig = isNasConnectorEnabled() ? getNasConnectorConfig() : null;
-const nasStorageSet = nasConnectorConfig
-  ? createNasStorageSet({
-    nasConfig: nasConnectorConfig,
-    fileServerConfig: getFileServerConfig(),
-  })
-  : null;
-const nasConnectorJobQueue = nasConnectorConfig
-  ? new NasConnectorJobQueue({
-    NasTransferJobModel: NasTransferJob,
-    NasConnectorModel: NasConnector,
-    leaseSeconds: nasConnectorConfig.jobLeaseSeconds,
-  })
-  : null;
-const nasRetentionService = nasConnectorConfig
-  ? new NasRetentionService({
-    NasTransferJobModel: NasTransferJob,
-    NasAuditEventModel: NasAuditEvent,
-    NasFileEntryModel: NasFileEntry,
-    thumbnailStorage: nasStorageSet.thumbnails,
-    config: nasConnectorConfig,
-  })
-  : null;
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -181,32 +143,6 @@ const publicDownloadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const normalizeRequestIp = (value) => {
-  const candidate = typeof value === 'string' ? value.trim() : '';
-  const unwrapped = candidate.startsWith('::ffff:') ? candidate.slice(7) : candidate;
-  return net.isIP(unwrapped) ? unwrapped : null;
-};
-
-const nasCatalogueLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: isDevelopmentMode ? 5_000 : 1_000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Database-backed exemptions are deliberately scoped to NAS browsing rather
-  // than weakening the general File Server limiter.
-  skip: async (req) => {
-    const ipAddress = normalizeRequestIp(req.ip);
-    return Boolean(ipAddress && await NasRateLimitExemption.exists({ ipAddress }));
-  },
-});
-
-const nasConnectorHeartbeatLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: isDevelopmentMode ? 1_000 : 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 const cspDirectives = {
   defaultSrc: ["'self'"],
   baseUri: ["'self'"],
@@ -276,14 +212,6 @@ mongoose
   .connect(mongoURI)
   .then(() => {
     console.log('Connected to MongoDB');
-    if (nasRetentionService) {
-      const sweep = () => nasRetentionService.runOnce()
-        .then((summary) => console.info('[NAS retention] sweep_complete', summary))
-        .catch((error) => console.error('[NAS retention] sweep_failed', error?.code || error?.name || 'unknown'));
-      void sweep();
-      const timer = setInterval(sweep, nasConnectorConfig.retentionSweepIntervalHours * 60 * 60 * 1_000);
-      timer.unref?.();
-    }
   })
   .catch((err) => {
     console.error('Failed to connect to MongoDB:', err);
@@ -294,24 +222,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/brands', brandRoutes); 
 app.use('/api/upload', authenticate, uploadLimiter, uploadRoutes); 
 app.use('/api/files', fileManagerLimiter, createFileRoutes());
-app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes({
-  nasConfig: nasConnectorConfig,
-  storageSet: nasStorageSet,
-}));
-if (nasConnectorConfig) {
-  app.use('/api/nas-connectors', createNasConnectorRoutes({
-    config: nasConnectorConfig,
-    heartbeatLimiter: nasConnectorHeartbeatLimiter,
-    jobQueue: nasConnectorJobQueue,
-    storageSet: nasStorageSet,
-  }));
-  app.use('/api/nas-catalogue', nasCatalogueLimiter, createNasCatalogueRoutes({
-    nasConfig: nasConnectorConfig,
-    fileServerConfig: getFileServerConfig(),
-    jobQueue: nasConnectorJobQueue,
-    storageSet: nasStorageSet,
-  }));
-}
+app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes());
 app.use('/api/models3d', modelRoutes); 
 app.use('/api/projects', projectRoutes); 
 app.use('/api/selections', selectRoutes); 

@@ -33,13 +33,13 @@ Thumbs.db
 
 
 /scripts/*
-!/scripts/Update-NasConnector.ps1
 /backup/*
+
+# Local archive for functionality that has moved to a separate application.
+/Legacy/
 
 # Backend example configuration contains placeholders only and must be shared.
 !Backend/.env.example
 
 /Documentation/*
-!/Documentation/NAS_CONNECTOR_BACKEND_INTERFACE.md
-!/Documentation/NAS_CONNECTOR_BACKEND_INTERFACE.html
 

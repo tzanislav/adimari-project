@@ -5,10 +5,10 @@ import '../CSS/Projects.css';
 const projectLinks = [
     {
     title: 'Database',
-    description: 'Browse the indexed company NAS. File delivery and sharing are prepared on demand.',
-    to: '/projects/nas-files',
+    description: 'Open the folder explorer. Its separate application link will be added here.',
+    to: '/projects/folder-explorer',
     thumbnail: '/file.png',
-    thumbnailPlaceholder: 'NAS',
+    thumbnailPlaceholder: 'Files',
     requiresEditor: true,
   },
   {
