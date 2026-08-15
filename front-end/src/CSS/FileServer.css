@@ -93,12 +93,35 @@
 .file-server-name-button { display: flex; width: 100%; min-width: 0; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .file-server-name-button .file-server-file-name { min-width: 0; }
 .file-server-name-button:hover { color: #1b5c9d; background: transparent; }
+.file-explorer-entry-name { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.file-explorer-file-icon { width: 32px; height: 32px; flex: 0 0 32px; object-fit: contain; }
 .file-server-row > span { color: #617082; font-size: 12px; }
 .file-server-row-actions { display: flex; flex-wrap: nowrap; gap: 6px; justify-content: flex-start; }
 .file-server-row-actions .file-server-button { white-space: nowrap; }
 .file-server-empty { margin: 0; padding: 26px 14px; color: #6d7988; text-align: center; }
 .file-server-load-more { display: block; margin: 15px auto; }
 .file-server-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 16px 2px 0; color: #7a8490; font-size: 11px; }
+
+.folder-explorer-controls { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 0 0 18px; }
+.folder-explorer-controls .file-server-field { width: min(100%, 340px); margin: 0; }
+.folder-explorer-browser .file-server-browser-heading, .folder-explorer-browser .file-server-row { grid-template-columns: minmax(180px, 1fr) 100px 170px 110px minmax(100px, max-content); }
+.folder-explorer-browser .file-server-row-actions { justify-content: flex-end; }
+.folder-explorer-requests { margin-top: 34px; }
+.folder-explorer-requests h2 { margin: 0 0 12px; font-size: 20px; }
+.folder-explorer-request-list { overflow: hidden; border: 1px solid #d7dfe8; border-radius: 8px; background: #fff; }
+.folder-explorer-request-list article { display: grid; grid-template-columns: minmax(210px, 1fr) 100px 145px minmax(150px, max-content); gap: 12px; align-items: center; padding: 11px 14px; border-top: 1px solid #edf0f4; }
+.folder-explorer-request-list article:first-child { border-top: 0; }
+.folder-explorer-request-list article > div:first-child { display: grid; gap: 3px; min-width: 0; }
+.folder-explorer-request-list strong, .folder-explorer-request-list article > div:first-child span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-explorer-request-list article > div:first-child span { color: #617082; font-size: 12px; }
+.folder-explorer-status { width: fit-content; padding: 3px 7px; border-radius: 999px; background: #edf1f5; color: #526272; font-size: 12px; font-weight: 700; }
+.folder-explorer-status.ready { background: #e6f7ea; color: #176635; }
+.folder-explorer-status.failed { background: #fff0f1; color: #9e242d; }
+.folder-explorer-status.cancelled { background: #edf1f5; color: #526272; }
+.folder-explorer-status.queued { background: #fff5dc; color: #8a5b00; }
+.folder-explorer-status.requested, .folder-explorer-status.accepted { background: #eaf3fc; color: #1b5c9d; }
+.folder-explorer-status.uploading { background: #eaf3fc; color: #1b5c9d; }
+.folder-explorer-failure { max-width: 220px; color: #9e242d; font-size: 12px; }
 
 .file-server-modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(17, 26, 39, .55); }
 .file-server-modal { width: min(100%, 500px); max-height: min(720px, 90vh); overflow: auto; padding: 24px; border-radius: 9px; background: #fff; box-shadow: 0 22px 50px rgba(0, 0, 0, .24); }
@@ -129,4 +152,8 @@
   .file-server-row-actions { flex-wrap: wrap; }
   .file-server-upload-status { grid-template-columns: 1fr; gap: 7px; }
   .file-server-new-link, .file-server-share-toolbar { align-items: stretch; flex-direction: column; }
+  .folder-explorer-controls { align-items: stretch; flex-direction: column; }
+  .folder-explorer-browser .file-server-row { grid-template-columns: 1fr; }
+  .folder-explorer-browser .file-server-row-actions { justify-content: flex-start; }
+  .folder-explorer-request-list article { grid-template-columns: 1fr; gap: 7px; }
 }

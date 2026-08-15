@@ -5,7 +5,7 @@ import '../CSS/Projects.css';
 const projectLinks = [
     {
     title: 'Database',
-    description: 'Open the folder explorer. Its separate application link will be added here.',
+    description: 'Browse the NAS catalog and request files for secure delivery.',
     to: '/projects/folder-explorer',
     thumbnail: '/file.png',
     thumbnailPlaceholder: 'Files',
