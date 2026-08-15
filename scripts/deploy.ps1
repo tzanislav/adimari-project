@@ -157,8 +157,10 @@ pm2 logs adimari-backend --lines 50 --nostream >&2 || true
 exit 1
 '@ -f $quotedRemoteDirectory, $quotedBranch, $quotedPublicHost
 
-# Send an explicit BOM-free UTF-8 payload. Piping a here-string directly into
-# ssh on Windows can prepend a UTF-8 BOM, making Bash skip `set -euo pipefail`.
+# Send an explicit BOM-free, LF-only UTF-8 payload. Piping a here-string
+# directly into ssh on Windows can prepend a UTF-8 BOM; CRLF also makes Bash
+# parse `pipefail\r` as an invalid shell option.
+$remoteScript = $remoteScript -replace "`r`n", "`n"
 $remotePayload = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($remoteScript))
 $remoteCommand = "printf %s '$remotePayload' | base64 --decode | bash"
 
