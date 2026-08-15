@@ -735,6 +735,7 @@ function FolderExplorer() {
             className="file-server-visually-hidden"
             type="file"
             multiple
+            accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
             disabled={!storageNodeId || isUploadingFiles}
             onChange={(event) => {
               void queueFilesForUpload(event.target.files);
@@ -1062,12 +1063,24 @@ function toUserMessage(error, fallback) {
     return 'Your sign-in has expired. Please sign in again before using the NAS explorer.';
   }
 
+  if (error?.status === 404) {
+    return 'The NAS File Sync service is not connected to Adimari. The server proxy needs to be configured.';
+  }
+
+  if (error?.status === 413) {
+    return 'The selected upload is larger than the server currently allows.';
+  }
+
   if (typeof error?.status === 'number') {
-    return `${fallback} File Sync returned HTTP ${error.status}.`;
+    return `${fallback} ${error.message || `File Sync returned HTTP ${error.status}.`}`;
   }
 
   if (error instanceof TypeError) {
     return `${fallback} The File Sync service could not be reached.`;
+  }
+
+  if (error?.message) {
+    return `${fallback} ${error.message}`;
   }
 
   return fallback;

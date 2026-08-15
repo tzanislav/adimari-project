@@ -30,10 +30,57 @@ server {
     # possible. Self-signed production certificates are not supported.
     include __TLS_OPTIONS_INCLUDE_PATH__;
 
-    # The API accepts only small JSON control-plane payloads. Browser file
-    # bytes use S3 directly in later phases and must not be proxied through
-    # Express.
+    # Adimari's own API accepts only small JSON control-plane payloads.
     client_max_body_size 1m;
+
+    # The NAS File Explorer is served by Adimari but its API is File Sync.
+    # Replace __FILE_SYNC_API_UPSTREAM__ with the full upstream origin without
+    # a trailing slash, for example http://127.0.0.1:5002 when File Sync runs
+    # on this host. The trailing slash below deliberately removes
+    # /file-sync-api/ before forwarding.
+    # This location must be present in production: the frontend uses this
+    # same-origin path and sends browser file bytes through it.
+    # Keep a request for the public API base canonical. All real API calls use
+    # the trailing-slash form below, but this also prevents Express from
+    # serving its SPA fallback for the bare prefix.
+    location = /file-sync-api {
+        return 308 /file-sync-api/;
+    }
+
+    # The NAS connector's SignalR connection upgrades on this route. It must
+    # be handled before the general File Sync proxy, otherwise browser uploads
+    # work but the connector cannot stay connected to receive them.
+    location ^~ /file-sync-api/hubs/agent {
+        proxy_pass __FILE_SYNC_API_UPSTREAM__/hubs/agent;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location ^~ /file-sync-api/ {
+        client_max_body_size 1g;
+        proxy_pass __FILE_SYNC_API_UPSTREAM__/;
+        proxy_http_version 1.1;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 15m;
+        proxy_send_timeout 15m;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:__ADIMARI_BACKEND_PORT__;

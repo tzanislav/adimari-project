@@ -1,11 +1,13 @@
 [CmdletBinding()]
 param(
-    [string]$m = "Deploy $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
+    [Alias('m')]
+    [string]$CommitMessage = "Deploy $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
     [string]$Branch = 'main',
     [string]$RemoteHost = 'ec2-54-76-118-84.eu-west-1.compute.amazonaws.com',
     [string]$RemoteUser = 'ubuntu',
     [string]$RemoteDirectory = '/home/ubuntu/adimari-project',
-    [string]$KeyPath = 'C:\Users\tzani\OneDrive\Software Dev\WebArch\adimari-key-pair.pem'
+    [string]$KeyPath = 'D:\Libraries\Work\Dev\Web Development\adimari-key-pair.pem',
+    [string]$PublicHost = 'adimari-db.com'
 )
 
 Set-StrictMode -Version Latest
@@ -40,6 +42,10 @@ if ($Branch -notmatch '^[A-Za-z0-9._/-]+$') {
     throw 'Branch may contain only letters, numbers, periods, underscores, slashes, and hyphens.'
 }
 
+if ($PublicHost -notmatch '^[A-Za-z0-9.-]+$') {
+    throw 'PublicHost must be a hostname without a scheme, path, or port.'
+}
+
 if (-not (Test-Path -LiteralPath $KeyPath -PathType Leaf)) {
     throw "SSH key not found: $KeyPath"
 }
@@ -66,7 +72,7 @@ Invoke-NativeCommand git add --all
 
 & git diff --cached --quiet
 if ($LASTEXITCODE -eq 1) {
-    Invoke-NativeCommand git commit -m $m
+    Invoke-NativeCommand git commit -m $CommitMessage
 }
 elseif ($LASTEXITCODE -ne 0) {
     throw 'Unable to determine whether there are staged changes.'
@@ -80,12 +86,14 @@ Invoke-NativeCommand git push origin $Branch
 
 $quotedRemoteDirectory = ConvertTo-BashSingleQuoted $RemoteDirectory
 $quotedBranch = ConvertTo-BashSingleQuoted $Branch
+$quotedPublicHost = ConvertTo-BashSingleQuoted $PublicHost
 
 $remoteScript = @'
 set -euo pipefail
 
 DEPLOY_DIR={0}
 BRANCH={1}
+PUBLIC_HOST={2}
 
 cd "$DEPLOY_DIR"
 git fetch --prune origin
@@ -118,7 +126,27 @@ port="${{port:-5001}}"
 
 for attempt in {{1..15}}; do
     if curl --fail --silent --show-error "http://127.0.0.1:$port/api/test" >/dev/null; then
-        echo "Deployment complete: adimari-backend is responding on port $port."
+        # The public NAS explorer uses the same-origin File Sync proxy. A
+        # missing Nginx location falls through to the React SPA (HTTP 200),
+        # while the protected File Sync API correctly responds with HTTP 401.
+        if proxy_status="$(curl --silent --show-error --output /dev/null \
+            --write-out '%{{http_code}}' \
+            --resolve "$PUBLIC_HOST:443:127.0.0.1" \
+            --max-time 15 \
+            "https://$PUBLIC_HOST/file-sync-api/api/storage-nodes")"; then
+            :
+        else
+            echo "The File Sync proxy check could not reach https://$PUBLIC_HOST/file-sync-api/." >&2
+            exit 1
+        fi
+
+        if [ "$proxy_status" != '401' ]; then
+            echo "File Sync proxy check returned HTTP $proxy_status; expected 401 from the protected File Sync API." >&2
+            echo "Install/reload the /file-sync-api/ Nginx proxy before deploying the explorer." >&2
+            exit 1
+        fi
+
+        echo "Deployment complete: adimari-backend is responding on port $port and the File Sync proxy is active."
         exit 0
     fi
     sleep 1
@@ -127,7 +155,7 @@ done
 echo 'The backend did not become healthy. Recent PM2 logs:' >&2
 pm2 logs adimari-backend --lines 50 --nostream >&2 || true
 exit 1
-'@ -f $quotedRemoteDirectory, $quotedBranch
+'@ -f $quotedRemoteDirectory, $quotedBranch, $quotedPublicHost
 
 # The here-string is created with Windows line endings. Bash receives the script
 # over stdin, so normalize it before sending it to the Linux host.

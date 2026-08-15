@@ -10,7 +10,7 @@ The current page is available to authenticated users at:
 /projects/folder-explorer
 ```
 
-It is linked from the **Database** card on the Projects page.
+It is linked from the **NAS File Explorer** card on the Projects page.
 
 ## Current behaviour
 
@@ -33,6 +33,12 @@ The existing `/projects/file-server` page is separate: it remains the private S3
 The API base URL defaults to the same-origin path `/file-sync-api`, which the production reverse proxy should forward to File Sync. A deployment can override it with `VITE_FILE_SYNC_API_BASE_URL`.
 
 During local development, `front-end/vite.config.js` proxies `/file-sync-api/*` to `http://localhost:5000/*`. The browser sends its Firebase bearer token; File Sync validates it. Do not add NAS credentials, NAS paths, or connector control logic to this project.
+
+In production, Nginx must proxy `/file-sync-api/` to the File Sync
+coordinator and preserve WebSocket upgrades for `/file-sync-api/hubs/agent`.
+`scripts/deploy.ps1` verifies the protected proxy endpoint after deploying the
+frontend; it expects an unauthenticated request to return HTTP 401. Override
+its `-PublicHost` parameter when deploying to a non-default host.
 
 The explorer uses the reusable [image-preview component](FILE_EXPLORER_IMAGE_LIGHTBOX_API.md) for supported image files. File Sync does not yet supply thumbnails, so the first preview requests the image through the normal secure delivery flow and displays the browser's short-lived object URL. A future thumbnail endpoint can replace that full-file preview without changing the lightbox API. The lightbox remains presentation-only and must never receive NAS paths, credentials, or raw service errors.
 

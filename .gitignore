@@ -44,4 +44,5 @@ Thumbs.db
 /Documentation/*
 !/Documentation/FILE_EXPLORER_IMPLEMENTATION.md
 !/Documentation/FILE_EXPLORER_IMAGE_LIGHTBOX_API.md
+!/Documentation/NAS-Upload-Audit.md
 

@@ -4,8 +4,8 @@ import '../CSS/Projects.css';
 
 const projectLinks = [
     {
-    title: 'Database',
-    description: 'Browse the NAS catalog and request files for secure delivery.',
+    title: 'NAS File Explorer',
+    description: 'Browse NAS folders, upload from this device, and request files for secure delivery.',
     to: '/projects/folder-explorer',
     thumbnail: '/file.png',
     thumbnailPlaceholder: 'Files',
