@@ -81,11 +81,13 @@ Adimari NAS File Explorer
   `20260815-web-s3-v8`; its local and public protected endpoints return the
   expected HTTP 401 without a bearer token.
 - The fresh NAS agent package is ready at
-  `file-sync-connector/artifacts/FileSyncNasAgent-20260815-connector-s3-v5`.
+  `file-sync-connector/artifacts/FileSyncNasAgent-20260815-connector-s3-v6`.
   It includes a manifest-checked `Update-NasAgent.ps1` updater, preserves the
   target PC's `appsettings.Local.json` and `App_Data`, and keeps the previous
-  program files in a timestamped rollback folder. It still needs to be run on
-  the NAS target PC because this workspace has no connection to that machine.
+  program files in a timestamped rollback folder. Its local dashboard footer
+  also displays the compiled release version and UTC build time. It still needs
+  to be run on the NAS target PC because this workspace has no connection to
+  that machine.
 - A real mobile upload remains the final acceptance test after that agent
   installation. It must use a non-empty photo and confirm equal browser/NAS
   byte counts.
@@ -98,7 +100,7 @@ restore the unverified handoff that caused the 0 KB issue. Only the NAS target
 PC still needs the current agent installed.
 
 1. Copy the complete
-   `file-sync-connector/artifacts/FileSyncNasAgent-20260815-connector-s3-v5`
+   `file-sync-connector/artifacts/FileSyncNasAgent-20260815-connector-s3-v6`
    folder to the NAS PC **beside**, not inside, its existing agent install
    folder. Do not use `file-sync-connector\publish\FileSyncNasAgent` or any
    older `win-x64` publish folder.
@@ -106,7 +108,7 @@ PC still needs the current agent installed.
    copied release folder. Substitute the actual installed agent directory:
 
    ```powershell
-   cd 'C:\Staged\FileSyncNasAgent-20260815-connector-s3-v5'
+   cd 'C:\Staged\FileSyncNasAgent-20260815-connector-s3-v6'
    .\Update-NasAgent.ps1 -InstallPath 'C:\FileSyncNasAgent'
    ```
 
