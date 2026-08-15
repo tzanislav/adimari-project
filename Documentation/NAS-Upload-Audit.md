@@ -39,6 +39,7 @@ Adimari NAS File Explorer
 | A connector override without a complete `S3` section cannot download the temporary object. | The new upload flow fails rather than creating a corrupt file. | Confirm the target PC's `appsettings.Local.json` has S3 key, secret, region, bucket, and matching prefix. |
 | The watcher observed connector temporary files in the NAS root. | A partial `.filesync-upload-*.tmp` file could briefly appear in the catalog. | Fixed in connector source: scans and watcher events now ignore those temporary files. |
 | The browser acknowledgement, watcher, and delayed rename events could target an already-existing catalog row. | SQLite raised `UNIQUE constraint failed: Files.StorageNodeId, Files.RelativePath`, so the UI could report failure after a successful local save. | The coordinator serializes inventory writes and treats duplicate/delayed rename destinations as idempotent updates or merges. The connector also no longer publishes a second watcher upsert for its own temporary-to-final browser-upload rename. |
+| File Sync stores uploaded objects beneath `files-sync/`, while Adimari File Sharing originally accepted only the File Manager's `files/` prefix. | Sharing a valid uploaded NAS file returned HTTP 400 even though the upload and catalog update had completed. | Fixed with an explicit optional `FILE_SYNC_S3_PREFIX`, used only to create, resolve, and download share links. Browse, upload, move, and delete remain restricted to the primary File Manager prefix. |
 
 ## Repairs made in this change
 
@@ -72,13 +73,21 @@ Adimari NAS File Explorer
    rejects a legacy or incompatible agent before it stores the browser file in
    S3, which prevents the old, misleading invalid-URL failure and avoids
    unnecessary temporary objects.
+9. Adimari File Sharing now permits the separately configured File Sync S3
+   prefix only for share creation and public-share reads. This preserves the
+   File Manager's `files/` boundary while allowing NAS Explorer objects under
+   `files-sync/` to receive working share links. The Coordinator also turns a
+   downstream namespace configuration failure into a specific administrator
+   message rather than a generic share-service error.
 
 ## Deployment status
 
-- The actual Adimari frontend was deployed and its public bundle was verified
-  to contain both the gallery-aware file input and the `/file-sync-api` route.
+- The actual Adimari frontend and backend were deployed. Its public bundle was
+  verified to contain both the gallery-aware file input and the
+  `/file-sync-api` route. The backend has the File Sync share prefix configured
+  and validates it as a share-only prefix at startup.
 - The File Sync coordinator is active on production release
-  `20260815-web-s3-v8`; its local and public protected endpoints return the
+  `20260815-web-s3-v9`; its local and public protected endpoints return the
   expected HTTP 401 without a bearer token.
 - The fresh NAS agent package is ready at
   `file-sync-connector/artifacts/FileSyncNasAgent-20260815-connector-s3-v6`.
@@ -163,6 +172,16 @@ Use a small non-empty image with a distinctive byte size.
 5. If it fails, retain the error displayed next to the file and collect the
    File Sync coordinator and connector logs. A mismatch now fails visibly; it
    must not be acknowledged as a successful 0 KB file.
+
+## Share-link acceptance test
+
+1. In **NAS File Explorer**, use **Share** on a file that was uploaded through
+   the explorer.
+2. The request to `/file-sync-api/api/shares` must succeed rather than return
+   HTTP 400.
+3. Open the generated public link in a private browser session and confirm the
+   download opens the same S3 object. This exercises the distinct, share-only
+   File Sync prefix without widening normal File Manager access.
 
 ## Follow-up security repair
 
