@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The live Folder Explorer is Adimari's authenticated user interface for the separate File Sync application. It deliberately contains no NAS configuration, backend route implementation, credentials, upload logic, or direct NAS delivery.
+The live Folder Explorer is Adimari's authenticated user interface for the separate File Sync application. It deliberately contains no NAS configuration, backend route implementation, credentials, or direct NAS delivery.
 
 The current page is available to authenticated users at:
 
@@ -18,8 +18,10 @@ It is linked from the **Database** card on the Projects page.
 
 - Select a published NAS storage node.
 - Browse cursor-paged folders with breadcrumbs.
+- Upload one or more files to the folder currently open in the explorer, either through the picker or a drag-and-drop box. Phone gallery multi-select is supported.
 - Request a file for delivery and observe its current status.
 - Start one authenticated delivery from the Download button; once ready, browser-viewable files such as PDFs open in a new tab and other files download normally.
+- Create a public Adimari download link for a current S3-cached file. The link is copied immediately and opens the existing branded `/file-download/:token` page.
 - Preview supported images in the reusable lightbox. The initial preview uses the same authenticated, full-file delivery flow as download; it does not expose a NAS path or S3 URL.
 
 The File Sync service remains the source of truth for the catalog, delivery queue, S3 access, and diagnostics.

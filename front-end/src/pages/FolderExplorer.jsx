@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   cancelDownloadRequest,
   createDownloadRequest,
+  createShareLink,
   downloadCompletedFile,
   getDownloadRequests,
   getFolderPage,
   getStorageNodes,
+  uploadFiles,
 } from '../utils/fileSyncApi';
 import FileExplorerImageLightbox from '../components/FileExplorerImageLightbox';
 import '../CSS/FileServer.css';
@@ -41,6 +43,9 @@ function FolderExplorer() {
   const [isLoadingFolder, setIsLoadingFolder] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [requestingPaths, setRequestingPaths] = useState([]);
+  const [sharingPaths, setSharingPaths] = useState([]);
+  const [shareUploadPaths, setShareUploadPaths] = useState([]);
+  const [copiedSharePath, setCopiedSharePath] = useState(null);
   const [downloadingRequestIds, setDownloadingRequestIds] = useState([]);
   const [cancellingRequestIds, setCancellingRequestIds] = useState([]);
   const [previewEntry, setPreviewEntry] = useState(null);
@@ -51,11 +56,26 @@ function FolderExplorer() {
   const [previewError, setPreviewError] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [uploadState, setUploadState] = useState(null);
+  const [isRecentDeliveriesExpanded, setIsRecentDeliveriesExpanded] = useState(false);
   const requestSequence = useRef(0);
   const previewObjectUrl = useRef(null);
   const previewLoadSequence = useRef(0);
   const previewPath = useRef(null);
   const automaticDeliveryWindows = useRef(new Map());
+  const shareDeliveriesAwaitingCompletion = useRef(new Map());
+  const uploadInputRef = useRef(null);
+  const currentLocationRef = useRef({ storageNodeId, currentPath });
+  const uploadRefreshTimerIds = useRef(new Set());
+  const preservePathOnStorageNodeChange = useRef(false);
+  const hasInitializedBrowserHistory = useRef(false);
+  const shareCopyTimerId = useRef(null);
+
+  useEffect(() => {
+    currentLocationRef.current = { storageNodeId, currentPath };
+  }, [currentPath, storageNodeId]);
 
   const revokePreviewUrl = useCallback(() => {
     if (previewObjectUrl.current) {
@@ -101,10 +121,12 @@ function FolderExplorer() {
       setNextCursor(page.nextCursor);
       setHasMore(page.hasMore);
       setError('');
+      return page;
     } catch (loadError) {
       if (sequence === requestSequence.current) {
         setError(toUserMessage(loadError, 'Could not load this NAS folder.'));
       }
+      return null;
     } finally {
       if (sequence === requestSequence.current) {
         append ? setIsLoadingMore(false) : setIsLoadingFolder(false);
@@ -131,6 +153,10 @@ function FolderExplorer() {
 
   useEffect(() => {
     requestSequence.current += 1;
+    if (preservePathOnStorageNodeChange.current) {
+      preservePathOnStorageNodeChange.current = false;
+      return;
+    }
     setCurrentPath(ROOT_PATH);
     setEntries([]);
     setNextCursor(null);
@@ -153,6 +179,14 @@ function FolderExplorer() {
   }, [loadRequests, storageNodeId]);
 
   useEffect(() => () => revokePreviewUrl(), [revokePreviewUrl]);
+  useEffect(() => () => {
+    uploadRefreshTimerIds.current.forEach((timerId) => window.clearTimeout(timerId));
+    uploadRefreshTimerIds.current.clear();
+    shareDeliveriesAwaitingCompletion.current.clear();
+    if (shareCopyTimerId.current !== null) {
+      window.clearTimeout(shareCopyTimerId.current);
+    }
+  }, []);
 
   const requestsByPath = useMemo(() => new Map(requests.map((request) => [request.relativePath, request])), [requests]);
   const imageEntries = useMemo(() => entries.filter((entry) => !entry.isDirectory && isPreviewableImage(entry.name)), [entries]);
@@ -274,13 +308,65 @@ function FolderExplorer() {
     }
   }, [loadPreviewImage, previewEntry, previewRequestId, requests]);
 
-  const navigateToFolder = (folderPath) => {
+  const navigateToFolder = useCallback((folderPath, { targetStorageNodeId = storageNodeId, historyAction = 'push' } = {}) => {
     requestSequence.current += 1;
+    if (targetStorageNodeId !== storageNodeId) {
+      preservePathOnStorageNodeChange.current = true;
+      setStorageNodeId(targetStorageNodeId);
+    }
     setCurrentPath(folderPath);
     setEntries([]);
     setNextCursor(null);
     setHasMore(false);
-  };
+
+    if (historyAction !== 'none') {
+      const browserState = window.history.state && typeof window.history.state === 'object'
+        ? window.history.state
+        : {};
+      const nextState = {
+        ...browserState,
+        folderExplorer: { storageNodeId: targetStorageNodeId, currentPath: folderPath },
+      };
+
+      if (historyAction === 'replace') {
+        window.history.replaceState(nextState, '', window.location.href);
+      } else {
+        window.history.pushState(nextState, '', window.location.href);
+      }
+    }
+  }, [storageNodeId]);
+
+  useEffect(() => {
+    if (!storageNodeId || hasInitializedBrowserHistory.current) {
+      return;
+    }
+
+    if (!window.history.state?.folderExplorer) {
+      const browserState = window.history.state && typeof window.history.state === 'object'
+        ? window.history.state
+        : {};
+      window.history.replaceState({
+        ...browserState,
+        folderExplorer: { storageNodeId, currentPath },
+      }, '', window.location.href);
+    }
+
+    hasInitializedBrowserHistory.current = true;
+  }, [currentPath, storageNodeId]);
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const savedLocation = event.state?.folderExplorer;
+
+      navigateToFolder(savedLocation?.currentPath || ROOT_PATH, {
+        targetStorageNodeId: savedLocation?.storageNodeId || storageNodeId,
+        historyAction: 'none',
+      });
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigateToFolder, storageNodeId]);
 
   const handleDownload = useCallback(async (request, viewerWindow = null) => {
     setDownloadingRequestIds((ids) => [...ids, request.requestId]);
@@ -369,6 +455,94 @@ function FolderExplorer() {
     }
   };
 
+  const createAndCopyShare = useCallback(async (entry, targetStorageNodeId) => {
+    try {
+      const share = await createShareLink(targetStorageNodeId, entry.relativePath);
+      await copyToClipboard(share.url);
+
+      if (shareCopyTimerId.current !== null) {
+        window.clearTimeout(shareCopyTimerId.current);
+      }
+
+      setCopiedSharePath(entry.relativePath);
+      shareCopyTimerId.current = window.setTimeout(() => {
+        setCopiedSharePath(null);
+        shareCopyTimerId.current = null;
+      }, 3000);
+      setNotice(`Share link for ${entry.name} copied to the clipboard.`);
+    } catch (shareError) {
+      setError(toUserMessage(shareError, `Could not create a share link for ${entry.name}.`));
+    } finally {
+      setSharingPaths((paths) => paths.filter((path) => path !== entry.relativePath));
+      setShareUploadPaths((paths) => paths.filter((path) => path !== entry.relativePath));
+    }
+  }, []);
+
+  useEffect(() => {
+    for (const request of requests) {
+      const pendingShare = shareDeliveriesAwaitingCompletion.current.get(request.requestId);
+      if (!pendingShare) {
+        continue;
+      }
+
+      if (request.status === 'Ready') {
+        shareDeliveriesAwaitingCompletion.current.delete(request.requestId);
+        setShareUploadPaths((paths) => paths.filter((path) => path !== pendingShare.entry.relativePath));
+        void createAndCopyShare(pendingShare.entry, pendingShare.storageNodeId);
+      } else if (request.status === 'Failed' || request.status === 'Cancelled') {
+        shareDeliveriesAwaitingCompletion.current.delete(request.requestId);
+        setSharingPaths((paths) => paths.filter((path) => path !== pendingShare.entry.relativePath));
+        setShareUploadPaths((paths) => paths.filter((path) => path !== pendingShare.entry.relativePath));
+        setError(`The upload needed to share ${pendingShare.entry.name} did not complete.`);
+      }
+    }
+  }, [createAndCopyShare, requests]);
+
+  const handleShare = async (entry) => {
+    if (!storageNodeId) {
+      return;
+    }
+
+    setSharingPaths((paths) => [...paths, entry.relativePath]);
+    setError('');
+    setNotice('');
+
+    if (entry.isCached) {
+      await createAndCopyShare(entry, storageNodeId);
+      return;
+    }
+
+    const existingRequest = requestsByPath.get(entry.relativePath);
+    if (existingRequest?.status === 'Ready') {
+      await createAndCopyShare(entry, storageNodeId);
+      return;
+    }
+
+    try {
+      const request = existingRequest && CANCELLABLE_STATUSES.has(existingRequest.status)
+        ? existingRequest
+        : await createDownloadRequest(storageNodeId, entry.relativePath);
+
+      if (request !== existingRequest) {
+        setRequests((currentRequests) => [request, ...currentRequests.filter((currentRequest) => currentRequest.requestId !== request.requestId)]);
+      }
+
+      if (request.status === 'Ready') {
+        await createAndCopyShare(entry, storageNodeId);
+      } else if (CANCELLABLE_STATUSES.has(request.status)) {
+        shareDeliveriesAwaitingCompletion.current.set(request.requestId, { entry, storageNodeId });
+        setShareUploadPaths((paths) => [...paths, entry.relativePath]);
+        setNotice(`${entry.name} is uploading to S3. Its share link will be copied when ready.`);
+      } else {
+        setError(`The upload needed to share ${entry.name} could not be requested.`);
+        setSharingPaths((paths) => paths.filter((path) => path !== entry.relativePath));
+      }
+    } catch (shareError) {
+      setError(toUserMessage(shareError, `Could not upload ${entry.name} for sharing.`));
+      setSharingPaths((paths) => paths.filter((path) => path !== entry.relativePath));
+    }
+  };
+
   const handleCancel = async (request) => {
     setCancellingRequestIds((ids) => [...ids, request.requestId]);
 
@@ -390,6 +564,129 @@ function FolderExplorer() {
     void loadRequests(storageNodeId);
   };
 
+  const refreshUploadedFolder = useCallback((targetStorageNodeId, targetFolderPath) => {
+    let attempt = 0;
+
+    const refresh = async () => {
+      const currentLocation = currentLocationRef.current;
+      if (currentLocation.storageNodeId !== targetStorageNodeId || currentLocation.currentPath !== targetFolderPath) {
+        return;
+      }
+
+      await loadFolder(targetStorageNodeId, targetFolderPath);
+      attempt += 1;
+
+      if (attempt < 8) {
+        const timerId = window.setTimeout(() => {
+          uploadRefreshTimerIds.current.delete(timerId);
+          void refresh();
+        }, 1_000);
+        uploadRefreshTimerIds.current.add(timerId);
+      }
+    };
+
+    void refresh();
+  }, [loadFolder]);
+
+  const queueFilesForUpload = async (fileList) => {
+    const files = Array.from(fileList || []);
+
+    if (!storageNodeId || !files.length || isUploadingFiles) {
+      return;
+    }
+
+    const targetStorageNodeId = storageNodeId;
+    const targetFolderPath = currentPath;
+    const totalBytes = files.reduce((total, file) => total + file.size, 0);
+    uploadRefreshTimerIds.current.forEach((timerId) => window.clearTimeout(timerId));
+    uploadRefreshTimerIds.current.clear();
+    setIsUploadingFiles(true);
+    setError('');
+    setNotice('');
+    setUploadState({
+      phase: 'Preparing files for upload',
+      uploadedBytes: 0,
+      totalBytes,
+      files: files.map((file) => ({ name: file.name, size: file.size, status: 'Waiting to upload' })),
+    });
+
+    try {
+      const results = await uploadFiles(targetStorageNodeId, targetFolderPath, files, {
+        onProgress: (loadedBytes) => {
+          const payloadBytes = Math.min(loadedBytes, totalBytes);
+          let bytesBeforeFile = 0;
+
+          setUploadState({
+            phase: 'Sending files to File Sync',
+            uploadedBytes: payloadBytes,
+            totalBytes,
+            files: files.map((file) => {
+              const fileEndByte = bytesBeforeFile + file.size;
+              const status = payloadBytes >= fileEndByte
+                ? 'Received by File Sync'
+                : payloadBytes > bytesBeforeFile
+                  ? 'Uploading to File Sync'
+                  : 'Waiting to upload';
+              bytesBeforeFile = fileEndByte;
+              return { name: file.name, size: file.size, status };
+            }),
+          });
+        },
+        onRequestBodyUploaded: () => {
+          setUploadState({
+            phase: 'Saving files to the NAS folder',
+            uploadedBytes: totalBytes,
+            totalBytes,
+            files: files.map((file) => ({ name: file.name, size: file.size, status: 'Waiting for NAS agent' })),
+          });
+        },
+      });
+      const uploaded = results.filter((result) => result.isUploaded);
+      const failed = results.filter((result) => !result.isUploaded);
+
+      setUploadState({
+        phase: failed.length ? 'Upload finished with issues' : 'Upload complete',
+        uploadedBytes: totalBytes,
+        totalBytes,
+        files: files.map((file, index) => {
+          const result = results[index];
+          return {
+            name: file.name,
+            size: file.size,
+            status: result?.isUploaded ? 'Saved to NAS' : result?.errorMessage || 'Upload failed',
+            isFailed: Boolean(result && !result.isUploaded),
+          };
+        }),
+      });
+
+      if (uploaded.length) {
+        setNotice(`Uploaded ${uploaded.length} file${uploaded.length === 1 ? '' : 's'} to ${targetFolderPath || 'the NAS root folder'}.`);
+      }
+
+      if (failed.length) {
+        const failedNames = failed.slice(0, 3).map((result) => result.fileName).join(', ');
+        const remainingFailureCount = failed.length - 3;
+        setError(`${failed.length} file${failed.length === 1 ? '' : 's'} could not be uploaded: ${failedNames}${remainingFailureCount > 0 ? ` and ${remainingFailureCount} more` : ''}.`);
+      }
+
+      const currentLocation = currentLocationRef.current;
+      if (uploaded.length &&
+          currentLocation.storageNodeId === targetStorageNodeId &&
+          currentLocation.currentPath === targetFolderPath) {
+        refreshUploadedFolder(targetStorageNodeId, targetFolderPath);
+      }
+    } catch (uploadError) {
+      setUploadState((currentState) => currentState && {
+        ...currentState,
+        phase: 'Upload failed',
+        files: currentState.files.map((file) => ({ ...file, status: 'Upload failed', isFailed: true })),
+      });
+      setError(toUserMessage(uploadError, 'Could not upload the selected files to this NAS folder.'));
+    } finally {
+      setIsUploadingFiles(false);
+    }
+  };
+
   return (
     <>
       <main className="file-server-page">
@@ -409,7 +706,7 @@ function FolderExplorer() {
       <section className="folder-explorer-controls" aria-label="NAS storage node">
         <label className="file-server-field">
           NAS storage node
-          <select value={storageNodeId} onChange={(event) => setStorageNodeId(event.target.value)} disabled={isLoadingNodes || storageNodes.length === 0}>
+          <select value={storageNodeId} onChange={(event) => navigateToFolder(ROOT_PATH, { targetStorageNodeId: event.target.value })} disabled={isLoadingNodes || storageNodes.length === 0}>
             {storageNodes.map((nodeId) => <option key={nodeId} value={nodeId}>{nodeId}</option>)}
           </select>
         </label>
@@ -418,6 +715,70 @@ function FolderExplorer() {
 
       {error && <p className="file-server-message error" role="alert">{error}</p>}
       {notice && <p className="file-server-message success" role="status">{notice}</p>}
+
+      <section className="folder-explorer-upload" aria-label="Upload files to the current NAS folder">
+        <div className="folder-explorer-upload-heading">
+          <div>
+            <h2>Upload to this folder</h2>
+            <p>Choose or drag multiple files. They will be saved to the folder shown below.</p>
+          </div>
+          <button
+            className="file-server-button primary"
+            type="button"
+            disabled={!storageNodeId || isUploadingFiles}
+            onClick={() => uploadInputRef.current?.click()}
+          >
+            {isUploadingFiles ? 'Uploading filesâ€¦' : 'Choose files'}
+          </button>
+          <input
+            ref={uploadInputRef}
+            className="file-server-visually-hidden"
+            type="file"
+            multiple
+            disabled={!storageNodeId || isUploadingFiles}
+            onChange={(event) => {
+              void queueFilesForUpload(event.target.files);
+              event.target.value = '';
+            }}
+          />
+        </div>
+        <div
+          className={`file-server-dropzone folder-explorer-dropzone ${isDraggingFiles ? 'is-dragging' : ''}${!storageNodeId || isUploadingFiles ? ' is-disabled' : ''}`}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (!isUploadingFiles && storageNodeId) setIsDraggingFiles(true);
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDragLeave={() => setIsDraggingFiles(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDraggingFiles(false);
+            void queueFilesForUpload(event.dataTransfer.files);
+          }}
+        >
+          <strong>Drop files here to upload</strong>
+          <span>{isUploadingFiles ? 'Uploading the selected filesâ€¦' : 'Multiple files and phone photo selections are supported.'}</span>
+        </div>
+        {uploadState && (
+          <section className={`folder-explorer-upload-status${uploadState.phase.includes('failed') || uploadState.phase.includes('issues') ? ' has-failures' : ''}`} aria-live="polite">
+            <div className="folder-explorer-upload-progress">
+              <div>
+                <strong>{uploadState.phase}</strong>
+                <span>{formatBytes(uploadState.uploadedBytes)} of {formatBytes(uploadState.totalBytes)}</span>
+              </div>
+              <progress value={uploadState.uploadedBytes} max={uploadState.totalBytes || 1} />
+            </div>
+            <ul>
+              {uploadState.files.map((file, index) => (
+                <li key={`${file.name}-${index}`} className={file.isFailed ? 'failed' : ''}>
+                  <span><strong>{file.name}</strong> <em>{formatBytes(file.size)}</em></span>
+                  <span>{file.status}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </section>
 
       <nav className="file-server-breadcrumbs" aria-label="NAS folder location">
         <button className="file-server-crumb" type="button" onClick={() => navigateToFolder(ROOT_PATH)}>NAS files</button>
@@ -474,6 +835,19 @@ function FolderExplorer() {
                     >
                       Download
                     </button>
+                    <button
+                      className="file-server-button compact share"
+                      type="button"
+                      disabled={sharingPaths.includes(entry.relativePath)}
+                      title={entry.isCached
+                        ? 'Create and copy a public Adimari share link'
+                        : 'Upload the current file version to S3, then create and copy a public Adimari share link'}
+                      onClick={() => void handleShare(entry)}
+                    >
+                      {sharingPaths.includes(entry.relativePath)
+                        ? shareUploadPaths.includes(entry.relativePath) ? 'Uploadingâ€¦' : 'Creatingâ€¦'
+                        : copiedSharePath === entry.relativePath ? 'Copied!' : 'Share'}
+                    </button>
                   </div>
                 </article>
               );
@@ -490,7 +864,19 @@ function FolderExplorer() {
       )}
 
       <section className="folder-explorer-requests" aria-labelledby="folder-explorer-requests-title">
-        <h2 id="folder-explorer-requests-title">Recent file deliveries</h2>
+        <button
+          className="folder-explorer-requests-toggle"
+          type="button"
+          id="folder-explorer-requests-title"
+          aria-expanded={isRecentDeliveriesExpanded}
+          aria-controls="folder-explorer-requests-content"
+          onClick={() => setIsRecentDeliveriesExpanded((isExpanded) => !isExpanded)}
+        >
+          <span>Recent file deliveries</span>
+          <span aria-hidden="true">{isRecentDeliveriesExpanded ? '−' : '+'}</span>
+        </button>
+        {isRecentDeliveriesExpanded && (
+          <div id="folder-explorer-requests-content">
         {!storageNodeId ? <p className="file-server-muted">Select a NAS storage node to view delivery status.</p> : !requests.length ? (
           <p className="file-server-muted">No file deliveries have been requested for this NAS node.</p>
         ) : (
@@ -509,6 +895,8 @@ function FolderExplorer() {
                 </div>
               </article>
             ))}
+          </div>
+        )}
           </div>
         )}
       </section>
@@ -620,6 +1008,26 @@ function openBrowserViewer(fileName) {
   return viewerWindow;
 }
 
+async function copyToClipboard(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = value;
+  textArea.style.position = 'fixed';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.select();
+  const copied = document.execCommand('copy');
+  textArea.remove();
+
+  if (!copied) {
+    throw new Error('The browser could not copy the share link.');
+  }
+}
+
 function formatBytes(bytes) {
   if (typeof bytes !== 'number') {
     return '—';
@@ -652,6 +1060,14 @@ function formatTransferProgress(bytesTransferred, totalBytes) {
 function toUserMessage(error, fallback) {
   if (error?.status === 401 || error?.status === 403) {
     return 'Your sign-in has expired. Please sign in again before using the NAS explorer.';
+  }
+
+  if (typeof error?.status === 'number') {
+    return `${fallback} File Sync returned HTTP ${error.status}.`;
+  }
+
+  if (error instanceof TypeError) {
+    return `${fallback} The File Sync service could not be reached.`;
   }
 
   return fallback;

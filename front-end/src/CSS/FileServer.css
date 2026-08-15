@@ -50,6 +50,8 @@
 .file-server-button:disabled { cursor: wait; opacity: .6; }
 .file-server-button.primary { background: #1b5c9d; border-color: #1b5c9d; color: #fff; }
 .file-server-button.primary:hover:not(:disabled) { background: #124a82; }
+.file-server-button.share { border-color: #08756c; background: #08756c; color: #fff; }
+.file-server-button.share:hover:not(:disabled) { border-color: #075f59; background: #075f59; }
 .file-server-button.danger { border-color: #bb3e45; color: #9e242d; }
 .file-server-button.danger:hover:not(:disabled) { background: #fff0f1; }
 .file-server-button.ghost { border-color: transparent; background: transparent; }
@@ -104,10 +106,32 @@
 
 .folder-explorer-controls { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 0 0 18px; }
 .folder-explorer-controls .file-server-field { width: min(100%, 340px); margin: 0; }
+.folder-explorer-upload { margin: 0 0 18px; padding: 16px; border: 1px solid #d7dfe8; border-radius: 8px; background: #fff; }
+.folder-explorer-upload + .file-server-breadcrumbs { font-size: 16px; font-weight: 700; color: #111827; }
+.folder-explorer-upload + .file-server-breadcrumbs .file-server-crumb { color: #111827; font-weight: 700; }
+.folder-explorer-upload-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.folder-explorer-upload-heading h2 { margin: 0; font-size: 18px; }
+.folder-explorer-upload-heading p { margin: 4px 0 0; color: #607083; font-size: 13px; }
+.folder-explorer-dropzone { min-height: 128px; }
+.file-server-dropzone.is-disabled { cursor: not-allowed; opacity: .6; }
+.folder-explorer-upload-status { margin-top: 12px; padding: 12px; border: 1px solid #b8d2ed; border-radius: 7px; background: #f0f7ff; }
+.folder-explorer-upload-status.has-failures { border-color: #e4b3b8; background: #fff6f6; }
+.folder-explorer-upload-progress { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(140px, 2fr); gap: 12px; align-items: center; }
+.folder-explorer-upload-progress div { display: grid; gap: 3px; }
+.folder-explorer-upload-progress span { color: #52677d; font-size: 12px; }
+.folder-explorer-upload-progress progress { width: 100%; accent-color: #1b5c9d; }
+.folder-explorer-upload-status ul { display: grid; gap: 6px; max-height: 180px; margin: 12px 0 0; padding: 0; overflow: auto; list-style: none; }
+.folder-explorer-upload-status li { display: flex; justify-content: space-between; gap: 14px; padding-top: 6px; border-top: 1px solid #d7e4ef; color: #3e5266; font-size: 12px; }
+.folder-explorer-upload-status li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-explorer-upload-status li span:last-child { color: #52677d; text-align: right; }
+.folder-explorer-upload-status li.failed span:last-child { color: #9e242d; }
+.folder-explorer-upload-status em { color: #607083; font-style: normal; font-weight: 400; }
 .folder-explorer-browser .file-server-browser-heading, .folder-explorer-browser .file-server-row { grid-template-columns: minmax(180px, 1fr) 100px 170px 110px minmax(100px, max-content); }
 .folder-explorer-browser .file-server-row-actions { justify-content: flex-end; }
 .folder-explorer-requests { margin-top: 34px; }
 .folder-explorer-requests h2 { margin: 0 0 12px; font-size: 20px; }
+.folder-explorer-requests-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; margin: 0 0 12px; padding: 0; border: 0; background: transparent; color: #20242a; cursor: pointer; font-size: 20px; font-weight: 700; text-align: left; }
+.folder-explorer-requests-toggle:hover { color: #1b5c9d; background: transparent; }
 .folder-explorer-request-list { overflow: hidden; border: 1px solid #d7dfe8; border-radius: 8px; background: #fff; }
 .folder-explorer-request-list article { display: grid; grid-template-columns: minmax(210px, 1fr) 100px 145px minmax(150px, max-content); gap: 12px; align-items: center; padding: 11px 14px; border-top: 1px solid #edf0f4; }
 .folder-explorer-request-list article:first-child { border-top: 0; }
@@ -153,6 +177,10 @@
   .file-server-upload-status { grid-template-columns: 1fr; gap: 7px; }
   .file-server-new-link, .file-server-share-toolbar { align-items: stretch; flex-direction: column; }
   .folder-explorer-controls { align-items: stretch; flex-direction: column; }
+  .folder-explorer-upload-heading { align-items: stretch; flex-direction: column; }
+  .folder-explorer-upload-progress { grid-template-columns: 1fr; }
+  .folder-explorer-upload-status li { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .folder-explorer-upload-status li span:last-child { text-align: left; }
   .folder-explorer-browser .file-server-row { grid-template-columns: 1fr; }
   .folder-explorer-browser .file-server-row-actions { justify-content: flex-start; }
   .folder-explorer-request-list article { grid-template-columns: 1fr; gap: 7px; }
