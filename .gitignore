@@ -40,4 +40,6 @@ Thumbs.db
 !Backend/.env.example
 
 /Documentation/*
+!/Documentation/NAS_CONNECTOR_BACKEND_INTERFACE.md
+!/Documentation/NAS_CONNECTOR_BACKEND_INTERFACE.html
 
