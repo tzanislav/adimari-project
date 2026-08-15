@@ -37,7 +37,7 @@ Adimari NAS File Explorer
 | `file-sync-connector/publish/FileSyncNasAgent` is stale. | It contains the older browser-upload receiver and must not be used for this repair. | Use a new release publish, not that folder. |
 | A connector override without a complete `S3` section cannot download the temporary object. | The new upload flow fails rather than creating a corrupt file. | Confirm the target PC's `appsettings.Local.json` has S3 key, secret, region, bucket, and matching prefix. |
 | The watcher observed connector temporary files in the NAS root. | A partial `.filesync-upload-*.tmp` file could briefly appear in the catalog. | Fixed in connector source: scans and watcher events now ignore those temporary files. |
-| The browser acknowledgement and filesystem watcher could concurrently insert the same catalog row. | SQLite raised `UNIQUE constraint failed: Files.StorageNodeId, Files.RelativePath`, so the UI could report failure after a successful local save. | The coordinator serializes inventory writes, and the connector no longer publishes a second watcher upsert for its own temporary-to-final browser-upload rename. |
+| The browser acknowledgement, watcher, and delayed rename events could target an already-existing catalog row. | SQLite raised `UNIQUE constraint failed: Files.StorageNodeId, Files.RelativePath`, so the UI could report failure after a successful local save. | The coordinator serializes inventory writes and treats duplicate/delayed rename destinations as idempotent updates or merges. The connector also no longer publishes a second watcher upsert for its own temporary-to-final browser-upload rename. |
 
 ## Repairs made in this change
 
@@ -64,7 +64,24 @@ Adimari NAS File Explorer
    scan remains the reconciliation fallback.
 7. The coordinator serializes all inventory-table mutations, preventing a
    scan, watcher, or browser acknowledgement from racing the same
-   query-then-insert row creation.
+   query-then-insert row creation. Delayed rename events now update or merge
+   an existing destination instead of attempting a duplicate insert.
+
+## Deployment status
+
+- The actual Adimari frontend was deployed and its public bundle was verified
+  to contain both the gallery-aware file input and the `/file-sync-api` route.
+- The File Sync coordinator is active on production release
+  `20260815-web-s3-v7`; its local and public protected endpoints return the
+  expected HTTP 401 without a bearer token.
+- The fresh NAS agent package is ready at
+  `file-sync-connector/artifacts/FileSyncNasAgent-20260815-connector-s3-v4`.
+  It still needs to be installed on the NAS target PC, preserving that PC's
+  `appsettings.Local.json` and `App_Data`. No target-PC write was attempted
+  because this workspace has no connection to that machine.
+- A real mobile upload remains the final acceptance test after that agent
+  installation. It must use a non-empty photo and confirm equal browser/NAS
+  byte counts.
 
 ## Required deployment repairs
 
