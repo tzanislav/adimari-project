@@ -157,12 +157,13 @@ pm2 logs adimari-backend --lines 50 --nostream >&2 || true
 exit 1
 '@ -f $quotedRemoteDirectory, $quotedBranch, $quotedPublicHost
 
-# The here-string is created with Windows line endings. Bash receives the script
-# over stdin, so normalize it before sending it to the Linux host.
-$remoteScript = $remoteScript -replace "`r`n", "`n"
+# Send an explicit BOM-free UTF-8 payload. Piping a here-string directly into
+# ssh on Windows can prepend a UTF-8 BOM, making Bash skip `set -euo pipefail`.
+$remotePayload = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($remoteScript))
+$remoteCommand = "printf %s '$remotePayload' | base64 --decode | bash"
 
 Write-Host "Deploying to $RemoteUser@$RemoteHost..."
-$remoteScript | & $sshExecutable -i $KeyPath -o BatchMode=yes "$RemoteUser@$RemoteHost" 'bash -s'
+& $sshExecutable -i $KeyPath -o BatchMode=yes "$RemoteUser@$RemoteHost" $remoteCommand
 if ($LASTEXITCODE -ne 0) {
     throw "Remote deployment failed with exit code $LASTEXITCODE."
 }
