@@ -60,6 +60,18 @@ Preview the built bundle with Vite:
 npm run preview
 ```
 
+## Build Identifier
+
+The shared application footer includes the UTC timestamp embedded in the bundle
+and, when available, the first 12 characters of the Git revision. This makes a
+deployed UI identifiable without relying on browser cache timestamps.
+
+`npm run build` creates the timestamp when the build starts. Release tooling can
+provide an explicit UTC ISO-8601 timestamp through `ADIMARI_BUILD_TIMESTAMP`.
+For reproducible builds, `SOURCE_DATE_EPOCH` (Unix seconds) is also supported.
+`ADIMARI_BUILD_REVISION` can supply a revision when the build runs outside a Git
+checkout; otherwise the build reads the current Git revision automatically.
+
 ## Local Integration Notes
 
 - Firebase Google sign-in depends on backend CSP headers and popup-compatible security headers.

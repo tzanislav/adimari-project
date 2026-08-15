@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { buildInfoLabel, buildInfoTitle } from '../utils/buildInfo';
 import '../CSS/Footer.css';
 
 const Footer = () => {
@@ -47,6 +48,7 @@ const Footer = () => {
       <div className="footer-bottom">
         <div>© {year} Adimari</div>
         <div>Design library &amp; project workspace</div>
+        <div className="footer-build-info" title={buildInfoTitle}>{buildInfoLabel}</div>
       </div>
     </footer>
   );
