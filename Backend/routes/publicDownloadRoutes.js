@@ -48,7 +48,7 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
       const share = await loadExistingShare(req, res);
       if (!share) return undefined;
       if (!share.s3Key) return notFound(res);
-      const object = await storage.headFile({ key: share.s3Key });
+      const object = await storage.headShareableFile({ key: share.s3Key });
       return res.json({
         file: {
           name: share.originalFileName,
@@ -73,8 +73,8 @@ const createPublicDownloadRoutes = (dependencies = {}) => {
       const share = await loadExistingShare(req, res);
       if (!share) return undefined;
       if (!share.s3Key) return notFound(res);
-      await storage.headFile({ key: share.s3Key });
-      const downloadUrl = await storage.getDownloadUrl({
+      await storage.headShareableFile({ key: share.s3Key });
+      const downloadUrl = await storage.getShareableDownloadUrl({
         key: share.s3Key,
         fileName: share.originalFileName,
       });

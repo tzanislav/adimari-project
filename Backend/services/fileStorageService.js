@@ -18,6 +18,7 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const {
   FileStorageValidationError,
   assertManagedS3Key,
+  assertS3KeyWithinPrefixes,
   createManagedS3Key,
   normalizeContentType,
   normalizeFileName,
@@ -121,6 +122,10 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
   }
 
   const managedKey = (key) => assertManagedS3Key(key, config.prefix);
+  const shareableKey = (key) => assertS3KeyWithinPrefixes(
+    key,
+    config.shareablePrefixes || [config.prefix],
+  );
   const send = async (command) => {
     try {
       return await client.send(command);
@@ -134,6 +139,26 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
     } catch (error) {
       throw mapS3Error(error);
     }
+  };
+  const createDownloadUrl = async ({
+    key,
+    fileName,
+    disposition = 'attachment',
+    expiresIn = config.downloadUrlTtlSeconds,
+  } = {}, keyValidator = managedKey) => {
+    const managedS3Key = keyValidator(key);
+    if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > config.downloadUrlTtlSeconds) {
+      throw new FileStorageValidationError('Download URL expiry is invalid.');
+    }
+    if (!['attachment', 'inline'].includes(disposition)) {
+      throw new FileStorageValidationError('Download disposition is invalid.');
+    }
+
+    return sign(new GetObjectCommand({
+      Bucket: config.bucketName,
+      Key: managedS3Key,
+      ResponseContentDisposition: buildContentDisposition(fileName, disposition),
+    }), expiresIn);
   };
 
   return {
@@ -238,6 +263,13 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
       return send(new HeadObjectCommand({ Bucket: config.bucketName, Key: managedS3Key }));
     },
 
+    // Kept separate from headFile so only the explicitly authorized sharing
+    // paths can inspect File Sync's external namespace.
+    async headShareableFile({ key }) {
+      const managedS3Key = shareableKey(key);
+      return send(new HeadObjectCommand({ Bucket: config.bucketName, Key: managedS3Key }));
+    },
+
     async createMultipartUpload({ folder = '', fileName, contentType } = {}) {
       const key = createManagedS3Key({ prefix: config.prefix, folder, fileName });
       const result = await send(new CreateMultipartUploadCommand({
@@ -298,20 +330,13 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
       }));
     },
 
-    async getDownloadUrl({ key, fileName, disposition = 'attachment', expiresIn = config.downloadUrlTtlSeconds } = {}) {
-      const managedS3Key = managedKey(key);
-      if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > config.downloadUrlTtlSeconds) {
-        throw new FileStorageValidationError('Download URL expiry is invalid.');
-      }
-      if (!['attachment', 'inline'].includes(disposition)) {
-        throw new FileStorageValidationError('Download disposition is invalid.');
-      }
+    async getDownloadUrl(options = {}) {
+      return createDownloadUrl(options);
+    },
 
-      return sign(new GetObjectCommand({
-        Bucket: config.bucketName,
-        Key: managedS3Key,
-        ResponseContentDisposition: buildContentDisposition(fileName, disposition),
-      }), expiresIn);
+    // Kept separate from getDownloadUrl for the same reason as headShareableFile.
+    async getShareableDownloadUrl(options = {}) {
+      return createDownloadUrl(options, shareableKey);
     },
 
     async moveFile({ sourceKey, destinationFolder = '', destinationFileName } = {}) {

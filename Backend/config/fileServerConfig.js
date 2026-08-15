@@ -77,6 +77,17 @@ const validateManagedPrefix = (value) => {
   }
 };
 
+const optionalFileSyncPrefix = (environment) => {
+  const value = optionalString(environment, 'FILE_SYNC_S3_PREFIX');
+  if (!value) return undefined;
+
+  try {
+    return normalizeManagedPrefix(value);
+  } catch {
+    throw new FileServerConfigurationError('FILE_SYNC_S3_PREFIX must contain safe path segments.');
+  }
+};
+
 const createFileServerConfig = (environment = process.env) => {
   const accessKeyId = optionalString(environment, 'FILE_SERVER_AWS_ACCESS_KEY_ID');
   const secretAccessKey = optionalString(environment, 'FILE_SERVER_AWS_SECRET_ACCESS_KEY');
@@ -87,10 +98,15 @@ const createFileServerConfig = (environment = process.env) => {
     );
   }
 
+  const prefix = validateManagedPrefix(requiredString(environment, 'FILE_SERVER_S3_PREFIX'));
+  const fileSyncPrefix = optionalFileSyncPrefix(environment);
   const config = {
     region: requiredString(environment, 'FILE_SERVER_AWS_REGION'),
     bucketName: validateBucketName(requiredString(environment, 'FILE_SERVER_BUCKET_NAME')),
-    prefix: validateManagedPrefix(requiredString(environment, 'FILE_SERVER_S3_PREFIX')),
+    prefix,
+    // This is intentionally limited to share creation and public downloads.
+    // File-manager browse, upload, move, and delete APIs retain `prefix` only.
+    shareablePrefixes: Object.freeze([...new Set([prefix, ...(fileSyncPrefix ? [fileSyncPrefix] : [])])]),
     publicBaseUrl: normalizePublicBaseUrl(requiredString(environment, 'FILE_SERVER_PUBLIC_BASE_URL')),
     maxUploadBytes: requiredInteger(environment, 'FILE_SERVER_MAX_UPLOAD_BYTES', {
       min: 1,

@@ -59,3 +59,54 @@ test('file routes allow moderators and deny anonymous or regular users', async (
     await new Promise((resolve) => regular.server.close(resolve));
   }
 });
+
+test('a configured File Sync prefix can create a share without expanding manager storage operations', async () => {
+  const app = express();
+  app.use(express.json());
+  let sharedKey;
+  let managerStorageCalled = false;
+  app.use('/api/files', createFileRoutes({
+    config: {
+      prefix: 'files/',
+      shareablePrefixes: ['files/', 'files-sync/'],
+      publicBaseUrl: 'https://adimari-db.com',
+    },
+    storage: {
+      headShareableFile: async ({ key }) => {
+        sharedKey = key;
+        return { ContentLength: 12 };
+      },
+      headFile: async () => { managerStorageCalled = true; },
+    },
+    FileOperationModel: { findOne: async () => null },
+    FileShareModel: {
+      create: async (share) => ({ _id: 'share-1', ...share }),
+    },
+    FileAuditEventModel: { create: async () => ({}) },
+    authenticateMiddleware: (req, res, next) => {
+      if (req.header('authorization') !== 'Bearer valid') {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      req.user = { uid: 'test-user', role: 'moderator' };
+      return next();
+    },
+    authorizeMiddleware: (req, res, next) => next(),
+  }));
+  const server = await new Promise((resolve) => {
+    const listeningServer = app.listen(0, () => resolve(listeningServer));
+  });
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/files/shares`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer valid', 'content-type': 'application/json' },
+      body: JSON.stringify({ key: 'files-sync/nas/photo.jpg' }),
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(sharedKey, 'files-sync/nas/photo.jpg');
+    assert.equal(managerStorageCalled, false);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

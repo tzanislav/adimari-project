@@ -22,15 +22,15 @@ test('a valid public link exposes metadata without counting, then returns a sign
     _id: '507f1f77bcf86cd799439011',
     tokenHash,
     status: 'active',
-    s3Key: 'files/Projects/proposal.pdf',
+    s3Key: 'files-sync/nas/proposal.pdf',
     originalFileName: 'proposal.pdf',
   };
   let updateCalled = false;
   const app = await startApp(createPublicDownloadRoutes({
-    config: { prefix: 'files/', publicBaseUrl: 'https://adimari-db.com' },
+    config: { prefix: 'files/', shareablePrefixes: ['files/', 'files-sync/'], publicBaseUrl: 'https://adimari-db.com' },
     storage: {
-      headFile: async () => ({ ContentLength: 123 }),
-      getDownloadUrl: async () => 'https://signed.example/download',
+      headShareableFile: async () => ({ ContentLength: 123 }),
+      getShareableDownloadUrl: async () => 'https://signed.example/download',
     },
     FileShareModel: {
       findOne: () => ({ select: async () => share }),
@@ -60,10 +60,10 @@ test('a valid public link exposes metadata without counting, then returns a sign
 test('an invalid public link returns a generic not-found response without querying S3', async () => {
   let storageCalled = false;
   const app = await startApp(createPublicDownloadRoutes({
-    config: { prefix: 'files/', publicBaseUrl: 'https://adimari-db.com' },
+    config: { prefix: 'files/', shareablePrefixes: ['files/'], publicBaseUrl: 'https://adimari-db.com' },
     storage: {
-      headFile: async () => { storageCalled = true; },
-      getDownloadUrl: async () => { storageCalled = true; },
+      headShareableFile: async () => { storageCalled = true; },
+      getShareableDownloadUrl: async () => { storageCalled = true; },
     },
     FileShareModel: {},
     FileAuditEventModel: { create: async () => ({}) },

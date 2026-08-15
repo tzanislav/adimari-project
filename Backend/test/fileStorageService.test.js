@@ -8,6 +8,7 @@ const {
   createFileStorageService,
   mapS3Error,
 } = require('../services/fileStorageService');
+const { FileStorageValidationError } = require('../services/fileStorageValidation');
 
 const config = {
   region: 'eu-west-1',
@@ -68,6 +69,48 @@ test('generates attachment disposition and maps S3 access failures without expos
   const mapped = mapS3Error({ name: 'AccessDenied', message: 'raw AWS detail' });
   assert.equal(mapped.code, 'FILE_STORAGE_ACCESS_DENIED');
   assert.equal(mapped.message, 'File storage access was denied.');
+});
+
+test('allows a File Sync prefix only through the dedicated share operations', async () => {
+  const commands = [];
+  const service = createFileStorageService({
+    config: {
+      ...config,
+      shareablePrefixes: ['files/', 'files-sync/'],
+    },
+    client: {
+      send: async (command) => {
+        commands.push(command);
+        return { ContentLength: 456 };
+      },
+    },
+    signUrl: async (_client, command) => {
+      commands.push(command);
+      return 'https://signed.example/file-sync-download';
+    },
+  });
+
+  await assert.rejects(
+    service.headFile({ key: 'files-sync/nas/photo.jpg' }),
+    FileStorageValidationError,
+  );
+  await assert.rejects(
+    service.getDownloadUrl({ key: 'files-sync/nas/photo.jpg', fileName: 'photo.jpg' }),
+    FileStorageValidationError,
+  );
+
+  const object = await service.headShareableFile({ key: 'files-sync/nas/photo.jpg' });
+  const url = await service.getShareableDownloadUrl({
+    key: 'files-sync/nas/photo.jpg',
+    fileName: 'photo.jpg',
+  });
+
+  assert.equal(object.ContentLength, 456);
+  assert.equal(url, 'https://signed.example/file-sync-download');
+  assert.equal(commands[0].constructor.name, 'HeadObjectCommand');
+  assert.equal(commands[0].input.Key, 'files-sync/nas/photo.jpg');
+  assert.equal(commands[1].constructor.name, 'GetObjectCommand');
+  assert.equal(commands[1].input.Key, 'files-sync/nas/photo.jpg');
 });
 
 test('calculates managed usage without counting hidden folder markers as files', async () => {

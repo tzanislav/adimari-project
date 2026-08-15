@@ -27,6 +27,7 @@ test('creates isolated file-server configuration with dedicated IAM credentials'
 
   assert.equal(config.bucketName, 'adimari-private-files-prod');
   assert.equal(config.prefix, 'files/');
+  assert.deepEqual(config.shareablePrefixes, ['files/']);
   assert.equal(config.publicBaseUrl, 'https://adimari-db.com');
   assert.deepEqual(config.credentials, {
     accessKeyId: 'AKIAEXAMPLE',
@@ -43,6 +44,15 @@ test('allows IAM-role credentials when both file-server access-key variables are
   assert.equal(config.credentials, undefined);
 });
 
+test('adds one validated File Sync prefix only to the share allow-list', () => {
+  const config = createFileServerConfig(createEnvironment({
+    FILE_SYNC_S3_PREFIX: 'files-sync',
+  }));
+
+  assert.deepEqual(config.shareablePrefixes, ['files/', 'files-sync/']);
+  assert.equal(config.prefix, 'files/');
+});
+
 test('rejects partial credentials, unsafe prefixes, and non-origin public URLs', () => {
   assert.throws(
     () => createFileServerConfig(createEnvironment({ FILE_SERVER_AWS_SECRET_ACCESS_KEY: '' })),
@@ -50,6 +60,10 @@ test('rejects partial credentials, unsafe prefixes, and non-origin public URLs',
   );
   assert.throws(
     () => createFileServerConfig(createEnvironment({ FILE_SERVER_S3_PREFIX: '../files' })),
+    FileServerConfigurationError,
+  );
+  assert.throws(
+    () => createFileServerConfig(createEnvironment({ FILE_SYNC_S3_PREFIX: '../files-sync' })),
     FileServerConfigurationError,
   );
   assert.throws(

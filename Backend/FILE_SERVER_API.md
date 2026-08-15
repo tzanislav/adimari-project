@@ -43,3 +43,7 @@ Moves use S3 copy-then-delete. After S3 succeeds, active share records are updat
 | `GET /download/:token` | Backwards-compatible route: redirects an old direct link to the branded share page. |
 
 Share tokens contain 256 bits of randomness and only their SHA-256 hashes are stored. Public endpoints return the same generic 404 for malformed, revoked, or unknown links and never list S3 contents. The Download button obtains a short-lived signed URL for the single requested object, which is necessary to download very large files directly from S3 without proxying them through the backend.
+
+### File Sync share namespace
+
+Set the optional `FILE_SYNC_S3_PREFIX` only when File Sync uses the same S3 bucket and its objects must be shareable through this API. The value is validated as a single safe prefix (for example, `files-sync/`). It is accepted only by share creation, share listing, and the public share-download path; file-manager browse, upload, move, and delete operations remain confined to `FILE_SERVER_S3_PREFIX`.

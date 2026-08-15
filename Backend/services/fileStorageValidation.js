@@ -94,6 +94,26 @@ const assertManagedS3Key = (value, prefix) => {
   return key;
 };
 
+// A deliberately narrow allow-list variant for workflows which need to
+// reference a second, explicitly configured S3 namespace.  Callers must opt
+// in to this helper; the normal file-manager operations continue to use
+// assertManagedS3Key with the primary prefix only.
+const assertS3KeyWithinPrefixes = (value, prefixes) => {
+  if (!Array.isArray(prefixes) || prefixes.length === 0) {
+    throw new FileStorageValidationError('At least one managed S3 prefix is required.');
+  }
+
+  const key = requireString(value, 'S3 key');
+  const normalizedPrefixes = prefixes.map((prefix) => normalizeManagedPrefix(prefix));
+  const matchingPrefix = normalizedPrefixes.find((prefix) => key.startsWith(prefix));
+
+  if (!matchingPrefix) {
+    throw new FileStorageValidationError('S3 key is outside the allowed share prefixes.');
+  }
+
+  return assertManagedS3Key(key, matchingPrefix);
+};
+
 const createManagedS3Key = ({ prefix, folder = '', fileName }) => {
   const normalizedPrefix = normalizeManagedPrefix(prefix);
   const normalizedFolder = normalizeFolderPath(folder);
@@ -144,6 +164,7 @@ module.exports = {
   MAX_S3_MULTIPART_PARTS,
   MIN_S3_MULTIPART_PART_BYTES,
   assertManagedS3Key,
+  assertS3KeyWithinPrefixes,
   computeMultipartPartSize,
   createManagedS3Key,
   normalizeContentType,

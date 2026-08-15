@@ -14,6 +14,7 @@ const {
 const {
   FileStorageValidationError,
   assertManagedS3Key,
+  assertS3KeyWithinPrefixes,
   computeMultipartPartSize,
   createManagedS3Key,
   normalizeContentType,
@@ -78,6 +79,10 @@ const createFileRoutes = (dependencies = {}) => {
   const authenticateMiddleware = dependencies.authenticateMiddleware || authenticate;
   const authorizeMiddleware = dependencies.authorizeMiddleware || authorizeRole(['admin', 'moderator']);
   const router = express.Router();
+  const shareableKey = (key) => assertS3KeyWithinPrefixes(
+    key,
+    config.shareablePrefixes || [config.prefix],
+  );
 
   const audit = async (event) => {
     try {
@@ -203,7 +208,7 @@ const createFileRoutes = (dependencies = {}) => {
 
   router.get('/shares', async (req, res) => {
     try {
-      const key = assertManagedS3Key(String(req.query.key || ''), config.prefix);
+      const key = shareableKey(String(req.query.key || ''));
       const shares = await FileShareModel.find({ s3Key: key }).sort({ createdAt: -1 }).lean();
       res.json({ key, shares: shares.map(serializeShare) });
     } catch (error) {
@@ -217,8 +222,8 @@ const createFileRoutes = (dependencies = {}) => {
       if (!actorUid) {
         throw new FileStorageValidationError('Authenticated user identity is required.');
       }
-      const key = assertManagedS3Key(String(req.body?.key || ''), config.prefix);
-      await storage.headFile({ key });
+      const key = shareableKey(String(req.body?.key || ''));
+      await storage.headShareableFile({ key });
       const originalFileName = key.slice(key.lastIndexOf('/') + 1);
       let createdShare;
       let rawToken;
