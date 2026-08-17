@@ -288,3 +288,196 @@ test('moving a source file revokes affected folder snapshots and cleans up their
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('an empty file upload is completed server-side without starting a multipart upload', async () => {
+  const app = express();
+  app.use(express.json());
+  let putEmptyArguments;
+  let multipartStarted = false;
+  const auditEvents = [];
+  const operation = {
+    _id: '507f1f77bcf86cd799439014',
+    status: 'pending',
+    save: async () => operation,
+  };
+
+  app.use('/api/files', createFileRoutes({
+    config: { prefix: 'files/', multipartPartSizeBytes: 8 * 1024 * 1024 },
+    storage: {
+      headFile: async () => {
+        throw new FileStorageError({ code: 'FILE_NOT_FOUND', message: 'missing', status: 404 });
+      },
+      putEmptyFile: async (arguments_) => {
+        putEmptyArguments = arguments_;
+        return {
+          key: arguments_.key,
+          ContentLength: 0,
+          ETag: 'empty-etag',
+          ContentType: arguments_.contentType,
+          VersionId: 'empty-version',
+        };
+      },
+      createMultipartUpload: async () => {
+        multipartStarted = true;
+        return { uploadId: 'should-not-be-used' };
+      },
+    },
+    FileOperationModel: {
+      findOne: async () => null,
+      create: async (attributes) => {
+        Object.assign(operation, attributes);
+        return operation;
+      },
+    },
+    FileAuditEventModel: { create: async (event) => { auditEvents.push(event); return event; } },
+    authenticateMiddleware: (req, res, next) => {
+      if (req.header('authorization') !== 'Bearer valid') return res.status(401).json({ error: 'Unauthorized' });
+      req.user = { uid: 'test-user', role: 'moderator' };
+      return next();
+    },
+    authorizeMiddleware: (req, res, next) => next(),
+  }));
+  const server = await new Promise((resolve) => {
+    const listeningServer = app.listen(0, () => resolve(listeningServer));
+  });
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/files/uploads`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer valid', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        folder: 'Projects/2026',
+        fileName: 'empty.txt',
+        size: 0,
+        contentType: 'text/plain',
+      }),
+    });
+
+    assert.equal(response.status, 201);
+    const body = await response.json();
+    assert.equal(body.completed, true);
+    assert.equal(body.key, 'files/Projects/2026/empty.txt');
+    assert.deepEqual(body.file, {
+      key: 'files/Projects/2026/empty.txt',
+      name: 'empty.txt',
+      size: 0,
+      eTag: 'empty-etag',
+      contentType: 'text/plain',
+      versionId: 'empty-version',
+    });
+    assert.deepEqual(putEmptyArguments, {
+      key: 'files/Projects/2026/empty.txt',
+      contentType: 'text/plain',
+      preventOverwrite: true,
+    });
+    assert.equal(multipartStarted, false);
+    assert.equal(operation.status, 'completed');
+    assert.equal(operation.context.uploadMode, 'empty-object');
+    assert.deepEqual(auditEvents.map(({ action, result }) => ({ action, result })), [
+      { action: 'upload_started', result: 'success' },
+      { action: 'upload_completed', result: 'success' },
+    ]);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('uploads reject reserved folder markers, non-numeric sizes, and configured size limits', async () => {
+  const app = express();
+  app.use(express.json());
+  let storageTouched = false;
+  app.use('/api/files', createFileRoutes({
+    config: { prefix: 'files/', multipartPartSizeBytes: 8 * 1024 * 1024, maxUploadBytes: 10 },
+    storage: {
+      headFile: async () => {
+        storageTouched = true;
+        throw new Error('Storage must not be called for rejected uploads.');
+      },
+    },
+    FileOperationModel: { findOne: async () => null },
+    FileAuditEventModel: { create: async () => ({}) },
+    authenticateMiddleware: (req, res, next) => {
+      req.user = { uid: 'test-user', role: 'moderator' };
+      next();
+    },
+    authorizeMiddleware: (req, res, next) => next(),
+  }));
+  const server = await new Promise((resolve) => {
+    const listeningServer = app.listen(0, () => resolve(listeningServer));
+  });
+  const url = `http://127.0.0.1:${server.address().port}/api/files/uploads`;
+
+  try {
+    const marker = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ folder: 'Projects', fileName: '.keep', size: 0 }),
+    });
+    const stringSize = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ folder: 'Projects', fileName: 'empty.txt', size: '0' }),
+    });
+    const tooLarge = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ folder: 'Projects', fileName: 'large.txt', size: 11 }),
+    });
+
+    assert.equal(marker.status, 400);
+    assert.equal(stringSize.status, 400);
+    assert.equal(tooLarge.status, 413);
+    assert.equal(storageTouched, false);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('multipart lifecycle operations are scoped to the uploading user', async () => {
+  const app = express();
+  app.use(express.json());
+  const filters = [];
+  app.use('/api/files', createFileRoutes({
+    config: { prefix: 'files/' },
+    storage: {},
+    FileOperationModel: {
+      findOne: async (filter) => {
+        filters.push(filter);
+        return null;
+      },
+    },
+    FileAuditEventModel: { create: async () => ({}) },
+    authenticateMiddleware: (req, res, next) => {
+      req.user = { uid: 'test-user', role: 'moderator' };
+      next();
+    },
+    authorizeMiddleware: (req, res, next) => next(),
+  }));
+  const server = await new Promise((resolve) => {
+    const listeningServer = app.listen(0, () => resolve(listeningServer));
+  });
+  const operationId = '507f1f77bcf86cd799439099';
+  const baseUrl = `http://127.0.0.1:${server.address().port}/api/files/uploads/${operationId}`;
+
+  try {
+    const parts = await fetch(`${baseUrl}/parts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ partNumbers: [1] }),
+    });
+    const complete = await fetch(`${baseUrl}/complete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ parts: [{ partNumber: 1, eTag: 'etag' }] }),
+    });
+    const abort = await fetch(`${baseUrl}/abort`, { method: 'POST' });
+
+    assert.equal(parts.status, 404);
+    assert.equal(complete.status, 404);
+    assert.equal(abort.status, 404);
+    assert.equal(filters.length, 3);
+    assert.ok(filters.every((filter) => filter.actorUid === 'test-user'));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

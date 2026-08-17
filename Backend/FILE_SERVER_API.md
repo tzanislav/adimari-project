@@ -15,13 +15,31 @@ All endpoints below require a Firebase bearer token from a user with the `modera
 
 ## Multipart upload lifecycle
 
-1. `POST /api/files/uploads` with `folder`, `fileName`, `size`, optional `contentType`, and optional `conflictStrategy` (`cancel` or explicit `replace`).
+1. `POST /api/files/uploads` with `folder`, `fileName`, `size`, optional `contentType`, and optional `conflictStrategy` (`cancel` or explicit `replace`). `size` must be a non-negative integer within `FILE_SERVER_MAX_UPLOAD_BYTES`; `.keep` is reserved for internal folder markers and cannot be uploaded as a user file.
 2. `POST /api/files/uploads/:operationId/parts` with `{ "partNumbers": [1, 2] }` to receive a short-lived signed URL for each requested part.
 3. Upload each part directly to S3, keeping the returned ETag.
 4. `POST /api/files/uploads/:operationId/complete` with `{ "parts": [{ "partNumber": 1, "eTag": "..." }] }`.
 5. If the client cancels, call `POST /api/files/uploads/:operationId/abort`.
 
 For a new file, completion uses S3's `If-None-Match: *` precondition so an object created after conflict checking is not silently overwritten.
+
+For a zero-byte file, the creation request writes the empty object directly and
+returns `{ "completed": true }`; clients must skip the part and completion
+steps. All multipart lifecycle requests are scoped to the authenticated user
+who created the upload operation.
+
+## Folder uploads
+
+The File Server UI can upload a local folder or a dragged folder. It preserves
+the selected top-level folder and every non-empty nested path beneath the
+currently open File Server folder by submitting each file through the normal
+upload lifecycle with its derived parent `folder` value. S3 represents those
+paths as prefixes, so no separate S3 folder object is needed for non-empty
+directories.
+
+Native browser folder pickers expose files, not empty directories. Create any
+empty directories separately with `POST /api/files/folders` (or the **New
+folder** UI action) before or after importing the files.
 
 ## Move and delete
 

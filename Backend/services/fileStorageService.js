@@ -47,6 +47,7 @@ const mapS3Error = (error) => {
     NoSuchBucket: ['FILE_STORAGE_UNAVAILABLE', 'The file storage bucket is unavailable.', 503],
     AccessDenied: ['FILE_STORAGE_ACCESS_DENIED', 'File storage access was denied.', 502],
     PreconditionFailed: ['FILE_CONFLICT', 'The file changed before the operation completed.', 409],
+    ConditionalRequestConflict: ['FILE_CONFLICT', 'The file changed before the operation completed.', 409],
     EntityTooLarge: ['FILE_TOO_LARGE', 'The file exceeds the configured storage limit.', 413],
     InvalidRequest: ['FILE_STORAGE_INVALID_REQUEST', 'The file storage request is invalid.', 400],
     InvalidArgument: ['FILE_STORAGE_INVALID_REQUEST', 'The file storage request is invalid.', 400],
@@ -373,6 +374,30 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
       }
 
       return { key, uploadId: result.UploadId };
+    },
+
+    // Empty files use a regular PutObject request rather than a zero-byte
+    // multipart upload. The request body is always empty, so user file bytes
+    // never pass through the API server.
+    async putEmptyFile({ key, contentType, preventOverwrite = false } = {}) {
+      const managedS3Key = managedKey(key);
+      const normalizedContentType = normalizeContentType(contentType);
+      const result = await send(new PutObjectCommand({
+        Bucket: config.bucketName,
+        Key: managedS3Key,
+        Body: Buffer.alloc(0),
+        ContentLength: 0,
+        ContentType: normalizedContentType,
+        ...(preventOverwrite === true ? { IfNoneMatch: '*' } : {}),
+      }));
+
+      return {
+        key: managedS3Key,
+        ContentLength: 0,
+        ETag: result.ETag || null,
+        ContentType: normalizedContentType,
+        VersionId: result.VersionId || null,
+      };
     },
 
     async createMultipartPartUrls({ key, uploadId, partNumbers, expiresIn = config.uploadPartUrlTtlSeconds } = {}) {

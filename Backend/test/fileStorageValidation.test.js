@@ -38,6 +38,13 @@ test('increases multipart part size to remain below the S3 part-count limit', ()
   assert.ok(Math.ceil(fileSize / partSize) <= MAX_S3_MULTIPART_PARTS);
 });
 
+test('keeps zero-byte objects out of the multipart upload path', () => {
+  assert.throws(
+    () => computeMultipartPartSize({ fileSize: 0, preferredPartSize: 8 * 1024 * 1024 }),
+    FileStorageValidationError,
+  );
+});
+
 test('allows safe content types and rejects malformed values', () => {
   assert.equal(normalizeContentType('application/pdf'), 'application/pdf');
   assert.throws(() => normalizeContentType('application/pdf\nX-Test: injected'), FileStorageValidationError);

@@ -62,6 +62,40 @@ test('uses an S3 no-overwrite precondition when completing a new multipart uploa
   assert.deepEqual(capturedCommand.input.MultipartUpload.Parts, [{ PartNumber: 1, ETag: 'etag-1' }]);
 });
 
+test('writes an empty managed file with the same no-overwrite precondition', async () => {
+  let capturedCommand;
+  const service = createFileStorageService({
+    config,
+    client: {
+      send: async (command) => {
+        capturedCommand = command;
+        return { ETag: 'empty-etag', VersionId: 'version-1' };
+      },
+    },
+  });
+
+  const object = await service.putEmptyFile({
+    key: 'files/Projects/empty.txt',
+    contentType: 'text/plain',
+    preventOverwrite: true,
+  });
+
+  assert.equal(capturedCommand.constructor.name, 'PutObjectCommand');
+  assert.equal(capturedCommand.input.Key, 'files/Projects/empty.txt');
+  assert.equal(capturedCommand.input.ContentLength, 0);
+  assert.equal(capturedCommand.input.ContentType, 'text/plain');
+  assert.equal(capturedCommand.input.IfNoneMatch, '*');
+  assert.ok(Buffer.isBuffer(capturedCommand.input.Body));
+  assert.equal(capturedCommand.input.Body.length, 0);
+  assert.deepEqual(object, {
+    key: 'files/Projects/empty.txt',
+    ContentLength: 0,
+    ETag: 'empty-etag',
+    ContentType: 'text/plain',
+    VersionId: 'version-1',
+  });
+});
+
 test('generates attachment disposition and maps S3 access failures without exposing raw errors', () => {
   const disposition = buildDownloadDisposition('Résumé.pdf');
   assert.match(disposition, /^attachment;/);
@@ -70,6 +104,10 @@ test('generates attachment disposition and maps S3 access failures without expos
   const mapped = mapS3Error({ name: 'AccessDenied', message: 'raw AWS detail' });
   assert.equal(mapped.code, 'FILE_STORAGE_ACCESS_DENIED');
   assert.equal(mapped.message, 'File storage access was denied.');
+
+  const conditionalConflict = mapS3Error({ name: 'ConditionalRequestConflict' });
+  assert.equal(conditionalConflict.code, 'FILE_CONFLICT');
+  assert.equal(conditionalConflict.status, 409);
 });
 
 test('allows a File Sync prefix only through the dedicated share operations', async () => {

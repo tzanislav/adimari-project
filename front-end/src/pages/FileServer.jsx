@@ -7,6 +7,7 @@ const serverUrl = import.meta.env.VITE_SERVER_URL || '';
 const apiBase = `${serverUrl}/api/files`;
 const UPLOAD_URL_BATCH_SIZE = 20;
 const UPLOAD_CONCURRENCY = 3;
+const FOLDER_MARKER_FILE_NAME = '.keep';
 
 class FileServerApiError extends Error {
   constructor(message, { status, data } = {}) {
@@ -51,6 +52,72 @@ const formatBytes = (value = 0) => {
 const formatDate = (value) => (value ? new Date(value).toLocaleString() : 'Never');
 
 const folderPath = (folder, name) => (folder ? `${folder}/${name}` : name);
+
+const relativePathSegments = (relativePath) => {
+  if (typeof relativePath !== 'string' || !relativePath
+    || relativePath.startsWith('/') || relativePath.includes('\\')) {
+    return null;
+  }
+  const segments = relativePath.split('/');
+  if (!segments.length || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+    return null;
+  }
+  return segments;
+};
+
+const uploadItemForRelativePath = (file, relativePath, destinationRoot) => {
+  const segments = relativePathSegments(relativePath);
+  if (!segments) return null;
+
+  const fileName = segments.at(-1);
+  const relativeFolder = segments.slice(0, -1).join('/');
+  return {
+    file,
+    fileName,
+    targetFolder: relativeFolder ? folderPath(destinationRoot, relativeFolder) : destinationRoot,
+    displayName: segments.join('/'),
+  };
+};
+
+const readDirectoryEntries = (reader) => new Promise((resolve, reject) => {
+  const entries = [];
+  const readNextBatch = () => {
+    reader.readEntries((batch) => {
+      if (!batch.length) {
+        resolve(entries);
+        return;
+      }
+      entries.push(...batch);
+      readNextBatch();
+    }, reject);
+  };
+  readNextBatch();
+});
+
+const readFileEntry = (entry) => new Promise((resolve, reject) => entry.file(resolve, reject));
+
+const collectDroppedFiles = async (entries) => {
+  const files = [];
+
+  const visit = async (entry, parentPath = '') => {
+    const relativePath = parentPath ? `${parentPath}/${entry.name}` : entry.name;
+    if (entry.isFile) {
+      files.push({ file: await readFileEntry(entry), relativePath });
+      return;
+    }
+    if (!entry.isDirectory) return;
+
+    const children = await readDirectoryEntries(entry.createReader());
+    for (const child of children) {
+      await visit(child, relativePath);
+    }
+  };
+
+  for (const entry of entries) {
+    await visit(entry);
+  }
+  return files;
+};
 
 const getFolderArchiveStatus = (share) => share?.archive?.status || 'queued';
 const folderSnapshotNeedsNewLink = (share) => ['FILE_NOT_FOUND', 'FILE_CONFLICT', 'FOLDER_SHARE_SNAPSHOT_INVALID']
@@ -312,6 +379,7 @@ function FileServer() {
   const [notice, setNotice] = useState('');
   const [folderName, setFolderName] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [readingDroppedFolder, setReadingDroppedFolder] = useState(false);
   const [uploadState, setUploadState] = useState(null);
   const [moveDialog, setMoveDialog] = useState(null);
   const [moveFolders, setMoveFolders] = useState([]);
@@ -323,6 +391,25 @@ function FileServer() {
   const [folderShareDialog, setFolderShareDialog] = useState(null);
   const [stats, setStats] = useState(null);
   const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
+  const uploadInProgressRef = useRef(false);
+  const uploadQueueRef = useRef(null);
+  const dropCollectionInProgressRef = useRef(false);
+
+  const setFolderInputRef = useCallback((input) => {
+    folderInputRef.current = input;
+    if (input) {
+      // `webkitdirectory` is the directory-picker API supported by current
+      // Chromium, Safari, and Firefox browsers. Setting the attribute here
+      // avoids React treating the non-standard property as a boolean prop.
+      input.setAttribute('webkitdirectory', '');
+    }
+  }, []);
+
+  const navigateToFolder = (nextFolder) => {
+    if (uploadInProgressRef.current || dropCollectionInProgressRef.current) return;
+    setFolder(nextFolder);
+  };
 
   const loadFolder = useCallback(async ({ cursor = null, append = false, targetFolder = folder } = {}) => {
     try {
@@ -377,22 +464,41 @@ function FileServer() {
     }
   };
 
-  const uploadFile = async (file, { fileName = file.name, conflictStrategy = 'cancel' } = {}) => {
+  const uploadFile = async (file, {
+    fileName = file.name,
+    targetFolder = folder,
+    displayName = fileName,
+    statusPrefix = '',
+    conflictStrategy = 'cancel',
+    refreshAfterUpload = true,
+    showSuccessNotice = true,
+  } = {}) => {
     let operationId = null;
+    const withStatusPrefix = (status) => `${statusPrefix}${status}`;
     try {
       setError('');
       setNotice('');
-      setUploadState({ fileName, totalBytes: file.size, uploadedBytes: 0, status: 'Preparing upload…' });
+      setUploadState({ fileName: displayName, totalBytes: file.size, uploadedBytes: 0, status: withStatusPrefix('Preparing upload…') });
       const upload = await apiRequest('/uploads', {
         method: 'POST',
         body: {
-          folder,
+          folder: targetFolder,
           fileName,
           size: file.size,
           contentType: file.type || 'application/octet-stream',
           conflictStrategy,
         },
       });
+
+      // Zero-byte files are saved by the API immediately because S3 multipart
+      // uploads require at least one non-empty part.
+      if (upload.completed) {
+        setUploadState((previous) => ({ ...previous, uploadedBytes: previous.totalBytes, status: withStatusPrefix('Upload complete') }));
+        if (showSuccessNotice) setNotice(`Uploaded “${fileName}”.`);
+        if (refreshAfterUpload) await refresh();
+        return { status: 'completed' };
+      }
+
       operationId = upload.operationId;
       const partCount = Math.ceil(file.size / upload.partSize);
       const completedParts = [];
@@ -402,7 +508,7 @@ function FileServer() {
           { length: Math.min(UPLOAD_URL_BATCH_SIZE, partCount - batchStart + 1) },
           (_, index) => batchStart + index,
         );
-        setUploadState((previous) => ({ ...previous, status: `Uploading part ${batchStart} of ${partCount}…` }));
+        setUploadState((previous) => ({ ...previous, status: withStatusPrefix(`Uploading part ${batchStart} of ${partCount}…`) }));
         const signedParts = await apiRequest(`/uploads/${operationId}/parts`, { method: 'POST', body: { partNumbers } });
         await runWithConcurrency(signedParts.parts, UPLOAD_CONCURRENCY, async ({ partNumber, url }) => {
           const startByte = (partNumber - 1) * upload.partSize;
@@ -423,22 +529,24 @@ function FileServer() {
         });
       }
 
-      setUploadState((previous) => ({ ...previous, status: 'Finalising file…' }));
+      setUploadState((previous) => ({ ...previous, status: withStatusPrefix('Finalising file…') }));
       await apiRequest(`/uploads/${operationId}/complete`, { method: 'POST', body: { parts: completedParts } });
-      setUploadState((previous) => ({ ...previous, uploadedBytes: previous.totalBytes, status: 'Upload complete' }));
-      setNotice(`Uploaded “${fileName}”.`);
-      await refresh();
-      return true;
+      setUploadState((previous) => ({ ...previous, uploadedBytes: previous.totalBytes, status: withStatusPrefix('Upload complete') }));
+      if (showSuccessNotice) setNotice(`Uploaded “${fileName}”.`);
+      if (refreshAfterUpload) await refresh();
+      return { status: 'completed' };
     } catch (requestError) {
       if (requestError instanceof FileServerApiError && requestError.status === 409 && requestError.data?.code === 'FILE_NAME_CONFLICT') {
-        setUploadState(null);
+        setUploadState({ fileName: displayName, totalBytes: file.size, uploadedBytes: 0, status: 'Waiting for your conflict choice' });
         setConflict({
           kind: 'upload',
           file,
           fileName,
+          targetFolder,
+          displayName,
           existingFile: requestError.data.existingFile,
         });
-        return false;
+        return { status: 'conflict' };
       }
       if (operationId) {
         try {
@@ -449,19 +557,142 @@ function FileServer() {
       }
       setUploadState((previous) => (previous ? { ...previous, status: 'Upload failed' } : null));
       setError(requestError.message || 'Upload failed.');
-      return false;
+      return { status: 'failed', error: requestError.message || 'Upload failed.' };
     }
+  };
+
+  const finishUploadQueue = async (queue, { failureMessage, cancelled = false } = {}) => {
+    if (uploadQueueRef.current === queue) uploadQueueRef.current = null;
+    try {
+      if (queue.completedCount) await refresh();
+      if (failureMessage) {
+        // Refreshing successful earlier files clears request errors, so restore
+        // the actionable failure once the list has been updated.
+        setError(failureMessage);
+      } else if (cancelled) {
+        setNotice(`Stopped after uploading ${queue.completedCount} file${queue.completedCount === 1 ? '' : 's'}.`);
+      } else {
+        setNotice(`Uploaded ${queue.completedCount} file${queue.completedCount === 1 ? '' : 's'}${queue.preservesFolderStructure ? ' with its folder structure preserved' : ''}.`);
+      }
+    } finally {
+      uploadInProgressRef.current = false;
+      setUploadState(null);
+    }
+  };
+
+  const continueUploadQueue = async () => {
+    const queue = uploadQueueRef.current;
+    if (!queue) return;
+
+    try {
+      while (queue.nextIndex < queue.items.length) {
+        const item = queue.items[queue.nextIndex];
+        const result = await uploadFile(item.file, {
+          fileName: item.fileName,
+          targetFolder: item.targetFolder,
+          displayName: item.displayName,
+          statusPrefix: queue.items.length > 1 ? `File ${queue.nextIndex + 1} of ${queue.items.length} — ` : '',
+          refreshAfterUpload: false,
+          showSuccessNotice: false,
+        });
+        if (result.status === 'completed') {
+          queue.nextIndex += 1;
+          queue.completedCount += 1;
+          continue;
+        }
+        if (result.status === 'conflict') return;
+        await finishUploadQueue(queue, { failureMessage: result.error });
+        return;
+      }
+      await finishUploadQueue(queue);
+    } catch (queueError) {
+      await finishUploadQueue(queue, { failureMessage: queueError.message || 'Upload failed.' });
+    }
+  };
+
+  const queueUploadItems = (items, { preservesFolderStructure = false } = {}) => {
+    const selectedItems = items.filter(Boolean);
+    if (!selectedItems.length || uploadInProgressRef.current) return;
+    const markerFile = selectedItems.find((item) => item.fileName === FOLDER_MARKER_FILE_NAME);
+    if (markerFile) {
+      setError(`“${markerFile.displayName}” cannot be uploaded because .keep is reserved for File Server folder markers. Rename it and try again.`);
+      return;
+    }
+    uploadInProgressRef.current = true;
+    uploadQueueRef.current = {
+      items: selectedItems,
+      nextIndex: 0,
+      completedCount: 0,
+      preservesFolderStructure,
+    };
+    void continueUploadQueue();
   };
 
   const queueFiles = (files) => {
     const selectedFiles = Array.from(files || []);
-    if (!selectedFiles.length || uploadState) return;
-    void (async () => {
-      for (const file of selectedFiles) {
-        const completed = await uploadFile(file);
-        if (!completed) break;
+    queueUploadItems(selectedFiles.map((file) => ({
+      file,
+      fileName: file.name,
+      targetFolder: folder,
+      displayName: file.name,
+    })));
+  };
+
+  const queueFolderFiles = (files) => {
+    const selectedFiles = Array.from(files || []);
+    if (!selectedFiles.length) {
+      setNotice('No files were found in that folder. Browser folder pickers cannot include empty folders.');
+      return;
+    }
+    const uploadItems = selectedFiles.map((file) => uploadItemForRelativePath(file, file.webkitRelativePath, folder));
+    if (uploadItems.some((item) => !item)) {
+      setError('This browser did not provide the folder paths. Use a current version of Chrome, Edge, Safari, or Firefox to upload a folder.');
+      return;
+    }
+    queueUploadItems(uploadItems, { preservesFolderStructure: true });
+  };
+
+  const openFolderPicker = () => {
+    const input = folderInputRef.current;
+    if (!input) return;
+    if (!('webkitdirectory' in input)) {
+      setError('This browser does not support folder uploads. Use a current version of Chrome, Edge, Safari, or Firefox.');
+      return;
+    }
+    input.click();
+  };
+
+  const queueDroppedFiles = async (dataTransfer) => {
+    if (uploadInProgressRef.current || dropCollectionInProgressRef.current) return;
+
+    const entries = Array.from(dataTransfer.items || [])
+      .map((item) => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
+      .filter(Boolean);
+    if (!entries.length) {
+      queueFiles(dataTransfer.files);
+      return;
+    }
+
+    dropCollectionInProgressRef.current = true;
+    setReadingDroppedFolder(true);
+    try {
+      const droppedFiles = await collectDroppedFiles(entries);
+      if (!droppedFiles.length) {
+        setNotice('No files were found in the dropped folder. Browser folder uploads cannot preserve empty folders.');
+        return;
       }
-    })();
+      const uploadItems = droppedFiles.map(({ file, relativePath }) => uploadItemForRelativePath(file, relativePath, folder));
+      if (uploadItems.some((item) => !item)) {
+        setError('A dropped item has an invalid folder path and was not uploaded.');
+        return;
+      }
+      queueUploadItems(uploadItems, { preservesFolderStructure: entries.some((entry) => entry.isDirectory) });
+    } catch (dropError) {
+      setError(dropError.message || 'The dropped folder could not be read.');
+    } finally {
+      dropCollectionInProgressRef.current = false;
+      setReadingDroppedFolder(false);
+    }
   };
 
   const submitMove = async ({ destinationFolder, destinationFileName }, conflictStrategy = 'cancel') => {
@@ -719,11 +950,38 @@ function FileServer() {
   const resolveConflict = (choice, newName) => {
     if (!conflict) return;
     if (conflict.kind === 'upload') {
+      const fileName = choice === 'rename' ? newName : conflict.fileName;
+      const displayName = conflict.displayName || conflict.fileName;
+      const targetFolder = conflict.targetFolder;
+      const queue = uploadQueueRef.current;
+      const nextDisplayName = choice === 'rename' ? displayName.replace(/[^/]+$/, fileName) : displayName;
       setConflict(null);
-      void uploadFile(conflict.file, {
-        fileName: choice === 'rename' ? newName : conflict.fileName,
-        conflictStrategy: choice === 'replace' ? 'replace' : 'cancel',
-      });
+      void (async () => {
+        if (queue?.items[queue.nextIndex]?.file === conflict.file) {
+          queue.items[queue.nextIndex] = {
+            ...queue.items[queue.nextIndex],
+            fileName,
+            targetFolder,
+            displayName: nextDisplayName,
+          };
+        }
+        const result = await uploadFile(conflict.file, {
+          fileName,
+          targetFolder,
+          displayName: nextDisplayName,
+          conflictStrategy: choice === 'replace' ? 'replace' : 'cancel',
+          refreshAfterUpload: !queue,
+          showSuccessNotice: !queue,
+        });
+        if (!queue || uploadQueueRef.current !== queue) return;
+        if (result.status === 'completed') {
+          queue.nextIndex += 1;
+          queue.completedCount += 1;
+          void continueUploadQueue();
+        } else if (result.status === 'failed') {
+          await finishUploadQueue(queue, { failureMessage: result.error });
+        }
+      })();
       return;
     }
 
@@ -735,7 +993,23 @@ function FileServer() {
     }, choice === 'replace' ? 'replace' : 'cancel');
   };
 
+  const dismissConflict = () => {
+    if (conflict?.kind !== 'upload') {
+      setConflict(null);
+      return;
+    }
+    const queue = uploadQueueRef.current;
+    setConflict(null);
+    if (queue) {
+      void finishUploadQueue(queue, { cancelled: true });
+      return;
+    }
+    uploadInProgressRef.current = false;
+    setUploadState(null);
+  };
+
   const breadcrumbs = folder ? folder.split('/') : [];
+  const uploadBusy = Boolean(uploadState) || readingDroppedFolder;
 
   return (
     <main className="file-server-page">
@@ -755,23 +1029,32 @@ function FileServer() {
           <input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="New folder name" aria-label="New folder name" />
           <button className="file-server-button" type="submit">New folder</button>
         </form>
-        <button className="file-server-button primary" type="button" disabled={Boolean(uploadState)} onClick={() => fileInputRef.current?.click()}>
+        <button className="file-server-button primary" type="button" disabled={uploadBusy} onClick={() => fileInputRef.current?.click()}>
           Upload files
         </button>
+        <button className="file-server-button primary" type="button" disabled={uploadBusy} onClick={openFolderPicker}>
+          Upload folder
+        </button>
         <input ref={fileInputRef} className="file-server-visually-hidden" type="file" multiple onChange={(event) => { queueFiles(event.target.files); event.target.value = ''; }} />
+        <input ref={setFolderInputRef} className="file-server-visually-hidden" type="file" multiple onChange={(event) => { queueFolderFiles(event.target.files); event.target.value = ''; }} />
       </section>
 
       <section
         className={`file-server-dropzone ${dragging ? 'is-dragging' : ''}`}
-        onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
+        onDragEnter={(event) => { event.preventDefault(); if (!uploadBusy) setDragging(true); }}
         onDragOver={(event) => event.preventDefault()}
         onDragLeave={() => setDragging(false)}
-        onDrop={(event) => { event.preventDefault(); setDragging(false); queueFiles(event.dataTransfer.files); }}
+        onDrop={(event) => { event.preventDefault(); setDragging(false); if (!uploadBusy) void queueDroppedFiles(event.dataTransfer); }}
       >
-        <strong>Drop files here to upload</strong>
-        <span>Files upload directly from this browser to private S3 storage.</span>
+        <strong>Drop files or folders here to upload</strong>
+        <span>Folders are recreated below the current location, including nested folders. Files upload directly from this browser to private S3 storage.</span>
       </section>
 
+      {readingDroppedFolder && (
+        <section className="file-server-upload-status" aria-live="polite">
+          <div><strong>Reading dropped folder</strong><span>Finding nested files before upload begins…</span></div>
+        </section>
+      )}
       {uploadState && (
         <section className="file-server-upload-status" aria-live="polite">
           <div><strong>{uploadState.fileName}</strong><span>{uploadState.status}</span></div>
@@ -783,13 +1066,13 @@ function FileServer() {
       {notice && <p className="file-server-message success" role="status">{notice}</p>}
 
       <nav className="file-server-breadcrumbs" aria-label="File location">
-        <button className="file-server-crumb" onClick={() => setFolder('')}>Files</button>
+        <button className="file-server-crumb" disabled={uploadBusy} onClick={() => navigateToFolder('')}>Files</button>
         {breadcrumbs.map((segment, index) => {
           const path = breadcrumbs.slice(0, index + 1).join('/');
           return (
             <span key={path}>
               <span aria-hidden="true">/</span>
-              <button className="file-server-crumb" onClick={() => setFolder(path)}>{segment}</button>
+              <button className="file-server-crumb" disabled={uploadBusy} onClick={() => navigateToFolder(path)}>{segment}</button>
             </span>
           );
         })}
@@ -803,7 +1086,7 @@ function FileServer() {
           <>
             {listing.folders.map((item) => (
               <article className="file-server-row folder" key={item.prefix}>
-                <button className="file-server-name-button" onClick={() => setFolder(folderPath(folder, item.name))}>
+                <button className="file-server-name-button" disabled={uploadBusy} onClick={() => navigateToFolder(folderPath(folder, item.name))}>
                   <span aria-hidden="true">▸</span> {item.name}
                 </button>
                 <span>Folder</span><span>—</span>
@@ -847,7 +1130,7 @@ function FileServer() {
       {moveDialog && <MoveDialog move={moveDialog} folders={moveFolders} loadingFolders={loadingMoveFolders} onSubmit={submitMove} onClose={() => setMoveDialog(null)} />}
       {deleteFile && <DeleteDialog file={deleteFile} onDelete={() => void confirmDelete()} onClose={() => setDeleteFile(null)} />}
       {deleteFolder && <DeleteFolderDialog folder={deleteFolder} onDelete={() => void confirmFolderDelete()} onClose={() => setDeleteFolder(null)} />}
-      {conflict && <ConflictDialog conflict={conflict} onReplace={() => resolveConflict('replace')} onRename={(name) => resolveConflict('rename', name)} onClose={() => setConflict(null)} />}
+      {conflict && <ConflictDialog conflict={conflict} onReplace={() => resolveConflict('replace')} onRename={(name) => resolveConflict('rename', name)} onClose={dismissConflict} />}
       {shareDialog && <ShareDialog state={shareDialog} onCreate={() => void createShare()} onRevoke={(shareId) => void revokeShare(shareId)} onCopy={(url) => void copyShareUrl(url)} onClose={() => setShareDialog(null)} />}
       {folderShareDialog && <FolderShareDialog state={folderShareDialog} onCreate={() => void createFolderShare()} onRevoke={(shareId) => void revokeFolderShare(shareId)} onRetry={(shareId) => void retryFolderShareArchive(shareId)} onCopy={(url) => void copyShareUrl(url)} onClose={() => setFolderShareDialog(null)} />}
     </main>

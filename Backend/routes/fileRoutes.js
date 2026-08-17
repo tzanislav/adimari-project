@@ -35,6 +35,14 @@ const NON_RETRYABLE_FOLDER_ARCHIVE_CODES = new Set([
 
 const currentActorUid = (user) => user?.uid || user?.user_id || user?.email || null;
 
+const normalizeUserUploadFileName = (value) => {
+  const fileName = normalizeFileName(value);
+  if (fileName === '.keep') {
+    throw new FileStorageValidationError('The file name .keep is reserved for File Server folder markers.');
+  }
+  return fileName;
+};
+
 const sendError = (res, error) => {
   if (error instanceof FileStorageValidationError) {
     return res.status(400).json({ code: error.code, error: error.message });
@@ -490,16 +498,27 @@ const createFileRoutes = (dependencies = {}) => {
       }
 
       const folder = normalizeFolderPath(req.body?.folder);
-      const fileName = normalizeFileName(req.body?.fileName);
+      const fileName = normalizeUserUploadFileName(req.body?.fileName);
       const contentType = normalizeContentType(req.body?.contentType);
-      const size = Number(req.body?.size);
+      const size = req.body?.size;
+      if (!Number.isSafeInteger(size) || size < 0) {
+        throw new FileStorageValidationError('File size must be a non-negative whole number.');
+      }
+      if (Number.isSafeInteger(config.maxUploadBytes) && size > config.maxUploadBytes) {
+        throw new FileStorageError({
+          code: 'FILE_TOO_LARGE',
+          message: 'The file exceeds the configured upload limit.',
+          status: 413,
+        });
+      }
       const conflictStrategy = req.body?.conflictStrategy || 'cancel';
       if (!CONFLICT_STRATEGIES.has(conflictStrategy)) {
         throw new FileStorageValidationError('Conflict strategy must be cancel or replace.');
       }
 
       const key = createManagedS3Key({ prefix: config.prefix, folder, fileName });
-      const partSize = computeMultipartPartSize({
+      const isEmptyFile = size === 0;
+      const partSize = isEmptyFile ? null : computeMultipartPartSize({
         fileSize: size,
         preferredPartSize: config.multipartPartSizeBytes,
       });
@@ -521,10 +540,28 @@ const createFileRoutes = (dependencies = {}) => {
         context: {
           expectedSize: size,
           contentType,
-          partSize,
+          ...(isEmptyFile ? { uploadMode: 'empty-object' } : { partSize }),
           preventsOverwrite: !existingObject,
         },
       });
+
+      if (isEmptyFile) {
+        const object = await storage.putEmptyFile({
+          key,
+          contentType,
+          preventOverwrite: !existingObject,
+        });
+        await markOperation(operation, 'completed', { errorCode: null, errorMessage: null });
+        await audit({ action: 'upload_started', result: 'success', actorUid, s3Key: key, operationId: operation._id });
+        await audit({ action: 'upload_completed', result: 'success', actorUid, s3Key: key, operationId: operation._id });
+        return res.status(201).json({
+          operationId: operation._id,
+          key,
+          completed: true,
+          file: toFileDetails(key, object),
+        });
+      }
+
       const multipart = await storage.createMultipartUpload({ folder, fileName, contentType });
       await markOperation(operation, 'pending', {
         context: { ...operation.context, uploadId: multipart.uploadId },
@@ -548,12 +585,17 @@ const createFileRoutes = (dependencies = {}) => {
   });
 
   router.post('/uploads/:operationId/parts', async (req, res) => {
+    const actorUid = currentActorUid(req.user);
     try {
+      if (!actorUid) {
+        throw new FileStorageValidationError('Authenticated user identity is required.');
+      }
       if (!mongoose.isValidObjectId(req.params.operationId)) {
         throw new FileStorageValidationError('Upload operation ID is invalid.');
       }
       const operation = await FileOperationModel.findOne({
         _id: req.params.operationId,
+        actorUid,
         type: { $in: UPLOAD_OPERATION_TYPES },
         status: 'pending',
       });
@@ -576,11 +618,15 @@ const createFileRoutes = (dependencies = {}) => {
     const actorUid = currentActorUid(req.user);
     let operation;
     try {
+      if (!actorUid) {
+        throw new FileStorageValidationError('Authenticated user identity is required.');
+      }
       if (!mongoose.isValidObjectId(req.params.operationId)) {
         throw new FileStorageValidationError('Upload operation ID is invalid.');
       }
       operation = await FileOperationModel.findOne({
         _id: req.params.operationId,
+        actorUid,
         type: { $in: UPLOAD_OPERATION_TYPES },
         status: 'pending',
       });
@@ -611,11 +657,15 @@ const createFileRoutes = (dependencies = {}) => {
     const actorUid = currentActorUid(req.user);
     let operation;
     try {
+      if (!actorUid) {
+        throw new FileStorageValidationError('Authenticated user identity is required.');
+      }
       if (!mongoose.isValidObjectId(req.params.operationId)) {
         throw new FileStorageValidationError('Upload operation ID is invalid.');
       }
       operation = await FileOperationModel.findOne({
         _id: req.params.operationId,
+        actorUid,
         type: { $in: UPLOAD_OPERATION_TYPES },
         status: 'pending',
       });
@@ -645,7 +695,7 @@ const createFileRoutes = (dependencies = {}) => {
       }
       const sourceKey = assertManagedS3Key(String(req.body?.sourceKey || ''), config.prefix);
       const destinationFolder = normalizeFolderPath(req.body?.destinationFolder);
-      const destinationFileName = normalizeFileName(req.body?.destinationFileName);
+      const destinationFileName = normalizeUserUploadFileName(req.body?.destinationFileName);
       const destinationKey = createManagedS3Key({ prefix: config.prefix, folder: destinationFolder, fileName: destinationFileName });
       const conflictStrategy = req.body?.conflictStrategy || 'cancel';
       if (!CONFLICT_STRATEGIES.has(conflictStrategy)) {
