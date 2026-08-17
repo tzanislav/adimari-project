@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import logo from '../assets/LogoBlack.png';
 import '../CSS/PublicFileDownload.css';
@@ -18,21 +18,44 @@ const readResponse = async (response) => {
   return data;
 };
 
+const isArchivePending = (status) => ['queued', 'preparing'].includes(status);
+
+const archiveStatusMessage = (status, folder) => {
+  if (status === 'queued') return 'The server has queued this folder snapshot and will package it into one ZIP file shortly.';
+  if (status === 'preparing') {
+    const processedFiles = Number(folder?.archive?.processedFiles || 0);
+    const fileCount = Number(folder?.fileCount || 0);
+    const progress = fileCount > 0 ? ` (${processedFiles.toLocaleString()} of ${fileCount.toLocaleString()} files)` : '';
+    return `The server is packaging the folder into one ZIP file${progress}. This page will update automatically when it is ready.`;
+  }
+  if (status === 'failed') return 'The ZIP archive could not be prepared. Please ask the person who shared this folder to create a new link.';
+  return 'One ZIP file is prepared before this folder can be downloaded.';
+};
+
 function PublicFileDownload() {
   const { token } = useParams();
-  const [file, setFile] = useState(null);
+  const [share, setShare] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState('');
+
+  const loadShareInfo = useCallback(async () => {
+    const response = await fetch(`${serverUrl}/download/${encodeURIComponent(token)}/info`);
+    return readResponse(response);
+  }, [token]);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
+      setLoading(true);
+      setShare(null);
+      setError('');
+      setDownloadNotice('');
       try {
-        const response = await fetch(`${serverUrl}/download/${encodeURIComponent(token)}/info`);
-        const result = await readResponse(response);
+        const result = await loadShareInfo();
         if (!active) return;
-        setFile(result.file);
+        setShare(result);
       } catch (requestError) {
         if (active) setError(requestError.message);
       } finally {
@@ -43,14 +66,54 @@ function PublicFileDownload() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [loadShareInfo]);
+
+  const isFolderShare = share?.type === 'folder' || Boolean(share?.folder);
+  const folder = share?.folder;
+  const archiveStatus = folder?.archive?.status;
+  const archivePending = isFolderShare && isArchivePending(archiveStatus);
+  const archiveFailed = isFolderShare && archiveStatus === 'failed';
+
+  useEffect(() => {
+    if (!archivePending) return undefined;
+    let active = true;
+    const refreshArchiveStatus = async () => {
+      try {
+        const result = await loadShareInfo();
+        if (!active) return;
+        setShare(result);
+        setError('');
+      } catch (requestError) {
+        if (active) setError(requestError.message);
+      }
+    };
+    const intervalId = window.setInterval(() => void refreshArchiveStatus(), 3000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [archivePending, loadShareInfo]);
 
   const startDownload = async () => {
     try {
       setDownloading(true);
       setError('');
+      setDownloadNotice('');
       const response = await fetch(`${serverUrl}/download/${encodeURIComponent(token)}/download`, { method: 'POST' });
       const result = await readResponse(response);
+      if (response.status === 202) {
+        setShare((previous) => (previous?.folder ? {
+          ...previous,
+          folder: {
+            ...previous.folder,
+            archive: { ...previous.folder.archive, ...result.archive },
+          },
+        } : previous));
+        setDownloadNotice('The server is preparing one ZIP file for this folder. This page will update automatically when it is ready.');
+        setDownloading(false);
+        return;
+      }
+      if (!result.downloadUrl) throw new Error('The download is not ready yet. Please try again shortly.');
       window.location.assign(result.downloadUrl);
     } catch (requestError) {
       setError(requestError.message);
@@ -67,16 +130,45 @@ function PublicFileDownload() {
       <header className="public-file-download-topbar">Adimari Database</header>
       <section className="public-file-download-content">
         <img src={logo} alt="Adimari" className="public-file-download-logo" />
-        <article className="public-file-download-card" aria-live="polite">
-          {loading && <p>Loading file details...</p>}
-          {!loading && error && <><h1>Link unavailable</h1><p>{error}</p></>}
-          {!loading && file && <>
+        <article className={`public-file-download-card${isFolderShare ? ' is-folder-share' : ''}`} aria-live="polite">
+          {loading && <p>Loading share details...</p>}
+          {!loading && !share && error && <><h1>Link unavailable</h1><p>{error}</p></>}
+          {!loading && share && !isFolderShare && <>
             <p className="public-file-download-eyebrow">Shared file</p>
-            <h1 title={file.name}>{file.name}</h1>
-            <p className="public-file-download-size">{formatBytes(file.size)}</p>
+            <h1 title={share.file.name}>{share.file.name}</h1>
+            <p className="public-file-download-size">{formatBytes(share.file.size)}</p>
             {error && <p className="public-file-download-error">{error}</p>}
             <button type="button" onClick={() => void startDownload()} disabled={downloading}>
               {downloading ? 'Preparing download...' : 'Download'}
+            </button>
+          </>}
+          {!loading && share && isFolderShare && <>
+            <p className="public-file-download-eyebrow">Shared folder</p>
+            <h1 title={folder.name}>{folder.name}</h1>
+            <p className="public-file-download-size">
+              {Number(folder.fileCount || 0).toLocaleString()} file{folder.fileCount === 1 ? '' : 's'} · {formatBytes(folder.totalBytes)}
+            </p>
+            <p className={`public-file-download-archive-status ${archiveStatus || 'pending'}`} role={archivePending ? 'status' : undefined}>
+              {archiveStatus === 'ready' ? `ZIP ready${folder.archive?.size ? ` · ${formatBytes(folder.archive.size)}` : ''}` : archiveStatusMessage(archiveStatus, folder)}
+            </p>
+            {downloadNotice && <p className="public-file-download-notice" role="status">{downloadNotice}</p>}
+            {error && <p className="public-file-download-error">{error}</p>}
+            <div className="public-file-download-file-list" aria-label="Files in this shared folder">
+              {(folder.files || []).length > 0 ? (
+                <ul>
+                  {folder.files.map((item) => (
+                    <li key={item.path || item.name}>
+                      <span title={item.path || item.name}>{item.path || item.name}</span>
+                      <span>{formatBytes(item.size)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{folder.fileCount ? 'The folder file list is unavailable.' : 'This shared folder is empty.'}</p>
+              )}
+            </div>
+            <button type="button" onClick={() => void startDownload()} disabled={downloading || archivePending || archiveFailed}>
+              {downloading ? 'Starting download...' : archivePending ? 'Preparing ZIP...' : archiveFailed ? 'Archive unavailable' : 'Download all files'}
             </button>
           </>}
         </article>

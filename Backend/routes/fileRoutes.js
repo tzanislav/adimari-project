@@ -7,6 +7,7 @@ const { getFileServerConfig } = require('../config/fileServerConfig');
 const FileAuditEvent = require('../models/fileAuditEvent');
 const FileOperation = require('../models/fileOperation');
 const FileShare = require('../models/fileShare');
+const FileShareEntry = require('../models/fileShareEntry');
 const {
   FileStorageError,
   createFileStorageService,
@@ -26,6 +27,11 @@ const { createShareToken } = require('../services/fileShareToken');
 const UPLOAD_OPERATION_TYPES = ['upload', 'replace'];
 const CONFLICT_STRATEGIES = new Set(['cancel', 'replace']);
 const INLINE_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
+const NON_RETRYABLE_FOLDER_ARCHIVE_CODES = new Set([
+  'FILE_NOT_FOUND',
+  'FILE_CONFLICT',
+  'FOLDER_SHARE_SNAPSHOT_INVALID',
+]);
 
 const currentActorUid = (user) => user?.uid || user?.user_id || user?.email || null;
 
@@ -67,6 +73,10 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const serializeShare = (share) => {
   const serialized = typeof share?.toObject === 'function' ? share.toObject() : { ...share };
   delete serialized.tokenHash;
+  if (serialized.archive) {
+    delete serialized.archive.s3Key;
+    delete serialized.archive.heartbeatAt;
+  }
   return serialized;
 };
 
@@ -75,7 +85,9 @@ const createFileRoutes = (dependencies = {}) => {
   const storage = dependencies.storage || createFileStorageService({ config });
   const FileOperationModel = dependencies.FileOperationModel || FileOperation;
   const FileShareModel = dependencies.FileShareModel || FileShare;
+  const FileShareEntryModel = dependencies.FileShareEntryModel || FileShareEntry;
   const FileAuditEventModel = dependencies.FileAuditEventModel || FileAuditEvent;
+  const archiveService = dependencies.archiveService || { enqueue: () => false };
   const authenticateMiddleware = dependencies.authenticateMiddleware || authenticate;
   const authorizeMiddleware = dependencies.authorizeMiddleware || authorizeRole(['admin', 'moderator']);
   const router = express.Router();
@@ -91,6 +103,61 @@ const createFileRoutes = (dependencies = {}) => {
       // Audit failure must not turn a completed S3 operation into a client-visible failure.
       console.error('Failed to record file-server audit event:', error.code || error.name || 'unknown');
     }
+  };
+
+  const shareUrlForToken = (token) => new URL(`/file-download/${token}`, config.publicBaseUrl).toString();
+
+  const createShareRecord = async (attributes) => {
+    let createdShare;
+    let rawToken;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { token, tokenHash } = createShareToken();
+      try {
+        createdShare = await FileShareModel.create({ ...attributes, tokenHash });
+        rawToken = token;
+        break;
+      } catch (error) {
+        if (error?.code !== 11000 || attempt === 2) throw error;
+      }
+    }
+
+    return { createdShare, rawToken };
+  };
+
+  const deleteFolderShareArchive = async (share) => {
+    if (typeof storage.createShareArchiveKey !== 'function' || typeof storage.deleteShareArchive !== 'function') return;
+    try {
+      const shareId = typeof share === 'object' ? share?._id : share;
+      const archiveKey = typeof share === 'object' ? share?.archive?.s3Key : null;
+      const archiveAttempt = Number(typeof share === 'object' ? share?.archive?.attempts : null);
+      if (!archiveKey && (!Number.isSafeInteger(archiveAttempt) || archiveAttempt < 1)) return;
+      const key = archiveKey || storage.createShareArchiveKey({ shareId, attempt: archiveAttempt });
+      await storage.deleteShareArchive({ key });
+    } catch (error) {
+      // A revoked token never returns a URL, so delayed S3 cleanup is safe.
+      // Lifecycle cleanup remains the final guard if this best-effort call fails.
+      console.error('Failed to remove revoked folder-share archive:', error.code || error.name || 'unknown');
+    }
+  };
+
+  const revokeFolderSharesContaining = async (entryFilter, actorUid) => {
+    if (typeof FileShareEntryModel.distinct !== 'function') return [];
+    const shareIds = await FileShareEntryModel.distinct('fileShareId', entryFilter);
+    if (!shareIds?.length) return [];
+    let sharesForCleanup = shareIds.map((_id) => ({ _id }));
+    if (typeof FileShareModel.find === 'function') {
+      let query = FileShareModel.find({ _id: { $in: shareIds }, status: 'active', shareType: 'folder' });
+      if (typeof query.select === 'function') query = query.select('+archive.s3Key');
+      sharesForCleanup = typeof query.lean === 'function' ? await query.lean() : await query;
+    }
+    await FileShareModel.updateMany(
+      { _id: { $in: shareIds }, status: 'active', shareType: 'folder' },
+      { $set: { status: 'revoked', revokedAt: new Date(), revokedBy: actorUid } },
+    );
+    shareIds.forEach((shareId) => archiveService.cancel?.(shareId));
+    await Promise.all(sharesForCleanup.map((share) => deleteFolderShareArchive(share)));
+    return shareIds;
   };
 
   const markOperation = async (operation, status, updates = {}) => {
@@ -206,6 +273,150 @@ const createFileRoutes = (dependencies = {}) => {
     }
   });
 
+  router.get('/folder-shares', async (req, res) => {
+    try {
+      const folder = normalizeFolderPath(req.query.folder);
+      if (!folder) {
+        throw new FileStorageValidationError('A non-root folder path is required for sharing.');
+      }
+      const prefix = `${config.prefix}${folder}/`;
+      const shares = await FileShareModel.find({ shareType: 'folder', s3Key: prefix })
+        .sort({ createdAt: -1 })
+        .lean();
+      shares
+        .filter((share) => ['queued', 'preparing'].includes(share.archive?.status))
+        .forEach((share) => archiveService.enqueue(share._id));
+      res.json({ folder, shares: shares.map(serializeShare) });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  router.post('/folder-shares', async (req, res) => {
+    const actorUid = currentActorUid(req.user);
+    let createdShare;
+    try {
+      if (!actorUid) {
+        throw new FileStorageValidationError('Authenticated user identity is required.');
+      }
+      const folder = normalizeFolderPath(req.body?.folder);
+      if (!folder) {
+        throw new FileStorageValidationError('A non-root folder path is required for sharing.');
+      }
+      const snapshot = await storage.listFolderShareSnapshot({
+        folder,
+        maxFiles: config.shareArchiveMaxFiles,
+        maxBytes: config.shareArchiveMaxBytes,
+      });
+      if (!snapshot.files.length) {
+        throw new FileStorageValidationError('An empty folder cannot be shared.');
+      }
+
+      const originalFileName = folder.slice(folder.lastIndexOf('/') + 1);
+      const created = await createShareRecord({
+        shareType: 'folder',
+        s3Key: snapshot.prefix,
+        originalFileName,
+        folderPath: folder,
+        fileCount: snapshot.files.length,
+        totalBytes: snapshot.totalBytes,
+        // Keep the share invisible to archive recovery until all immutable
+        // snapshot rows have committed successfully.
+        archive: { status: 'initializing' },
+        createdBy: actorUid,
+      });
+      createdShare = created.createdShare;
+      await FileShareEntryModel.insertMany(snapshot.files.map((file) => ({
+        fileShareId: createdShare._id,
+        s3Key: file.key,
+        archivePath: file.archivePath,
+        size: file.size,
+        lastModified: file.lastModified,
+        eTag: file.eTag,
+      })));
+
+      const queuedShare = await FileShareModel.findOneAndUpdate(
+        { _id: createdShare._id, status: 'active', shareType: 'folder', 'archive.status': 'initializing' },
+        { $set: { 'archive.status': 'queued' } },
+        { new: true },
+      );
+      if (!queuedShare) {
+        throw new FileStorageError({
+          code: 'FOLDER_SHARE_INITIALIZATION_FAILED',
+          message: 'The folder share could not be initialized.',
+          status: 500,
+        });
+      }
+      createdShare = queuedShare;
+
+      const url = shareUrlForToken(created.rawToken);
+      await audit({
+        action: 'folder_share_created',
+        result: 'success',
+        actorUid,
+        s3Key: snapshot.prefix,
+        fileShareId: createdShare._id,
+        details: { fileCount: snapshot.files.length, totalBytes: snapshot.totalBytes },
+      });
+      archiveService.enqueue(createdShare._id);
+      return res.status(201).json({ share: serializeShare(createdShare), url });
+    } catch (error) {
+      if (createdShare?._id && typeof FileShareEntryModel.deleteMany === 'function') {
+        await FileShareEntryModel.deleteMany({ fileShareId: createdShare._id }).catch(() => undefined);
+      }
+      if (createdShare?._id && typeof FileShareModel.deleteOne === 'function') {
+        await FileShareModel.deleteOne({ _id: createdShare._id }).catch(() => undefined);
+      }
+      await audit({ action: 'folder_share_created', result: 'failure', actorUid, details: { code: error.code || error.name } });
+      return sendError(res, error);
+    }
+  });
+
+  router.post('/folder-shares/:shareId/retry', async (req, res) => {
+    const actorUid = currentActorUid(req.user);
+    try {
+      if (!actorUid || !mongoose.isValidObjectId(req.params.shareId)) {
+        throw new FileStorageValidationError('Share ID is invalid.');
+      }
+      const share = await FileShareModel.findOneAndUpdate(
+        {
+          _id: req.params.shareId,
+          status: 'active',
+          shareType: 'folder',
+          'archive.status': 'failed',
+          'archive.errorCode': { $nin: Array.from(NON_RETRYABLE_FOLDER_ARCHIVE_CODES) },
+        },
+        {
+          $set: {
+            'archive.status': 'queued',
+            'archive.errorCode': null,
+            'archive.failedAt': null,
+            'archive.heartbeatAt': null,
+            'archive.s3Key': null,
+            'archive.fileName': null,
+            'archive.size': null,
+            'archive.completedAt': null,
+            'archive.processedFiles': 0,
+            'archive.processedBytes': 0,
+          },
+        },
+        { new: true },
+      );
+      if (!share) {
+        return res.status(409).json({
+          code: 'FOLDER_SHARE_RECREATE_REQUIRED',
+          error: 'This folder snapshot changed or no longer exists. Create a new folder share link instead.',
+        });
+      }
+      archiveService.enqueue(share._id);
+      await audit({ action: 'share_archive_queued', result: 'success', actorUid, s3Key: share.s3Key, fileShareId: share._id });
+      return res.json({ share: serializeShare(share) });
+    } catch (error) {
+      await audit({ action: 'share_archive_queued', result: 'failure', actorUid, details: { code: error.code || error.name } });
+      return sendError(res, error);
+    }
+  });
+
   router.get('/shares', async (req, res) => {
     try {
       const key = shareableKey(String(req.query.key || ''));
@@ -225,28 +436,14 @@ const createFileRoutes = (dependencies = {}) => {
       const key = shareableKey(String(req.body?.key || ''));
       await storage.headShareableFile({ key });
       const originalFileName = key.slice(key.lastIndexOf('/') + 1);
-      let createdShare;
-      let rawToken;
+      const { createdShare, rawToken } = await createShareRecord({
+        shareType: 'file',
+        s3Key: key,
+        originalFileName,
+        createdBy: actorUid,
+      });
 
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const { token, tokenHash } = createShareToken();
-        try {
-          createdShare = await FileShareModel.create({
-            s3Key: key,
-            originalFileName,
-            tokenHash,
-            createdBy: actorUid,
-          });
-          rawToken = token;
-          break;
-        } catch (error) {
-          if (error?.code !== 11000 || attempt === 2) {
-            throw error;
-          }
-        }
-      }
-
-      const shareUrl = new URL(`/file-download/${rawToken}`, config.publicBaseUrl).toString();
+      const shareUrl = shareUrlForToken(rawToken);
       await audit({ action: 'share_created', result: 'success', actorUid, s3Key: key, fileShareId: createdShare._id });
       res.status(201).json({ share: serializeShare(createdShare), url: shareUrl });
     } catch (error) {
@@ -261,15 +458,21 @@ const createFileRoutes = (dependencies = {}) => {
       if (!actorUid || !mongoose.isValidObjectId(req.params.shareId)) {
         throw new FileStorageValidationError('Share ID is invalid.');
       }
-      const share = await FileShareModel.findOneAndUpdate(
+      let shareQuery = FileShareModel.findOneAndUpdate(
         { _id: req.params.shareId, status: 'active' },
         { $set: { status: 'revoked', revokedAt: new Date(), revokedBy: actorUid } },
         { new: true },
       );
+      if (typeof shareQuery.select === 'function') shareQuery = shareQuery.select('+archive.s3Key');
+      const share = await shareQuery;
       if (!share) {
         return res.status(404).json({ code: 'FILE_SHARE_NOT_FOUND', error: 'Active share link not found.' });
       }
 
+      if (share.shareType === 'folder') {
+        archiveService.cancel?.(share._id);
+        await deleteFolderShareArchive(share);
+      }
       await audit({ action: 'share_revoked', result: 'success', actorUid, s3Key: share.s3Key, fileShareId: share._id });
       return res.json({ share: serializeShare(share) });
     } catch (error) {
@@ -465,6 +668,10 @@ const createFileRoutes = (dependencies = {}) => {
           { s3Key: result.sourceKey, status: 'active' },
           { $set: { s3Key: result.destinationKey } },
         );
+        // A folder manifest records the source object's original key and ETag.
+        // Moving it removes that key, so invalidate any affected folder link
+        // rather than allowing a pending ZIP to fail later without context.
+        await revokeFolderSharesContaining({ s3Key: result.sourceKey }, actorUid);
       } catch (error) {
         await recordOperationFailure(operation, error, 'needs_repair');
         throw new FileStorageError({
@@ -501,6 +708,7 @@ const createFileRoutes = (dependencies = {}) => {
           { s3Key: key, status: 'active' },
           { $set: { status: 'revoked', revokedAt: new Date(), revokedBy: actorUid } },
         );
+        await revokeFolderSharesContaining({ s3Key: key }, actorUid);
       } catch (error) {
         await recordOperationFailure(operation, error, 'needs_repair');
         throw new FileStorageError({
@@ -540,6 +748,10 @@ const createFileRoutes = (dependencies = {}) => {
         await FileShareModel.updateMany(
           { s3Key: { $regex: new RegExp(`^${escapeRegex(result.prefix)}`) }, status: 'active' },
           { $set: { status: 'revoked', revokedAt: new Date(), revokedBy: actorUid } },
+        );
+        await revokeFolderSharesContaining(
+          { s3Key: { $regex: new RegExp(`^${escapeRegex(result.prefix)}`) } },
+          actorUid,
         );
       } catch (error) {
         await recordOperationFailure(operation, error, 'needs_repair');

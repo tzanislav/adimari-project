@@ -28,6 +28,8 @@ test('creates isolated file-server configuration with dedicated IAM credentials'
   assert.equal(config.bucketName, 'adimari-private-files-prod');
   assert.equal(config.prefix, 'files/');
   assert.deepEqual(config.shareablePrefixes, ['files/']);
+  assert.equal(config.shareArchivePrefix, 'file-share-archives/');
+  assert.equal(config.shareArchiveBuildConcurrency, 1);
   assert.equal(config.publicBaseUrl, 'https://adimari-db.com');
   assert.deepEqual(config.credentials, {
     accessKeyId: 'AKIAEXAMPLE',
@@ -68,6 +70,18 @@ test('rejects partial credentials, unsafe prefixes, and non-origin public URLs',
   );
   assert.throws(
     () => createFileServerConfig(createEnvironment({ FILE_SERVER_PUBLIC_BASE_URL: 'https://adimari-db.com/download' })),
+    FileServerConfigurationError,
+  );
+  assert.throws(
+    () => createFileServerConfig(createEnvironment({ FILE_SERVER_SHARE_ARCHIVE_PREFIX: 'files/archives/' })),
+    FileServerConfigurationError,
+  );
+  assert.throws(
+    () => createFileServerConfig(createEnvironment({ FILE_SERVER_SHARE_ARCHIVE_BUILD_CONCURRENCY: '0' })),
+    FileServerConfigurationError,
+  );
+  assert.throws(
+    () => createFileServerConfig(createEnvironment({ FILE_SERVER_SHARE_ARCHIVE_MAX_BYTES: String(101 * 1024 * 1024 * 1024) })),
     FileServerConfigurationError,
   );
 });

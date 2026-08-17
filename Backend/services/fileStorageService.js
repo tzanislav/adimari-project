@@ -14,6 +14,7 @@ const {
   S3Client,
   UploadPartCommand,
 } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const {
   FileStorageValidationError,
@@ -110,6 +111,7 @@ const buildContentDisposition = (fileName, dispositionType = 'attachment') => {
 };
 
 const buildDownloadDisposition = (fileName) => buildContentDisposition(fileName, 'attachment');
+const SHARE_ARCHIVE_UPLOAD_PART_SIZE_BYTES = 16 * 1024 * 1024;
 
 const createS3Client = (config) => new S3Client({
   region: config.region,
@@ -126,9 +128,10 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
     key,
     config.shareablePrefixes || [config.prefix],
   );
-  const send = async (command) => {
+  const archiveKey = (key) => assertManagedS3Key(key, config.shareArchivePrefix || 'file-share-archives/');
+  const send = async (command, options) => {
     try {
-      return await client.send(command);
+      return await client.send(command, options);
     } catch (error) {
       throw mapS3Error(error);
     }
@@ -221,6 +224,89 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
       } while (continuationToken);
 
       return Array.from(folders).sort((left, right) => left.localeCompare(right));
+    },
+
+    // Folder shares use a recursively listed, point-in-time manifest.  The
+    // caller stores each ETag and the archive worker sends it back as If-Match
+    // when reading, so a replacement cannot silently change the shared ZIP.
+    async listFolderShareSnapshot({ folder, maxFiles, maxBytes } = {}) {
+      const normalizedFolder = normalizeFolderPath(folder);
+      if (!normalizedFolder) {
+        throw new FileStorageValidationError('A non-root folder path is required for sharing.');
+      }
+      if (!Number.isSafeInteger(maxFiles) || maxFiles < 1) {
+        throw new FileStorageValidationError('Folder-share file limit is invalid.');
+      }
+      if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+        throw new FileStorageValidationError('Folder-share size limit is invalid.');
+      }
+
+      const prefix = `${config.prefix}${normalizedFolder}/`;
+      let continuationToken;
+      const files = [];
+      let totalBytes = 0;
+
+      do {
+        const result = await send(new ListObjectsV2Command({
+          Bucket: config.bucketName,
+          Prefix: prefix,
+          MaxKeys: 1_000,
+          ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+        }));
+
+        for (const object of result.Contents || []) {
+          if (!object.Key || object.Key === prefix || object.Key === `${prefix}.keep`) continue;
+          const key = managedKey(object.Key);
+          if (key.endsWith('/.keep')) continue;
+          const size = Number(object.Size);
+          if (!Number.isSafeInteger(size) || size < 0) {
+            throw new FileStorageError({
+              code: 'FILE_STORAGE_INVALID_OBJECT',
+              message: 'A file in the folder has invalid storage metadata.',
+              status: 502,
+            });
+          }
+          if (typeof object.ETag !== 'string' || !object.ETag) {
+            throw new FileStorageError({
+              code: 'FILE_STORAGE_INVALID_OBJECT',
+              message: 'A file in the folder cannot be safely snapshotted.',
+              status: 502,
+            });
+          }
+
+          if (files.length >= maxFiles) {
+            throw new FileStorageError({
+              code: 'FOLDER_SHARE_TOO_MANY_FILES',
+              message: `Folders with more than ${maxFiles.toLocaleString()} files cannot be shared as one archive.`,
+              status: 413,
+            });
+          }
+          if (totalBytes > maxBytes - size) {
+            throw new FileStorageError({
+              code: 'FOLDER_SHARE_TOO_LARGE',
+              message: 'This folder exceeds the maximum size for a shared archive.',
+              status: 413,
+            });
+          }
+
+          files.push({
+            key,
+            archivePath: key.slice(prefix.length),
+            size,
+            eTag: object.ETag,
+            lastModified: object.LastModified || null,
+          });
+          totalBytes += size;
+        }
+        continuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+      } while (continuationToken);
+
+      return {
+        folder: normalizedFolder,
+        prefix,
+        files: files.sort((left, right) => left.archivePath.localeCompare(right.archivePath)),
+        totalBytes,
+      };
     },
 
     async getUsageStats() {
@@ -337,6 +423,102 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
     // Kept separate from getDownloadUrl for the same reason as headShareableFile.
     async getShareableDownloadUrl(options = {}) {
       return createDownloadUrl(options, shareableKey);
+    },
+
+    async getShareableFileStream({ key, eTag, versionId, abortSignal } = {}) {
+      const managedS3Key = shareableKey(key);
+      if (typeof eTag !== 'string' || !eTag) {
+        throw new FileStorageError({
+          code: 'FOLDER_SHARE_SNAPSHOT_INVALID',
+          message: 'The folder-share snapshot cannot be read safely.',
+          status: 500,
+        });
+      }
+      const result = await send(new GetObjectCommand({
+        Bucket: config.bucketName,
+        Key: managedS3Key,
+        IfMatch: eTag,
+        ...(versionId ? { VersionId: String(versionId) } : {}),
+      }), abortSignal ? { abortSignal } : undefined);
+      if (!result.Body || typeof result.Body.pipe !== 'function') {
+        throw new FileStorageError({
+          code: 'FILE_STORAGE_INVALID_RESPONSE',
+          message: 'File storage returned an unreadable file stream.',
+          status: 502,
+        });
+      }
+      return result.Body;
+    },
+
+    createShareArchiveKey({ shareId, attempt } = {}) {
+      const normalizedShareId = String(shareId || '');
+      if (!/^[a-f\d]{24}$/i.test(normalizedShareId)) {
+        throw new FileStorageValidationError('Folder-share ID is invalid.');
+      }
+      const normalizedAttempt = Number(attempt);
+      if (!Number.isSafeInteger(normalizedAttempt) || normalizedAttempt < 1 || normalizedAttempt > 100_000) {
+        throw new FileStorageValidationError('Folder-share archive attempt is invalid.');
+      }
+      return archiveKey(`${config.shareArchivePrefix || 'file-share-archives/'}${normalizedShareId}-${normalizedAttempt}.zip`);
+    },
+
+    async uploadShareArchive({ key, body, onProgress, onUploadCreated } = {}) {
+      const managedS3Key = archiveKey(key);
+      if (!body || typeof body.pipe !== 'function') {
+        throw new FileStorageValidationError('Folder-share archive stream is invalid.');
+      }
+
+      try {
+        const upload = new Upload({
+          client,
+          params: {
+            Bucket: config.bucketName,
+            Key: managedS3Key,
+            Body: body,
+            ContentType: 'application/zip',
+          },
+          // Folder archives are intentionally serialized one at a time. A
+          // 16 MiB maximum part keeps the worker's upload buffer modest even
+          // when normal browser uploads use much larger multipart parts.
+          // Do not inherit the browser-upload part size: it may be as low as
+          // S3's 5 MiB minimum, which would exceed the 10,000-part limit for
+          // an otherwise permitted 100 GiB archive.
+          partSize: SHARE_ARCHIVE_UPLOAD_PART_SIZE_BYTES,
+          queueSize: 1,
+          leavePartsOnError: false,
+        });
+        if (typeof onProgress === 'function') {
+          upload.on('httpUploadProgress', onProgress);
+        }
+        if (typeof onUploadCreated === 'function') {
+          onUploadCreated(upload);
+        }
+        const result = await upload.done();
+        return { key: managedS3Key, eTag: result.ETag || null, versionId: result.VersionId || null };
+      } catch (error) {
+        throw mapS3Error(error);
+      }
+    },
+
+    async getShareArchiveDownloadUrl(options = {}) {
+      return createDownloadUrl(options, archiveKey);
+    },
+
+    async headShareArchive({ key, abortSignal } = {}) {
+      const managedS3Key = archiveKey(key);
+      return send(
+        new HeadObjectCommand({ Bucket: config.bucketName, Key: managedS3Key }),
+        abortSignal ? { abortSignal } : undefined,
+      );
+    },
+
+    async deleteShareArchive({ key, abortSignal } = {}) {
+      const managedS3Key = archiveKey(key);
+      await send(
+        new DeleteObjectCommand({ Bucket: config.bucketName, Key: managedS3Key }),
+        abortSignal ? { abortSignal } : undefined,
+      );
+      return { key: managedS3Key };
     },
 
     async moveFile({ sourceKey, destinationFolder = '', destinationFileName } = {}) {
@@ -458,6 +640,7 @@ const createFileStorageService = ({ config, client = createS3Client(config), sig
 
 module.exports = {
   FileStorageError,
+  SHARE_ARCHIVE_UPLOAD_PART_SIZE_BYTES,
   buildContentDisposition,
   buildDownloadDisposition,
   createFileStorageService,

@@ -52,6 +52,43 @@ const formatDate = (value) => (value ? new Date(value).toLocaleString() : 'Never
 
 const folderPath = (folder, name) => (folder ? `${folder}/${name}` : name);
 
+const getFolderArchiveStatus = (share) => share?.archive?.status || 'queued';
+const folderSnapshotNeedsNewLink = (share) => ['FILE_NOT_FOUND', 'FILE_CONFLICT', 'FOLDER_SHARE_SNAPSHOT_INVALID']
+  .includes(share?.archive?.errorCode);
+
+const folderArchiveStatusLabel = (status) => {
+  switch (status) {
+    case 'queued': return 'Archive queued';
+    case 'preparing': return 'Preparing ZIP';
+    case 'ready': return 'ZIP ready';
+    case 'failed': return 'Archive failed';
+    default: return 'Archive pending';
+  }
+};
+
+const folderArchiveStatusDetail = (share) => {
+  const status = getFolderArchiveStatus(share);
+  if (status === 'queued') return 'The folder snapshot is waiting to be packaged.';
+  if (status === 'preparing') {
+    const processedFiles = Number(share.archive?.processedFiles || 0);
+    const fileCount = Number(share.fileCount || 0);
+    if (fileCount > 0) return `The server is packaging the folder into one ZIP file (${processedFiles.toLocaleString()} of ${fileCount.toLocaleString()} files).`;
+    return 'The server is packaging the folder into one ZIP file.';
+  }
+  if (status === 'ready') {
+    const fileName = share.archive?.fileName || 'Folder archive';
+    return share.archive?.size ? `${fileName} · ${formatBytes(share.archive.size)}` : fileName;
+  }
+  if (status === 'failed') {
+    return folderSnapshotNeedsNewLink(share)
+      ? 'A source file changed or no longer exists. Create a new link for the current folder.'
+      : 'The ZIP could not be prepared. You can retry it.';
+  }
+  return 'The folder archive is being set up.';
+};
+
+const isFolderArchivePending = (share) => ['queued', 'preparing'].includes(getFolderArchiveStatus(share));
+
 const runWithConcurrency = async (items, limit, task) => {
   let nextIndex = 0;
   const worker = async () => {
@@ -151,7 +188,7 @@ function DeleteFolderDialog({ folder, onDelete, onClose }) {
     <div className="file-server-modal-backdrop" role="presentation">
       <section className="file-server-modal" role="dialog" aria-modal="true" aria-labelledby="delete-folder-title">
         <h2 id="delete-folder-title">Delete folder and all contents?</h2>
-        <p><strong>{folder.name}</strong>, every file in it, and all nested folders will be permanently deleted. Any active share links for those files will be revoked.</p>
+        <p><strong>{folder.name}</strong>, every file in it, and all nested folders will be permanently deleted. Any active file and folder share links will be revoked.</p>
         <div className="file-server-modal-actions">
           <button className="file-server-button danger" onClick={onDelete}>Delete folder</button>
           <button className="file-server-button ghost" onClick={onClose}>Cancel</button>
@@ -205,6 +242,67 @@ function ShareDialog({ state, onCreate, onRevoke, onCopy, onClose }) {
   );
 }
 
+function FolderShareDialog({ state, onCreate, onRevoke, onRetry, onCopy, onClose }) {
+  const { folder, shares = [], loading, createdUrl, busy } = state;
+  return (
+    <div className="file-server-modal-backdrop" role="presentation">
+      <section className="file-server-modal file-server-share-modal" role="dialog" aria-modal="true" aria-labelledby="share-folder-title">
+        <h2 id="share-folder-title">Share {folder.name}</h2>
+        <p className="file-server-muted">
+          A snapshot of this folder and its nested files is packaged into one ZIP. Anyone with an active link can download it without signing in.
+        </p>
+        {createdUrl && (
+          <div className="file-server-new-link">
+            <label className="file-server-field">
+              New folder share link
+              <input readOnly value={createdUrl} onFocus={(event) => event.target.select()} />
+            </label>
+            <button className="file-server-button primary" onClick={() => onCopy(createdUrl)}>Copy link</button>
+          </div>
+        )}
+        <div className="file-server-share-toolbar">
+          <button className="file-server-button primary" disabled={busy} onClick={onCreate}>Create new link</button>
+          <span>Links are only shown in full when first created.</span>
+        </div>
+        {loading ? <p>Loading folder share links...</p> : (
+          <div className="file-server-share-list">
+            {shares.length === 0 ? <p className="file-server-muted">No folder share links yet.</p> : shares.map((share) => {
+              const archiveStatus = getFolderArchiveStatus(share);
+              const isActive = share.status === 'active';
+              return (
+                <article className="file-server-share-row file-server-folder-share-row" key={share._id}>
+                  <div>
+                    <strong>{isActive ? 'Active folder link' : 'Revoked folder link'}</strong>
+                    <span>{share.fileCount || 0} file{share.fileCount === 1 ? '' : 's'} · {formatBytes(share.totalBytes)}</span>
+                    <span>Created {formatDate(share.createdAt)} · {share.downloadCount || 0} download start{share.downloadCount === 1 ? '' : 's'}</span>
+                    <span>Last: {formatDate(share.lastDownloadedAt)}</span>
+                    {isActive && (
+                      <span className={`file-server-archive-status ${archiveStatus}`}>
+                        <strong>{folderArchiveStatusLabel(archiveStatus)}</strong> {folderArchiveStatusDetail(share)}
+                      </span>
+                    )}
+                  </div>
+                  {isActive && (
+                    <div className="file-server-share-row-actions">
+                      {archiveStatus === 'failed' && !folderSnapshotNeedsNewLink(share) && (
+                        <button className="file-server-button compact" disabled={busy} onClick={() => onRetry(share._id)}>Retry archive</button>
+                      )}
+                      <button className="file-server-button danger compact" disabled={busy} onClick={() => onRevoke(share._id)}>Revoke</button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+        <div className="file-server-modal-actions">
+          <button className="file-server-button ghost" onClick={onClose}>Close</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function FileServer() {
   const [folder, setFolder] = useState('');
   const [listing, setListing] = useState({ files: [], folders: [], nextContinuationToken: null });
@@ -222,6 +320,7 @@ function FileServer() {
   const [deleteFolder, setDeleteFolder] = useState(null);
   const [conflict, setConflict] = useState(null);
   const [shareDialog, setShareDialog] = useState(null);
+  const [folderShareDialog, setFolderShareDialog] = useState(null);
   const [stats, setStats] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -506,6 +605,108 @@ function FileServer() {
     }
   };
 
+  const loadFolderShares = useCallback(async (shareFolder, { preserveUrl = false, silent = false } = {}) => {
+    setFolderShareDialog((previous) => {
+      if (!previous || previous.folder.path !== shareFolder.path) return previous;
+      return {
+        ...previous,
+        loading: silent ? previous.loading : true,
+        ...(preserveUrl || silent ? {} : { createdUrl: null }),
+      };
+    });
+    try {
+      const result = await apiRequest(`/folder-shares?folder=${encodeURIComponent(shareFolder.path)}`);
+      setFolderShareDialog((previous) => {
+        if (!previous || previous.folder.path !== shareFolder.path) return previous;
+        return {
+          ...previous,
+          shares: result.shares || [],
+          loading: false,
+          busy: silent ? previous.busy : false,
+        };
+      });
+    } catch (requestError) {
+      if (!silent) setError(requestError.message);
+      setFolderShareDialog((previous) => {
+        if (!previous || previous.folder.path !== shareFolder.path) return previous;
+        return { ...previous, loading: false, busy: false };
+      });
+    }
+  }, []);
+
+  const openFolderShares = (item) => {
+    const shareFolder = { name: item.name, path: folderPath(folder, item.name) };
+    setFolderShareDialog({ folder: shareFolder, shares: [], loading: true, busy: false, createdUrl: null });
+    void loadFolderShares(shareFolder);
+  };
+
+  const createFolderShare = async () => {
+    if (!folderShareDialog) return;
+    const shareFolder = folderShareDialog.folder;
+    try {
+      setFolderShareDialog((previous) => (previous ? { ...previous, busy: true } : previous));
+      const result = await apiRequest('/folder-shares', { method: 'POST', body: { folder: shareFolder.path } });
+      setFolderShareDialog((previous) => {
+        if (!previous || previous.folder.path !== shareFolder.path) return previous;
+        return {
+          ...previous,
+          shares: [result.share, ...previous.shares],
+          createdUrl: result.url,
+          loading: false,
+          busy: false,
+        };
+      });
+      setNotice('New folder share link created. The ZIP is being prepared in the background.');
+    } catch (requestError) {
+      setError(requestError.message);
+      setFolderShareDialog((previous) => (previous ? { ...previous, busy: false } : previous));
+    }
+  };
+
+  const revokeFolderShare = async (shareId) => {
+    if (!folderShareDialog) return;
+    try {
+      setFolderShareDialog((previous) => (previous ? { ...previous, busy: true } : previous));
+      const result = await apiRequest(`/shares/${shareId}/revoke`, { method: 'POST' });
+      setFolderShareDialog((previous) => (previous ? {
+        ...previous,
+        shares: previous.shares.map((share) => (share._id === shareId ? result.share : share)),
+        busy: false,
+      } : previous));
+      setNotice('Folder share link revoked.');
+    } catch (requestError) {
+      setError(requestError.message);
+      setFolderShareDialog((previous) => (previous ? { ...previous, busy: false } : previous));
+    }
+  };
+
+  const retryFolderShareArchive = async (shareId) => {
+    if (!folderShareDialog) return;
+    try {
+      setFolderShareDialog((previous) => (previous ? { ...previous, busy: true } : previous));
+      const result = await apiRequest(`/folder-shares/${shareId}/retry`, { method: 'POST' });
+      setFolderShareDialog((previous) => (previous ? {
+        ...previous,
+        shares: previous.shares.map((share) => (share._id === shareId ? result.share : share)),
+        busy: false,
+      } : previous));
+      setNotice('Archive retry queued. The folder is being packaged into one ZIP.');
+    } catch (requestError) {
+      setError(requestError.message);
+      setFolderShareDialog((previous) => (previous ? { ...previous, busy: false } : previous));
+    }
+  };
+
+  useEffect(() => {
+    if (!folderShareDialog?.shares?.some((share) => share.status === 'active' && isFolderArchivePending(share))) {
+      return undefined;
+    }
+    const intervalId = window.setInterval(() => {
+      void loadFolderShares(folderShareDialog.folder, { preserveUrl: true, silent: true });
+    }, 3000);
+    return () => window.clearInterval(intervalId);
+  }, [folderShareDialog, loadFolderShares]);
+
   const copyShareUrl = async (url) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -607,6 +808,7 @@ function FileServer() {
                 </button>
                 <span>Folder</span><span>—</span>
                 <div className="file-server-row-actions">
+                  <button className="file-server-button compact" onClick={() => openFolderShares(item)}>Share</button>
                   <button className="file-server-button danger compact" onClick={() => setDeleteFolder({ name: item.name, path: folderPath(folder, item.name) })}>Delete</button>
                 </div>
               </article>
@@ -647,6 +849,7 @@ function FileServer() {
       {deleteFolder && <DeleteFolderDialog folder={deleteFolder} onDelete={() => void confirmFolderDelete()} onClose={() => setDeleteFolder(null)} />}
       {conflict && <ConflictDialog conflict={conflict} onReplace={() => resolveConflict('replace')} onRename={(name) => resolveConflict('rename', name)} onClose={() => setConflict(null)} />}
       {shareDialog && <ShareDialog state={shareDialog} onCreate={() => void createShare()} onRevoke={(shareId) => void revokeShare(shareId)} onCopy={(url) => void copyShareUrl(url)} onClose={() => setShareDialog(null)} />}
+      {folderShareDialog && <FolderShareDialog state={folderShareDialog} onCreate={() => void createFolderShare()} onRevoke={(shareId) => void revokeFolderShare(shareId)} onRetry={(shareId) => void retryFolderShareArchive(shareId)} onCopy={(url) => void copyShareUrl(url)} onClose={() => setFolderShareDialog(null)} />}
     </main>
   );
 }

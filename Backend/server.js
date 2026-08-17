@@ -5,6 +5,8 @@ require('dotenv').config();
 const { getLicensePasswordCrypto } = require('./security/licensePasswordCrypto');
 const { getBackendBindHost } = require('./config/backendNetworkConfig');
 const { getFileServerConfig } = require('./config/fileServerConfig');
+const { createFileStorageService } = require('./services/fileStorageService');
+const { createFolderShareArchiveService } = require('./services/folderShareArchiveService');
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const brandRoutes = require('./routes/brandRoutes'); // Import brand routes
 const uploadRoutes = require('./routes/upload'); // Import upload route
@@ -31,7 +33,12 @@ const { authenticate, authorizeRole } = require('./auth/authMiddleware');
 // Fail closed before accepting requests if the server-side license encryption key is unavailable.
 getLicensePasswordCrypto();
 // Fail closed before accepting requests if private file-server settings are incomplete or malformed.
-getFileServerConfig();
+const fileServerConfig = getFileServerConfig();
+const fileStorage = createFileStorageService({ config: fileServerConfig });
+const folderShareArchiveService = createFolderShareArchiveService({
+  config: fileServerConfig,
+  storage: fileStorage,
+});
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -221,8 +228,16 @@ mongoose
 app.use('/api/users', userRoutes); 
 app.use('/api/brands', brandRoutes); 
 app.use('/api/upload', authenticate, uploadLimiter, uploadRoutes); 
-app.use('/api/files', fileManagerLimiter, createFileRoutes());
-app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes());
+app.use('/api/files', fileManagerLimiter, createFileRoutes({
+  config: fileServerConfig,
+  storage: fileStorage,
+  archiveService: folderShareArchiveService,
+}));
+app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes({
+  config: fileServerConfig,
+  storage: fileStorage,
+  archiveService: folderShareArchiveService,
+}));
 app.use('/api/models3d', modelRoutes); 
 app.use('/api/projects', projectRoutes); 
 app.use('/api/selections', selectRoutes); 
@@ -259,6 +274,7 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 5001;
 const bindHost = getBackendBindHost();
 const server = http.createServer(app);
+folderShareArchiveService.start();
 server.listen(PORT, bindHost, () => {
   console.log('Server listening on http://' + bindHost + ':' + PORT + ' (loopback only)');
 });

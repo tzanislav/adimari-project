@@ -27,9 +27,9 @@ For a new file, completion uses S3's `If-None-Match: *` precondition so an objec
 
 - `POST /api/files/move` with `sourceKey`, `destinationFolder`, `destinationFileName`, and optional explicit `conflictStrategy: "replace"`.
 - `DELETE /api/files/object?key=files/path/name.ext`.
-- `DELETE /api/files/folder?folder=Projects/2026` recursively deletes the named non-root folder, its subfolders, and every object within them. Active share links for affected files are revoked.
+- `DELETE /api/files/folder?folder=Projects/2026` recursively deletes the named non-root folder, its subfolders, and every object within them. Active file and folder share links containing affected files are revoked.
 
-Moves use S3 copy-then-delete. After S3 succeeds, active share records are updated to the new key. Deletes revoke matching active shares. If that metadata update fails, the operation is recorded as `needs_repair` and the API does not report success.
+Moves use S3 copy-then-delete. After S3 succeeds, direct file-share records are updated to the new key; folder-share links containing the moved snapshot object are revoked because their original manifest path no longer exists. Deletes revoke matching active shares. If that metadata update fails, the operation is recorded as `needs_repair` and the API does not report success.
 
 ## Share links
 
@@ -43,6 +43,46 @@ Moves use S3 copy-then-delete. After S3 succeeds, active share records are updat
 | `GET /download/:token` | Backwards-compatible route: redirects an old direct link to the branded share page. |
 
 Share tokens contain 256 bits of randomness and only their SHA-256 hashes are stored. Public endpoints return the same generic 404 for malformed, revoked, or unknown links and never list S3 contents. The Download button obtains a short-lived signed URL for the single requested object, which is necessary to download very large files directly from S3 without proxying them through the backend.
+
+## Folder share links
+
+Folder shares are available only in the private File Sharing manager, for a
+non-root folder inside `FILE_SERVER_S3_PREFIX`. They include every nested file
+that exists when the link is created.
+
+| Request | Purpose |
+| --- | --- |
+| `POST /api/files/folder-shares` with `{ "folder": "Projects/2026" }` | Captures the recursive file manifest, creates a public link, and queues a server-side ZIP build. |
+| `GET /api/files/folder-shares?folder=Projects/2026` | Lists a folder's links and their ZIP state. |
+| `POST /api/files/folder-shares/:shareId/retry` | Requeues an active folder link whose ZIP build failed. |
+| `POST /api/files/shares/:shareId/revoke` | Also revokes a folder link and deletes its generated ZIP. |
+
+The public `GET /download/:token/info` response is either a legacy `{ file }`
+payload or a `{ type: "folder", folder }` payload. The folder payload lists
+the snapshot files and reports archive status as `queued`, `preparing`,
+`ready`, or `failed`. While packaging, `POST /download/:token/download`
+returns HTTP 202 with the same archive status. Once ready it returns one
+short-lived S3 URL for the ZIP and records one download start.
+
+The worker reads S3 objects lazily, one at a time, and writes a ZIP directly
+to S3. It uses store-only ZIP entries rather than recompressing images, PDFs,
+videos, DWGs, or existing archives. A snapshot ETag is sent as `If-Match` for
+each source object, so an object changed after link creation fails the archive
+instead of silently changing the shared content. The owner can retry a transient
+archive failure; if a snapshotted source file moved, changed, or disappeared,
+the owner must create a fresh link.
+
+Archives are stored outside all browse/share prefixes in
+`FILE_SERVER_SHARE_ARCHIVE_PREFIX` (default `file-share-archives/`). The File
+Server IAM identity must have `GetObject`, `PutObject`, `DeleteObject`,
+`AbortMultipartUpload`, and `ListMultipartUploadParts` permissions for that
+prefix. Revocation deletes an archive best-effort. Configure
+S3 lifecycle to abort incomplete multipart uploads, but do not apply a blanket
+expiration rule to this prefix while permanent share links are active. The default guardrails are 5,000 files,
+20 GiB source bytes, and one concurrent archive build. The ZIP uploader has a
+hard 100 GiB source-byte ceiling (to remain safely below S3's multipart part
+limit); set the documented `FILE_SERVER_SHARE_ARCHIVE_*` environment variables
+within that ceiling to tune them deliberately.
 
 ### File Sync share namespace
 
