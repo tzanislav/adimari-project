@@ -1029,12 +1029,17 @@ function FileServer() {
           <input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="New folder name" aria-label="New folder name" />
           <button className="file-server-button" type="submit">New folder</button>
         </form>
-        <button className="file-server-button primary" type="button" disabled={uploadBusy} onClick={() => fileInputRef.current?.click()}>
-          Upload files
-        </button>
-        <button className="file-server-button primary" type="button" disabled={uploadBusy} onClick={openFolderPicker}>
-          Upload folder
-        </button>
+        <div className="file-server-toolbar-buttons">
+          <button className="file-server-button primary" type="button" disabled={uploadBusy} onClick={() => fileInputRef.current?.click()}>
+          <img src="/File%20Icons/file.png" alt="File" className="file-server-icon" />
+            
+            Upload files
+          </button>
+          <button className="file-server-button primary " type="button" disabled={uploadBusy} onClick={openFolderPicker}>
+            <img src="/File%20Icons/folder.png" alt="Folder" className="file-server-icon" />
+            Upload folder
+          </button>
+        </div>
         <input ref={fileInputRef} className="file-server-visually-hidden" type="file" multiple onChange={(event) => { queueFiles(event.target.files); event.target.value = ''; }} />
         <input ref={setFolderInputRef} className="file-server-visually-hidden" type="file" multiple onChange={(event) => { queueFolderFiles(event.target.files); event.target.value = ''; }} />
       </section>
@@ -1065,7 +1070,8 @@ function FileServer() {
       {error && <p className="file-server-message error" role="alert">{error}</p>}
       {notice && <p className="file-server-message success" role="status">{notice}</p>}
 
-      <nav className="file-server-breadcrumbs" aria-label="File location">
+      <nav className="file-server-breadcrumbs " aria-label="File location">
+        <img src="/File%20Icons/folder.png" alt="Folder" className="file-server-icon-32" />
         <button className="file-server-crumb" disabled={uploadBusy} onClick={() => navigateToFolder('')}>Files</button>
         {breadcrumbs.map((segment, index) => {
           const path = breadcrumbs.slice(0, index + 1).join('/');
