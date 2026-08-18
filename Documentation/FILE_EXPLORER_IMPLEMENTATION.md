@@ -21,12 +21,11 @@ It is linked from the **NAS File Explorer** card on the Projects page.
 - Upload one or more files to the folder currently open in the explorer, either through the picker or a drag-and-drop box. Phone gallery multi-select is supported.
 - Request a file for delivery and observe its current status.
 - Start one authenticated delivery from the Download button; once ready, browser-viewable files such as PDFs open in a new tab and other files download normally.
-- Create a public Adimari download link for a current S3-cached file. The link is copied immediately and opens the existing branded `/file-download/:token` page.
 - Preview supported images in the reusable lightbox. The initial preview uses the same authenticated, full-file delivery flow as download; it does not expose a NAS path or S3 URL.
 
 The File Sync service remains the source of truth for the catalog, delivery queue, S3 access, and diagnostics.
 
-The existing `/projects/file-server` page is separate: it remains the private S3 File Sharing manager and is not the Folder Explorer integration point.
+The existing `/projects/file-server` page is separate: it remains the private S3 File Sharing manager and is the only authenticated UI that exposes public share links. The NAS explorer does not render share controls.
 
 ## File Sync route
 

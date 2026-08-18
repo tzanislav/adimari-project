@@ -2,21 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   cancelDownloadRequest,
   createDownloadRequest,
-  createShareLink,
   downloadCompletedFile,
   getDownloadRequests,
   getFolderPage,
   getStorageNodes,
   uploadFiles,
 } from '../utils/fileSyncApi';
+import FileExplorerFileIcon from '../components/FileExplorerFileIcon';
 import FileExplorerImageLightbox from '../components/FileExplorerImageLightbox';
+import FileExplorerWorkspace from '../components/FileExplorerWorkspace';
+import { sortFileExplorerEntries } from '../utils/fileExplorerSorting';
 import '../CSS/FileServer.css';
 
 const ROOT_PATH = '';
 const CANCELLABLE_STATUSES = new Set(['Requested', 'Accepted', 'Queued', 'Uploading']);
 const IMAGE_FILE_PATTERN = /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i;
-const FILE_ICON_DIRECTORY = '/File%20Icons/';
-const FILE_ICON_ALIASES = { docx: 'doc', xlsx: 'xls', xlsm: 'xls' };
 const BROWSER_VIEWABLE_CONTENT_TYPES = {
   avif: 'image/avif',
   bmp: 'image/bmp',
@@ -43,9 +43,6 @@ function FolderExplorer() {
   const [isLoadingFolder, setIsLoadingFolder] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [requestingPaths, setRequestingPaths] = useState([]);
-  const [sharingPaths, setSharingPaths] = useState([]);
-  const [shareUploadPaths, setShareUploadPaths] = useState([]);
-  const [copiedSharePath, setCopiedSharePath] = useState(null);
   const [downloadingRequestIds, setDownloadingRequestIds] = useState([]);
   const [cancellingRequestIds, setCancellingRequestIds] = useState([]);
   const [previewEntry, setPreviewEntry] = useState(null);
@@ -60,18 +57,17 @@ function FolderExplorer() {
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [uploadState, setUploadState] = useState(null);
   const [isRecentDeliveriesExpanded, setIsRecentDeliveriesExpanded] = useState(false);
+  const [sort, setSort] = useState({ key: 'name', direction: 'asc' });
   const requestSequence = useRef(0);
   const previewObjectUrl = useRef(null);
   const previewLoadSequence = useRef(0);
   const previewPath = useRef(null);
   const automaticDeliveryWindows = useRef(new Map());
-  const shareDeliveriesAwaitingCompletion = useRef(new Map());
   const uploadInputRef = useRef(null);
   const currentLocationRef = useRef({ storageNodeId, currentPath });
   const uploadRefreshTimerIds = useRef(new Set());
   const preservePathOnStorageNodeChange = useRef(false);
   const hasInitializedBrowserHistory = useRef(false);
-  const shareCopyTimerId = useRef(null);
 
   useEffect(() => {
     currentLocationRef.current = { storageNodeId, currentPath };
@@ -182,16 +178,38 @@ function FolderExplorer() {
   useEffect(() => () => {
     uploadRefreshTimerIds.current.forEach((timerId) => window.clearTimeout(timerId));
     uploadRefreshTimerIds.current.clear();
-    shareDeliveriesAwaitingCompletion.current.clear();
-    if (shareCopyTimerId.current !== null) {
-      window.clearTimeout(shareCopyTimerId.current);
-    }
   }, []);
 
   const requestsByPath = useMemo(() => new Map(requests.map((request) => [request.relativePath, request])), [requests]);
-  const imageEntries = useMemo(() => entries.filter((entry) => !entry.isDirectory && isPreviewableImage(entry.name)), [entries]);
-  const breadcrumbs = getBreadcrumbs(currentPath);
+  const explorerEntries = useMemo(() => sortFileExplorerEntries(entries.map((entry) => ({
+    id: entry.relativePath,
+    kind: entry.isDirectory ? 'folder' : 'file',
+    name: entry.name,
+    path: entry.relativePath,
+    sizeBytes: entry.sizeBytes,
+    modifiedAt: entry.lastModifiedUtc,
+    raw: entry,
+  })), sort), [entries, sort]);
+  const imageEntries = useMemo(() => explorerEntries
+    .filter((entry) => entry.kind === 'file' && isPreviewableImage(entry.name))
+    .map((entry) => entry.raw), [explorerEntries]);
+  const breadcrumbs = useMemo(() => [
+    { id: 'nas-root', label: 'NAS files', path: ROOT_PATH, current: !currentPath },
+    ...getBreadcrumbs(currentPath).map((crumb) => ({
+      id: crumb.path,
+      label: crumb.name,
+      path: crumb.path,
+      current: crumb.path === currentPath,
+    })),
+  ], [currentPath]);
   const previewIndex = previewEntry ? imageEntries.findIndex((entry) => entry.relativePath === previewEntry.relativePath) : -1;
+
+  const handleSortChange = useCallback((key) => {
+    setSort((currentSort) => ({
+      key,
+      direction: currentSort.key === key && currentSort.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }, []);
 
   const loadPreviewImage = useCallback(async (request, relativePath) => {
     const sequence = ++previewLoadSequence.current;
@@ -455,94 +473,6 @@ function FolderExplorer() {
     }
   };
 
-  const createAndCopyShare = useCallback(async (entry, targetStorageNodeId) => {
-    try {
-      const share = await createShareLink(targetStorageNodeId, entry.relativePath);
-      await copyToClipboard(share.url);
-
-      if (shareCopyTimerId.current !== null) {
-        window.clearTimeout(shareCopyTimerId.current);
-      }
-
-      setCopiedSharePath(entry.relativePath);
-      shareCopyTimerId.current = window.setTimeout(() => {
-        setCopiedSharePath(null);
-        shareCopyTimerId.current = null;
-      }, 3000);
-      setNotice(`Share link for ${entry.name} copied to the clipboard.`);
-    } catch (shareError) {
-      setError(toUserMessage(shareError, `Could not create a share link for ${entry.name}.`));
-    } finally {
-      setSharingPaths((paths) => paths.filter((path) => path !== entry.relativePath));
-      setShareUploadPaths((paths) => paths.filter((path) => path !== entry.relativePath));
-    }
-  }, []);
-
-  useEffect(() => {
-    for (const request of requests) {
-      const pendingShare = shareDeliveriesAwaitingCompletion.current.get(request.requestId);
-      if (!pendingShare) {
-        continue;
-      }
-
-      if (request.status === 'Ready') {
-        shareDeliveriesAwaitingCompletion.current.delete(request.requestId);
-        setShareUploadPaths((paths) => paths.filter((path) => path !== pendingShare.entry.relativePath));
-        void createAndCopyShare(pendingShare.entry, pendingShare.storageNodeId);
-      } else if (request.status === 'Failed' || request.status === 'Cancelled') {
-        shareDeliveriesAwaitingCompletion.current.delete(request.requestId);
-        setSharingPaths((paths) => paths.filter((path) => path !== pendingShare.entry.relativePath));
-        setShareUploadPaths((paths) => paths.filter((path) => path !== pendingShare.entry.relativePath));
-        setError(`The upload needed to share ${pendingShare.entry.name} did not complete.`);
-      }
-    }
-  }, [createAndCopyShare, requests]);
-
-  const handleShare = async (entry) => {
-    if (!storageNodeId) {
-      return;
-    }
-
-    setSharingPaths((paths) => [...paths, entry.relativePath]);
-    setError('');
-    setNotice('');
-
-    if (entry.isCached) {
-      await createAndCopyShare(entry, storageNodeId);
-      return;
-    }
-
-    const existingRequest = requestsByPath.get(entry.relativePath);
-    if (existingRequest?.status === 'Ready') {
-      await createAndCopyShare(entry, storageNodeId);
-      return;
-    }
-
-    try {
-      const request = existingRequest && CANCELLABLE_STATUSES.has(existingRequest.status)
-        ? existingRequest
-        : await createDownloadRequest(storageNodeId, entry.relativePath);
-
-      if (request !== existingRequest) {
-        setRequests((currentRequests) => [request, ...currentRequests.filter((currentRequest) => currentRequest.requestId !== request.requestId)]);
-      }
-
-      if (request.status === 'Ready') {
-        await createAndCopyShare(entry, storageNodeId);
-      } else if (CANCELLABLE_STATUSES.has(request.status)) {
-        shareDeliveriesAwaitingCompletion.current.set(request.requestId, { entry, storageNodeId });
-        setShareUploadPaths((paths) => [...paths, entry.relativePath]);
-        setNotice(`${entry.name} is uploading to S3. Its share link will be copied when ready.`);
-      } else {
-        setError(`The upload needed to share ${entry.name} could not be requested.`);
-        setSharingPaths((paths) => paths.filter((path) => path !== entry.relativePath));
-      }
-    } catch (shareError) {
-      setError(toUserMessage(shareError, `Could not upload ${entry.name} for sharing.`));
-      setSharingPaths((paths) => paths.filter((path) => path !== entry.relativePath));
-    }
-  };
-
   const handleCancel = async (request) => {
     setCancellingRequestIds((ids) => [...ids, request.requestId]);
 
@@ -716,153 +646,125 @@ function FolderExplorer() {
       {error && <p className="file-server-message error" role="alert">{error}</p>}
       {notice && <p className="file-server-message success" role="status">{notice}</p>}
 
-      <section className="folder-explorer-upload" aria-label="Upload files to the current NAS folder">
-        <div className="folder-explorer-upload-heading">
-          <div>
-            <h2>Upload to this folder</h2>
-            <p>Choose or drag multiple files. They will be saved to the folder shown below.</p>
-          </div>
-          <button
-            className="file-server-button primary"
-            type="button"
-            disabled={!storageNodeId || isUploadingFiles}
-            onClick={() => uploadInputRef.current?.click()}
-          >
-            {isUploadingFiles ? 'Uploading filesâ€¦' : 'Choose files'}
-          </button>
-          <input
-            ref={uploadInputRef}
-            className="file-server-visually-hidden"
-            type="file"
-            multiple
-            accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
-            disabled={!storageNodeId || isUploadingFiles}
-            onChange={(event) => {
-              void queueFilesForUpload(event.target.files);
-              event.target.value = '';
-            }}
-          />
-        </div>
-        <div
-          className={`file-server-dropzone folder-explorer-dropzone ${isDraggingFiles ? 'is-dragging' : ''}${!storageNodeId || isUploadingFiles ? ' is-disabled' : ''}`}
-          onDragEnter={(event) => {
-            event.preventDefault();
-            if (!isUploadingFiles && storageNodeId) setIsDraggingFiles(true);
-          }}
-          onDragOver={(event) => event.preventDefault()}
-          onDragLeave={() => setIsDraggingFiles(false)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setIsDraggingFiles(false);
-            void queueFilesForUpload(event.dataTransfer.files);
-          }}
-        >
-          <strong>Drop files here to upload</strong>
-          <span>{isUploadingFiles ? 'Uploading the selected filesâ€¦' : 'Multiple files and phone photo selections are supported.'}</span>
-        </div>
-        {uploadState && (
-          <section className={`folder-explorer-upload-status${uploadState.phase.includes('failed') || uploadState.phase.includes('issues') ? ' has-failures' : ''}`} aria-live="polite">
-            <div className="folder-explorer-upload-progress">
-              <div>
-                <strong>{uploadState.phase}</strong>
-                <span>{formatBytes(uploadState.uploadedBytes)} of {formatBytes(uploadState.totalBytes)}</span>
-              </div>
-              <progress value={uploadState.uploadedBytes} max={uploadState.totalBytes || 1} />
-            </div>
-            <ul>
-              {uploadState.files.map((file, index) => (
-                <li key={`${file.name}-${index}`} className={file.isFailed ? 'failed' : ''}>
-                  <span><strong>{file.name}</strong> <em>{formatBytes(file.size)}</em></span>
-                  <span>{file.status}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-      </section>
-
-      <nav className="file-server-breadcrumbs" aria-label="NAS folder location">
-        <button className="file-server-crumb" type="button" onClick={() => navigateToFolder(ROOT_PATH)}>NAS files</button>
-        {breadcrumbs.map((crumb) => (
-          <span key={crumb.path}>
-            <span aria-hidden="true">/</span>{' '}
-            <button className="file-server-crumb" type="button" onClick={() => navigateToFolder(crumb.path)}>{crumb.name}</button>
-          </span>
-        ))}
-      </nav>
-
-      <section className="file-server-browser folder-explorer-browser" aria-label="NAS folder explorer">
-        <div className="file-server-browser-heading">
-          <span>Name</span><span>Size</span><span>Modified</span><span>Status</span><span>Actions</span>
-        </div>
-        {isLoadingFolder ? <p className="file-server-empty">Loading folder…</p> : (
-          <>
-            {entries.map((entry) => {
-              const entryRequest = requestsByPath.get(entry.relativePath);
-              const isRequesting = requestingPaths.includes(entry.relativePath);
-
-              return entry.isDirectory ? (
-                <article className="file-server-row folder" key={entry.relativePath}>
-                  <button className="file-server-name-button" type="button" onClick={() => navigateToFolder(entry.relativePath)}>
-                    <FileIcon entry={entry} /><span className="file-server-file-name">{entry.name}</span>
-                  </button>
-                  <span>Folder</span>
-                  <span>{formatDate(entry.lastModifiedUtc)}</span>
-                  <span className="folder-explorer-status">Available</span>
-                  <div className="file-server-row-actions"><button className="file-server-button compact" type="button" onClick={() => navigateToFolder(entry.relativePath)}>Open</button></div>
-                </article>
-              ) : (
-                <article className={`file-server-row${isPreviewableImage(entry.name) ? ' image-file' : ''}`} key={entry.relativePath}>
-                  {isPreviewableImage(entry.name) ? (
-                    <button className="file-server-name-button" type="button" onClick={() => void openImagePreview(entry)} aria-label={`Preview ${entry.name}`}>
-                      <FileIcon entry={entry} /><span className="file-server-file-name">{entry.name}</span>
-                    </button>
-                  ) : <div className="file-server-file-name file-explorer-entry-name"><FileIcon entry={entry} /> {entry.name}</div>}
-                  <span>{formatBytes(entry.sizeBytes)}</span>
-                  <span>{formatDate(entry.lastModifiedUtc)}</span>
-                  <span className={`folder-explorer-status ${getEntryStatus(entryRequest, isRequesting).toLowerCase()}`}>
-                    {getEntryStatus(entryRequest, isRequesting)}
-                  </span>
-                  <div className="file-server-row-actions">
-                    <button
-                      className="file-server-button compact primary"
-                      type="button"
-                      onClick={() => isPreviewableImage(entry.name)
-                        ? void openImagePreview(entry)
-                        : entryRequest?.status === 'Ready'
-                          ? void handleDownload(entryRequest, openBrowserViewer(entryRequest.fileName))
-                          : void handleRequestDownload(entry)}
-                      disabled={isRequesting || Boolean(entryRequest && CANCELLABLE_STATUSES.has(entryRequest.status)) || downloadingRequestIds.includes(entryRequest?.requestId)}
-                    >
-                      Download
-                    </button>
-                    <button
-                      className="file-server-button compact share"
-                      type="button"
-                      disabled={sharingPaths.includes(entry.relativePath)}
-                      title={entry.isCached
-                        ? 'Create and copy a public Adimari share link'
-                        : 'Upload the current file version to S3, then create and copy a public Adimari share link'}
-                      onClick={() => void handleShare(entry)}
-                    >
-                      {sharingPaths.includes(entry.relativePath)
-                        ? shareUploadPaths.includes(entry.relativePath) ? 'Uploadingâ€¦' : 'Creatingâ€¦'
-                        : copiedSharePath === entry.relativePath ? 'Copied!' : 'Share'}
-                    </button>
+      <FileExplorerWorkspace
+        upload={{
+          ariaLabel: 'Upload files to the current NAS folder',
+          actions: (
+            <button
+              className="file-server-button primary"
+              type="button"
+              disabled={!storageNodeId || isUploadingFiles}
+              onClick={() => uploadInputRef.current?.click()}
+            >
+              <img src="/File%20Icons/file.png" alt="" aria-hidden="true" className="file-server-icon" />
+              {isUploadingFiles ? 'Uploading files...' : 'Upload files'}
+            </button>
+          ),
+          dropzone: {
+            disabled: !storageNodeId || isUploadingFiles,
+            isDragging: isDraggingFiles,
+            label: 'Drop files here to upload',
+            description: isUploadingFiles
+              ? 'Uploading the selected files...'
+              : 'Multiple files and phone photo selections are supported.',
+            onDragEnter: (event) => {
+              event.preventDefault();
+              if (!isUploadingFiles && storageNodeId) setIsDraggingFiles(true);
+            },
+            onDragOver: (event) => event.preventDefault(),
+            onDragLeave: () => setIsDraggingFiles(false),
+            onDrop: (event) => {
+              event.preventDefault();
+              setIsDraggingFiles(false);
+              if (!isUploadingFiles && storageNodeId) void queueFilesForUpload(event.dataTransfer.files);
+            },
+          },
+          children: (
+            <>
+              <input
+                ref={uploadInputRef}
+                className="file-server-visually-hidden"
+                type="file"
+                multiple
+                accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+                disabled={!storageNodeId || isUploadingFiles}
+                onChange={(event) => {
+                  void queueFilesForUpload(event.target.files);
+                  event.target.value = '';
+                }}
+              />
+              {uploadState && (
+                <section className={`folder-explorer-upload-status${uploadState.phase.includes('failed') || uploadState.phase.includes('issues') ? ' has-failures' : ''}`} aria-live="polite">
+                  <div className="folder-explorer-upload-progress">
+                    <div>
+                      <strong>{uploadState.phase}</strong>
+                      <span>{formatBytes(uploadState.uploadedBytes)} of {formatBytes(uploadState.totalBytes)}</span>
+                    </div>
+                    <progress value={uploadState.uploadedBytes} max={uploadState.totalBytes || 1} />
                   </div>
-                </article>
-              );
-            })}
-            {!entries.length && <p className="file-server-empty">This folder is empty.</p>}
-          </>
-        )}
-      </section>
+                  <ul>
+                    {uploadState.files.map((file, index) => (
+                      <li key={`${file.name}-${index}`} className={file.isFailed ? 'failed' : ''}>
+                        <span><strong>{file.name}</strong> <em>{formatBytes(file.size)}</em></span>
+                        <span>{file.status}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </>
+          ),
+        }}
+        breadcrumbs={breadcrumbs}
+        onNavigateBreadcrumb={(breadcrumb) => navigateToFolder(breadcrumb.path)}
+        entries={explorerEntries}
+        renderEntryIcon={(entry) => <FileExplorerFileIcon entry={entry} />}
+        renderSize={(entry) => (entry.kind === 'folder' ? 'Folder' : formatBytes(entry.sizeBytes))}
+        renderModified={(entry) => formatDate(entry.modifiedAt)}
+        renderRowStatus={(entry) => {
+          const entryRequest = requestsByPath.get(entry.raw.relativePath);
+          const isRequesting = requestingPaths.includes(entry.raw.relativePath);
+          const status = entry.kind === 'folder' ? 'Available' : getEntryStatus(entryRequest, isRequesting);
+          return <span className={`folder-explorer-status ${status.toLowerCase()}`}>{status}</span>;
+        }}
+        renderRowActions={(entry) => {
+          if (entry.kind === 'folder') {
+            return <button className="file-server-button compact" type="button" onClick={() => navigateToFolder(entry.raw.relativePath)}>Open</button>;
+          }
 
-      {hasMore && (
-        <button className="file-server-button file-server-load-more" type="button" disabled={isLoadingMore} onClick={() => void loadFolder(storageNodeId, currentPath, nextCursor, true)}>
-          {isLoadingMore ? 'Loading…' : 'Load more'}
-        </button>
-      )}
+          const entryRequest = requestsByPath.get(entry.raw.relativePath);
+          const isRequesting = requestingPaths.includes(entry.raw.relativePath);
+          return (
+            <button
+              className="file-server-button compact primary"
+              type="button"
+              onClick={() => isPreviewableImage(entry.name)
+                ? void openImagePreview(entry.raw)
+                : entryRequest?.status === 'Ready'
+                  ? void handleDownload(entryRequest, openBrowserViewer(entryRequest.fileName))
+                  : void handleRequestDownload(entry.raw)}
+              disabled={isRequesting || Boolean(entryRequest && CANCELLABLE_STATUSES.has(entryRequest.status)) || downloadingRequestIds.includes(entryRequest?.requestId)}
+            >
+              Download
+            </button>
+          );
+        }}
+        onOpenFolder={(entry) => navigateToFolder(entry.raw.relativePath)}
+        onOpenFile={(entry) => void openImagePreview(entry.raw)}
+        isFileOpenable={(entry) => isPreviewableImage(entry.name)}
+        loading={isLoadingFolder}
+        loadingLabel="Loading folder..."
+        emptyLabel="This folder is empty."
+        pagination={{
+          hasMore,
+          loading: isLoadingMore,
+          onLoadMore: () => void loadFolder(storageNodeId, currentPath, nextCursor, true),
+        }}
+        sort={sort}
+        onSortChange={handleSortChange}
+        browserAriaLabel="NAS folder explorer"
+        breadcrumbsAriaLabel="NAS folder location"
+      />
 
       <section className="folder-explorer-requests" aria-labelledby="folder-explorer-requests-title">
         <button
@@ -941,34 +843,6 @@ function getEntryStatus(request, isRequesting) {
   return request?.status || 'Available';
 }
 
-// eslint-disable-next-line react/prop-types
-function FileIcon({ entry }) {
-  const iconName = getFileIconName(entry);
-
-  return (
-    <img
-      className="file-explorer-file-icon"
-      src={`${FILE_ICON_DIRECTORY}${encodeURIComponent(iconName)}`}
-      alt=""
-      aria-hidden="true"
-      onError={(event) => {
-        event.currentTarget.onerror = null;
-        event.currentTarget.src = `${FILE_ICON_DIRECTORY}file.png`;
-      }}
-    />
-  );
-}
-
-function getFileIconName(entry) {
-  if (entry.isDirectory) {
-    return 'folder.png';
-  }
-
-  const extension = entry.name.includes('.') ? entry.name.split('.').pop().toLowerCase() : '';
-  const iconExtension = FILE_ICON_ALIASES[extension] || extension;
-  return iconExtension ? `${iconExtension}.png` : 'file.png';
-}
-
 function getImageContentType(fileName) {
   const extension = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
 
@@ -1007,26 +881,6 @@ function openBrowserViewer(fileName) {
   }
 
   return viewerWindow;
-}
-
-async function copyToClipboard(value) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-
-  const textArea = document.createElement('textarea');
-  textArea.value = value;
-  textArea.style.position = 'fixed';
-  textArea.style.opacity = '0';
-  document.body.appendChild(textArea);
-  textArea.select();
-  const copied = document.execCommand('copy');
-  textArea.remove();
-
-  if (!copied) {
-    throw new Error('The browser could not copy the share link.');
-  }
 }
 
 function formatBytes(bytes) {

@@ -1,6 +1,9 @@
 /* eslint-disable react/prop-types */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchWithAuth } from '../utils/authHeaders';
+import FileExplorerFileIcon from '../components/FileExplorerFileIcon';
+import FileExplorerWorkspace from '../components/FileExplorerWorkspace';
+import { sortFileExplorerEntries } from '../utils/fileExplorerSorting';
 import '../CSS/FileServer.css';
 
 const serverUrl = import.meta.env.VITE_SERVER_URL || '';
@@ -8,8 +11,6 @@ const apiBase = `${serverUrl}/api/files`;
 const UPLOAD_URL_BATCH_SIZE = 20;
 const UPLOAD_CONCURRENCY = 3;
 const FOLDER_MARKER_FILE_NAME = '.keep';
-const FILE_ICON_DIRECTORY = '/File%20Icons/';
-const FILE_ICON_ALIASES = { docx: 'doc', xlsx: 'xls', xlsm: 'xls' };
 
 class FileServerApiError extends Error {
   constructor(message, { status, data } = {}) {
@@ -392,6 +393,7 @@ function FileServer() {
   const [shareDialog, setShareDialog] = useState(null);
   const [folderShareDialog, setFolderShareDialog] = useState(null);
   const [stats, setStats] = useState(null);
+  const [sort, setSort] = useState({ key: 'name', direction: 'asc' });
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const uploadInProgressRef = useRef(false);
@@ -1010,7 +1012,41 @@ function FileServer() {
     setUploadState(null);
   };
 
-  const breadcrumbs = folder ? folder.split('/') : [];
+  const explorerEntries = useMemo(() => sortFileExplorerEntries([
+    ...listing.folders.map((item) => ({
+      id: item.prefix,
+      kind: 'folder',
+      name: item.name,
+      path: folderPath(folder, item.name),
+      sizeBytes: null,
+      modifiedAt: null,
+      raw: item,
+    })),
+    ...listing.files.map((file) => ({
+      id: file.key,
+      kind: 'file',
+      name: file.name,
+      path: file.key,
+      sizeBytes: file.size,
+      modifiedAt: file.lastModified,
+      raw: file,
+    })),
+  ], sort), [folder, listing.files, listing.folders, sort]);
+  const breadcrumbs = useMemo(() => [
+    { id: 'files-root', label: 'Files', path: '', current: !folder },
+    ...(folder ? folder.split('/').map((name, index, segments) => ({
+      id: segments.slice(0, index + 1).join('/'),
+      label: name,
+      path: segments.slice(0, index + 1).join('/'),
+      current: index === segments.length - 1,
+    })) : []),
+  ], [folder]);
+  const handleSortChange = useCallback((key) => {
+    setSort((currentSort) => ({
+      key,
+      direction: currentSort.key === key && currentSort.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }, []);
   const uploadBusy = Boolean(uploadState) || readingDroppedFolder;
 
   return (
@@ -1031,106 +1067,103 @@ function FileServer() {
           <input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="New folder name" aria-label="New folder name" />
           <button className="file-server-button" type="submit">New folder</button>
         </form>
-        <div className="file-server-toolbar-buttons">
-          <button className="file-server-button primary" type="button" disabled={uploadBusy} onClick={() => fileInputRef.current?.click()}>
-          <img src="/File%20Icons/file.png" alt="File" className="file-server-icon" />
-            
-            Upload files
-          </button>
-          <button className="file-server-button primary " type="button" disabled={uploadBusy} onClick={openFolderPicker}>
-            <img src="/File%20Icons/folder.png" alt="Folder" className="file-server-icon" />
-            Upload folder
-          </button>
-        </div>
-        <input ref={fileInputRef} className="file-server-visually-hidden" type="file" multiple onChange={(event) => { queueFiles(event.target.files); event.target.value = ''; }} />
-        <input ref={setFolderInputRef} className="file-server-visually-hidden" type="file" multiple onChange={(event) => { queueFolderFiles(event.target.files); event.target.value = ''; }} />
       </section>
 
-      <section
-        className={`file-server-dropzone ${dragging ? 'is-dragging' : ''}`}
-        onDragEnter={(event) => { event.preventDefault(); if (!uploadBusy) setDragging(true); }}
-        onDragOver={(event) => event.preventDefault()}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(event) => { event.preventDefault(); setDragging(false); if (!uploadBusy) void queueDroppedFiles(event.dataTransfer); }}
-      >
-        <strong>Drop files or folders here to upload</strong>
-        <span>Folders are recreated below the current location, including nested folders. Files upload directly from this browser to private S3 storage.</span>
-      </section>
-
-      {readingDroppedFolder && (
-        <section className="file-server-upload-status" aria-live="polite">
-          <div><strong>Reading dropped folder</strong><span>Finding nested files before upload begins…</span></div>
-        </section>
-      )}
-      {uploadState && (
-        <section className="file-server-upload-status" aria-live="polite">
-          <div><strong>{uploadState.fileName}</strong><span>{uploadState.status}</span></div>
-          <progress value={uploadState.uploadedBytes} max={uploadState.totalBytes || 1} />
-          <span>{formatBytes(uploadState.uploadedBytes)} of {formatBytes(uploadState.totalBytes)}</span>
-        </section>
-      )}
       {error && <p className="file-server-message error" role="alert">{error}</p>}
       {notice && <p className="file-server-message success" role="status">{notice}</p>}
 
-      <nav className="file-server-breadcrumbs " aria-label="File location">
-        <img src="/File%20Icons/folder.png" alt="Folder" className="file-server-icon-32" />
-        <button className="file-server-crumb" disabled={uploadBusy} onClick={() => navigateToFolder('')}>Files</button>
-        {breadcrumbs.map((segment, index) => {
-          const path = breadcrumbs.slice(0, index + 1).join('/');
+      <FileExplorerWorkspace
+        upload={{
+          ariaLabel: 'Upload files to the current folder',
+          actions: (
+            <>
+              <button className="file-server-button primary" type="button" disabled={uploadBusy} onClick={() => fileInputRef.current?.click()}>
+                <img src="/File%20Icons/file.png" alt="" aria-hidden="true" className="file-server-icon" />
+                Upload files
+              </button>
+              <button className="file-server-button primary" type="button" disabled={uploadBusy} onClick={openFolderPicker}>
+                <img src="/File%20Icons/folder.png" alt="" aria-hidden="true" className="file-server-icon" />
+                Upload folder
+              </button>
+            </>
+          ),
+          dropzone: {
+            disabled: uploadBusy,
+            isDragging: dragging,
+            label: 'Drop files or folders here to upload',
+            description: 'Folders are recreated below the current location, including nested folders. Files upload directly from this browser to private S3 storage.',
+            onDragEnter: (event) => {
+              event.preventDefault();
+              if (!uploadBusy) setDragging(true);
+            },
+            onDragOver: (event) => event.preventDefault(),
+            onDragLeave: () => setDragging(false),
+            onDrop: (event) => {
+              event.preventDefault();
+              setDragging(false);
+              if (!uploadBusy) void queueDroppedFiles(event.dataTransfer);
+            },
+          },
+          children: (
+            <>
+              <input ref={fileInputRef} className="file-server-visually-hidden" type="file" multiple onChange={(event) => { queueFiles(event.target.files); event.target.value = ''; }} />
+              <input ref={setFolderInputRef} className="file-server-visually-hidden" type="file" multiple onChange={(event) => { queueFolderFiles(event.target.files); event.target.value = ''; }} />
+              {readingDroppedFolder && (
+                <section className="file-server-upload-status" aria-live="polite">
+                  <div><strong>Reading dropped folder</strong><span>Finding nested files before upload begins...</span></div>
+                </section>
+              )}
+              {uploadState && (
+                <section className="file-server-upload-status" aria-live="polite">
+                  <div><strong>{uploadState.fileName}</strong><span>{uploadState.status}</span></div>
+                  <progress value={uploadState.uploadedBytes} max={uploadState.totalBytes || 1} />
+                  <span>{formatBytes(uploadState.uploadedBytes)} of {formatBytes(uploadState.totalBytes)}</span>
+                </section>
+              )}
+            </>
+          ),
+        }}
+        breadcrumbs={breadcrumbs}
+        onNavigateBreadcrumb={(breadcrumb) => navigateToFolder(breadcrumb.path)}
+        navigationDisabled={uploadBusy}
+        entries={explorerEntries}
+        renderEntryIcon={(entry) => <FileExplorerFileIcon entry={entry} />}
+        renderSize={(entry) => (entry.kind === 'folder' ? 'Folder' : formatBytes(entry.sizeBytes))}
+        renderModified={(entry) => (entry.kind === 'folder' ? '—' : formatDate(entry.modifiedAt))}
+        renderRowActions={(entry) => {
+          if (entry.kind === 'folder') {
+            return (
+              <>
+                <button className="file-server-button compact" type="button" onClick={() => openFolderShares(entry.raw)}>Share</button>
+                <button className="file-server-button danger compact" type="button" onClick={() => setDeleteFolder({ name: entry.name, path: entry.path })}>Delete</button>
+              </>
+            );
+          }
+
+          const file = entry.raw;
           return (
-            <span key={path}>
-              <span aria-hidden="true">/</span>
-              <button className="file-server-crumb" disabled={uploadBusy} onClick={() => navigateToFolder(path)}>{segment}</button>
-            </span>
+            <>
+              <button className="file-server-button compact" type="button" onClick={() => void downloadFile(file)}>Download</button>
+              <button className="file-server-button compact" type="button" onClick={() => openShares(file)}>Share</button>
+              <button className="file-server-button compact" type="button" onClick={() => openMoveDialog(file)}>Move</button>
+              <button className="file-server-button danger compact" type="button" onClick={() => setDeleteFile(file)}>Delete</button>
+            </>
           );
-        })}
-      </nav>
-
-      <section className="file-server-browser" aria-label="File browser">
-        <div className="file-server-browser-heading">
-          <span>Name</span><span>Size</span><span>Modified</span><span>Actions</span>
-        </div>
-        {loading ? <p className="file-server-empty">Loading files…</p> : (
-          <>
-            {listing.folders.map((item) => (
-              <article className="file-server-row folder" key={item.prefix}>
-                <button className="file-server-name-button" disabled={uploadBusy} onClick={() => navigateToFolder(folderPath(folder, item.name))}>
-                  <FileIcon isDirectory />
-                  <span className="file-server-file-name">{item.name}</span>
-                </button>
-                <span>Folder</span><span>—</span>
-                <div className="file-server-row-actions">
-                  <button className="file-server-button compact" onClick={() => openFolderShares(item)}>Share</button>
-                  <button className="file-server-button danger compact" onClick={() => setDeleteFolder({ name: item.name, path: folderPath(folder, item.name) })}>Delete</button>
-                </div>
-              </article>
-            ))}
-            {listing.files.map((file) => (
-              <article className="file-server-row" key={file.key}>
-                <div className="file-server-file-name file-explorer-entry-name">
-                  <FileIcon fileName={file.name} />
-                  {file.name}
-                </div>
-                <span>{formatBytes(file.size)}</span>
-                <span>{formatDate(file.lastModified)}</span>
-                <div className="file-server-row-actions">
-                  <button className="file-server-button compact" onClick={() => void downloadFile(file)}>Download</button>
-                  <button className="file-server-button compact" onClick={() => openShares(file)}>Share</button>
-                  <button className="file-server-button compact" onClick={() => openMoveDialog(file)}>Move</button>
-                  <button className="file-server-button danger compact" onClick={() => setDeleteFile(file)}>Delete</button>
-                </div>
-              </article>
-            ))}
-            {!listing.files.length && !listing.folders.length && <p className="file-server-empty">This folder is empty.</p>}
-          </>
-        )}
-      </section>
-
-      {listing.nextContinuationToken && (
-        <button className="file-server-button file-server-load-more" disabled={loadingMore} onClick={() => void loadFolder({ cursor: listing.nextContinuationToken, append: true })}>
-          {loadingMore ? 'Loading…' : 'Load more'}
-        </button>
-      )}
+        }}
+        onOpenFolder={(entry) => navigateToFolder(entry.path)}
+        loading={loading}
+        loadingLabel="Loading files..."
+        emptyLabel="This folder is empty."
+        pagination={{
+          hasMore: Boolean(listing.nextContinuationToken),
+          loading: loadingMore,
+          onLoadMore: () => void loadFolder({ cursor: listing.nextContinuationToken, append: true }),
+        }}
+        sort={sort}
+        onSortChange={handleSortChange}
+        browserAriaLabel="File browser"
+        breadcrumbsAriaLabel="File location"
+      />
 
       <section className="file-server-stats" aria-label="File server storage statistics">
         <span>Storage: {stats ? formatBytes(stats.totalBytes) : 'Loading…'}</span>
@@ -1147,33 +1180,6 @@ function FileServer() {
       {folderShareDialog && <FolderShareDialog state={folderShareDialog} onCreate={() => void createFolderShare()} onRevoke={(shareId) => void revokeFolderShare(shareId)} onRetry={(shareId) => void retryFolderShareArchive(shareId)} onCopy={(url) => void copyShareUrl(url)} onClose={() => setFolderShareDialog(null)} />}
     </main>
   );
-}
-
-function FileIcon({ fileName = '', isDirectory = false }) {
-  const iconName = getFileIconName(fileName, isDirectory);
-
-  return (
-    <img
-      className="file-explorer-file-icon"
-      src={`${FILE_ICON_DIRECTORY}${encodeURIComponent(iconName)}`}
-      alt=""
-      aria-hidden="true"
-      onError={(event) => {
-        event.currentTarget.onerror = null;
-        event.currentTarget.src = `${FILE_ICON_DIRECTORY}file.png`;
-      }}
-    />
-  );
-}
-
-function getFileIconName(fileName, isDirectory) {
-  if (isDirectory) {
-    return 'folder.png';
-  }
-
-  const extension = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
-  const iconExtension = FILE_ICON_ALIASES[extension] || extension;
-  return iconExtension ? `${iconExtension}.png` : 'file.png';
 }
 
 export default FileServer;

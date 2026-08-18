@@ -363,13 +363,6 @@
   gap: 8px;
 }
 
-.file-explorer-file-icon {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  object-fit: contain;
-}
-
 .file-server-row>span {
   color: #617082;
   font-size: 12px;
