@@ -4,8 +4,8 @@ import '../CSS/Projects.css';
 
 const projectLinks = [
     {
-    title: 'NAS File Explorer',
-    description: 'Browse NAS folders, upload from this device, and request files for secure delivery.',
+    title: 'Server Folder Explorer',
+    description: 'Browse our local server, download and upload files to it.',
     to: '/projects/folder-explorer',
     thumbnail: '/file.png',
     thumbnailPlaceholder: 'Files',
@@ -13,7 +13,7 @@ const projectLinks = [
   },
   {
     title: 'File Sharing',
-    description: 'Manage private files and create download-only share links.',
+    description: 'Our home made WeTransfer.',
     to: '/projects/file-server',
     thumbnail: '/send.png',
     thumbnailPlaceholder: 'Files',
