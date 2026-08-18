@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   cancelDownloadRequest,
   createDownloadRequest,
+  createShareLink,
   downloadCompletedFile,
   getDownloadRequests,
   getFolderPage,
@@ -31,6 +32,8 @@ const BROWSER_VIEWABLE_CONTENT_TYPES = {
   webp: 'image/webp',
 };
 
+const getShareEntryKey = (storageNodeId, relativePath) => JSON.stringify([storageNodeId, relativePath]);
+
 function FolderExplorer() {
   const [storageNodes, setStorageNodes] = useState([]);
   const [storageNodeId, setStorageNodeId] = useState('');
@@ -43,6 +46,9 @@ function FolderExplorer() {
   const [isLoadingFolder, setIsLoadingFolder] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [requestingPaths, setRequestingPaths] = useState([]);
+  const [sharingEntryKeys, setSharingEntryKeys] = useState([]);
+  const [shareUploadEntryKeys, setShareUploadEntryKeys] = useState([]);
+  const [copiedShareEntryKey, setCopiedShareEntryKey] = useState(null);
   const [downloadingRequestIds, setDownloadingRequestIds] = useState([]);
   const [cancellingRequestIds, setCancellingRequestIds] = useState([]);
   const [previewEntry, setPreviewEntry] = useState(null);
@@ -63,11 +69,13 @@ function FolderExplorer() {
   const previewLoadSequence = useRef(0);
   const previewPath = useRef(null);
   const automaticDeliveryWindows = useRef(new Map());
+  const shareDeliveriesAwaitingCompletion = useRef(new Map());
   const uploadInputRef = useRef(null);
   const currentLocationRef = useRef({ storageNodeId, currentPath });
   const uploadRefreshTimerIds = useRef(new Set());
   const preservePathOnStorageNodeChange = useRef(false);
   const hasInitializedBrowserHistory = useRef(false);
+  const shareCopyTimerId = useRef(null);
 
   useEffect(() => {
     currentLocationRef.current = { storageNodeId, currentPath };
@@ -178,6 +186,10 @@ function FolderExplorer() {
   useEffect(() => () => {
     uploadRefreshTimerIds.current.forEach((timerId) => window.clearTimeout(timerId));
     uploadRefreshTimerIds.current.clear();
+    shareDeliveriesAwaitingCompletion.current.clear();
+    if (shareCopyTimerId.current !== null) {
+      window.clearTimeout(shareCopyTimerId.current);
+    }
   }, []);
 
   const requestsByPath = useMemo(() => new Map(requests.map((request) => [request.relativePath, request])), [requests]);
@@ -473,6 +485,101 @@ function FolderExplorer() {
     }
   };
 
+  const createAndCopyShare = useCallback(async (entry, targetStorageNodeId) => {
+    const shareEntryKey = getShareEntryKey(targetStorageNodeId, entry.relativePath);
+
+    try {
+      const share = await createShareLink(targetStorageNodeId, entry.relativePath);
+      const wasCopied = await copyToClipboard(share.url);
+
+      if (shareCopyTimerId.current !== null) {
+        window.clearTimeout(shareCopyTimerId.current);
+      }
+
+      setCopiedShareEntryKey(shareEntryKey);
+      shareCopyTimerId.current = window.setTimeout(() => {
+        setCopiedShareEntryKey(null);
+        shareCopyTimerId.current = null;
+      }, 3000);
+      setNotice(wasCopied
+        ? `Share link for ${entry.name} copied to the clipboard.`
+        : `Share link for ${entry.name} created. Copy it from the prompt.`);
+    } catch (shareError) {
+      setError(toUserMessage(shareError, `Could not create a share link for ${entry.name}.`));
+    } finally {
+      setSharingEntryKeys((keys) => keys.filter((key) => key !== shareEntryKey));
+      setShareUploadEntryKeys((keys) => keys.filter((key) => key !== shareEntryKey));
+    }
+  }, []);
+
+  useEffect(() => {
+    for (const request of requests) {
+      const pendingShare = shareDeliveriesAwaitingCompletion.current.get(request.requestId);
+      if (!pendingShare) {
+        continue;
+      }
+
+      if (request.status === 'Ready') {
+        shareDeliveriesAwaitingCompletion.current.delete(request.requestId);
+        const shareEntryKey = getShareEntryKey(pendingShare.storageNodeId, pendingShare.entry.relativePath);
+        setShareUploadEntryKeys((keys) => keys.filter((key) => key !== shareEntryKey));
+        void createAndCopyShare(pendingShare.entry, pendingShare.storageNodeId);
+      } else if (request.status === 'Failed' || request.status === 'Cancelled') {
+        shareDeliveriesAwaitingCompletion.current.delete(request.requestId);
+        const shareEntryKey = getShareEntryKey(pendingShare.storageNodeId, pendingShare.entry.relativePath);
+        setSharingEntryKeys((keys) => keys.filter((key) => key !== shareEntryKey));
+        setShareUploadEntryKeys((keys) => keys.filter((key) => key !== shareEntryKey));
+        setError(`The upload needed to share ${pendingShare.entry.name} did not complete.`);
+      }
+    }
+  }, [createAndCopyShare, requests]);
+
+  const handleShare = async (entry) => {
+    if (!storageNodeId) {
+      return;
+    }
+
+    const shareEntryKey = getShareEntryKey(storageNodeId, entry.relativePath);
+    setSharingEntryKeys((keys) => keys.includes(shareEntryKey) ? keys : [...keys, shareEntryKey]);
+    setError('');
+    setNotice('');
+
+    if (entry.isCached) {
+      await createAndCopyShare(entry, storageNodeId);
+      return;
+    }
+
+    const existingRequest = requestsByPath.get(entry.relativePath);
+    if (existingRequest?.status === 'Ready') {
+      await createAndCopyShare(entry, storageNodeId);
+      return;
+    }
+
+    try {
+      const request = existingRequest && CANCELLABLE_STATUSES.has(existingRequest.status)
+        ? existingRequest
+        : await createDownloadRequest(storageNodeId, entry.relativePath);
+
+      if (request !== existingRequest) {
+        setRequests((currentRequests) => [request, ...currentRequests.filter((currentRequest) => currentRequest.requestId !== request.requestId)]);
+      }
+
+      if (request.status === 'Ready') {
+        await createAndCopyShare(entry, storageNodeId);
+      } else if (CANCELLABLE_STATUSES.has(request.status)) {
+        shareDeliveriesAwaitingCompletion.current.set(request.requestId, { entry, storageNodeId });
+        setShareUploadEntryKeys((keys) => keys.includes(shareEntryKey) ? keys : [...keys, shareEntryKey]);
+        setNotice(`${entry.name} is uploading to S3. Its share link will be copied when ready.`);
+      } else {
+        setError(`The upload needed to share ${entry.name} could not be requested.`);
+        setSharingEntryKeys((keys) => keys.filter((key) => key !== shareEntryKey));
+      }
+    } catch (shareError) {
+      setError(toUserMessage(shareError, `Could not upload ${entry.name} for sharing.`));
+      setSharingEntryKeys((keys) => keys.filter((key) => key !== shareEntryKey));
+    }
+  };
+
   const handleCancel = async (request) => {
     setCancellingRequestIds((ids) => [...ids, request.requestId]);
 
@@ -734,19 +841,35 @@ function FolderExplorer() {
 
           const entryRequest = requestsByPath.get(entry.raw.relativePath);
           const isRequesting = requestingPaths.includes(entry.raw.relativePath);
+          const shareEntryKey = getShareEntryKey(storageNodeId, entry.raw.relativePath);
           return (
-            <button
-              className="file-server-button compact primary"
-              type="button"
-              onClick={() => isPreviewableImage(entry.name)
-                ? void openImagePreview(entry.raw)
-                : entryRequest?.status === 'Ready'
-                  ? void handleDownload(entryRequest, openBrowserViewer(entryRequest.fileName))
-                  : void handleRequestDownload(entry.raw)}
-              disabled={isRequesting || Boolean(entryRequest && CANCELLABLE_STATUSES.has(entryRequest.status)) || downloadingRequestIds.includes(entryRequest?.requestId)}
-            >
-              Download
-            </button>
+            <>
+              <button
+                className="file-server-button compact primary"
+                type="button"
+                onClick={() => isPreviewableImage(entry.name)
+                  ? void openImagePreview(entry.raw)
+                  : entryRequest?.status === 'Ready'
+                    ? void handleDownload(entryRequest, openBrowserViewer(entryRequest.fileName))
+                    : void handleRequestDownload(entry.raw)}
+                disabled={isRequesting || Boolean(entryRequest && CANCELLABLE_STATUSES.has(entryRequest.status)) || downloadingRequestIds.includes(entryRequest?.requestId)}
+              >
+                Download
+              </button>
+              <button
+                className="file-server-button compact share"
+                type="button"
+                disabled={sharingEntryKeys.includes(shareEntryKey)}
+                title={entry.raw.isCached
+                  ? 'Create and copy a public Adimari share link'
+                  : 'Upload the current file version to S3, then create and copy a public Adimari share link'}
+                onClick={() => void handleShare(entry.raw)}
+              >
+                {sharingEntryKeys.includes(shareEntryKey)
+                  ? shareUploadEntryKeys.includes(shareEntryKey) ? 'Uploading...' : 'Creating...'
+                  : copiedShareEntryKey === shareEntryKey ? 'Copied!' : 'Share'}
+              </button>
+            </>
           );
         }}
         onOpenFolder={(entry) => navigateToFolder(entry.raw.relativePath)}
@@ -881,6 +1004,40 @@ function openBrowserViewer(fileName) {
   }
 
   return viewerWindow;
+}
+
+async function copyToClipboard(value) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      // Fall back to the legacy copy method below when permission is unavailable.
+    }
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = value;
+  textArea.style.position = 'fixed';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.select();
+  let copied = false;
+
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  } finally {
+    textArea.remove();
+  }
+
+  if (copied) {
+    return true;
+  }
+
+  window.prompt('Copy this share link:', value);
+  return false;
 }
 
 function formatBytes(bytes) {

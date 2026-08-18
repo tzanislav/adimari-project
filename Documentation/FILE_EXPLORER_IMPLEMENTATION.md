@@ -21,11 +21,12 @@ It is linked from the **NAS File Explorer** card on the Projects page.
 - Upload one or more files to the folder currently open in the explorer, either through the picker or a drag-and-drop box. Phone gallery multi-select is supported.
 - Request a file for delivery and observe its current status.
 - Start one authenticated delivery from the Download button; once ready, browser-viewable files such as PDFs open in a new tab and other files download normally.
+- Create and immediately copy a public link for an individual file. If the file is not already cached, the explorer first queues it for S3 delivery and creates the link when that finishes.
 - Preview supported images in the reusable lightbox. The initial preview uses the same authenticated, full-file delivery flow as download; it does not expose a NAS path or S3 URL.
 
 The File Sync service remains the source of truth for the catalog, delivery queue, S3 access, and diagnostics.
 
-The existing `/projects/file-server` page is separate: it remains the private S3 File Sharing manager and is the only authenticated UI that exposes public share links. The NAS explorer does not render share controls.
+The existing `/projects/file-server` page is separate: it remains the private S3 File Sharing manager, including folder sharing and share-link management. The NAS explorer exposes only the simple, per-file create-and-copy share action.
 
 ## File Sync route
 

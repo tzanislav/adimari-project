@@ -175,10 +175,17 @@ Use a small non-empty image with a distinctive byte size.
 
 ## Share-link acceptance test
 
-Public link creation is intentionally exposed only in **File Sharing**. The
-NAS File Explorer must not render a Share action. Validate public link creation
-and download from the File Sharing project, while keeping the File Sync prefix
-restricted to its existing server-side share integration.
+1. In **NAS File Explorer**, use **Share** on a file that was uploaded through
+   the explorer.
+2. The request to `/file-sync-api/api/shares` must succeed rather than return
+   HTTP 400.
+3. Open the generated public link in a private browser session and confirm the
+   download opens the same S3 object. This exercises the distinct, share-only
+   File Sync prefix without widening normal File Manager access.
+
+NAS Explorer sharing is limited to this immediate, single-file create-and-copy
+action. Folder sharing and share-link management remain exclusive to **File
+Sharing**.
 
 ## Follow-up security repair
 

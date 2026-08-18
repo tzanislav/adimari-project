@@ -46,6 +46,14 @@ export const createDownloadRequest = async (storageNodeId, relativePath) => (
   })
 ).json();
 
+export const createShareLink = async (storageNodeId, relativePath) => (
+  await request('/api/shares', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ storageNodeId, relativePath }),
+  })
+).json();
+
 export const cancelDownloadRequest = async (requestId) => (
   await request(`/api/download-requests/${encodeURIComponent(requestId)}/cancel`, {
     method: 'POST',
