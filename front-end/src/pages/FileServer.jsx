@@ -8,6 +8,8 @@ const apiBase = `${serverUrl}/api/files`;
 const UPLOAD_URL_BATCH_SIZE = 20;
 const UPLOAD_CONCURRENCY = 3;
 const FOLDER_MARKER_FILE_NAME = '.keep';
+const FILE_ICON_DIRECTORY = '/File%20Icons/';
+const FILE_ICON_ALIASES = { docx: 'doc', xlsx: 'xls', xlsm: 'xls' };
 
 class FileServerApiError extends Error {
   constructor(message, { status, data } = {}) {
@@ -1093,7 +1095,8 @@ function FileServer() {
             {listing.folders.map((item) => (
               <article className="file-server-row folder" key={item.prefix}>
                 <button className="file-server-name-button" disabled={uploadBusy} onClick={() => navigateToFolder(folderPath(folder, item.name))}>
-                  <span aria-hidden="true">▸</span> {item.name}
+                  <FileIcon isDirectory />
+                  <span className="file-server-file-name">{item.name}</span>
                 </button>
                 <span>Folder</span><span>—</span>
                 <div className="file-server-row-actions">
@@ -1104,7 +1107,10 @@ function FileServer() {
             ))}
             {listing.files.map((file) => (
               <article className="file-server-row" key={file.key}>
-                <div className="file-server-file-name"><span aria-hidden="true">◻</span> {file.name}</div>
+                <div className="file-server-file-name file-explorer-entry-name">
+                  <FileIcon fileName={file.name} />
+                  {file.name}
+                </div>
                 <span>{formatBytes(file.size)}</span>
                 <span>{formatDate(file.lastModified)}</span>
                 <div className="file-server-row-actions">
@@ -1141,6 +1147,33 @@ function FileServer() {
       {folderShareDialog && <FolderShareDialog state={folderShareDialog} onCreate={() => void createFolderShare()} onRevoke={(shareId) => void revokeFolderShare(shareId)} onRetry={(shareId) => void retryFolderShareArchive(shareId)} onCopy={(url) => void copyShareUrl(url)} onClose={() => setFolderShareDialog(null)} />}
     </main>
   );
+}
+
+function FileIcon({ fileName = '', isDirectory = false }) {
+  const iconName = getFileIconName(fileName, isDirectory);
+
+  return (
+    <img
+      className="file-explorer-file-icon"
+      src={`${FILE_ICON_DIRECTORY}${encodeURIComponent(iconName)}`}
+      alt=""
+      aria-hidden="true"
+      onError={(event) => {
+        event.currentTarget.onerror = null;
+        event.currentTarget.src = `${FILE_ICON_DIRECTORY}file.png`;
+      }}
+    />
+  );
+}
+
+function getFileIconName(fileName, isDirectory) {
+  if (isDirectory) {
+    return 'folder.png';
+  }
+
+  const extension = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
+  const iconExtension = FILE_ICON_ALIASES[extension] || extension;
+  return iconExtension ? `${iconExtension}.png` : 'file.png';
 }
 
 export default FileServer;
