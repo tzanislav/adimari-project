@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import logo from '../assets/LogoBlack.png';
+import RandomBackgroundVideo from '../components/RandomBackgroundVideo';
 import '../CSS/PublicFileDownload.css';
 
 const serverUrl = import.meta.env.VITE_SERVER_URL || '';
@@ -123,9 +124,7 @@ function PublicFileDownload() {
 
   return (
     <main className="public-file-download-page">
-      <video className="public-file-download-video" autoPlay muted loop playsInline aria-hidden="true">
-        <source src="/home_Back.mp4" type="video/mp4" />
-      </video>
+      <RandomBackgroundVideo className="public-file-download-video" />
       <div className="public-file-download-overlay" />
       <header className="public-file-download-topbar">Adimari Database</header>
       <section className="public-file-download-content">

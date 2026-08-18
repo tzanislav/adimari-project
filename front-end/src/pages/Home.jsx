@@ -1,6 +1,7 @@
 import logo from '../assets/LogoBlack.png';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import RandomBackgroundVideo from '../components/RandomBackgroundVideo';
 import '../CSS/Home.css';
 
 function Home() {
@@ -9,16 +10,7 @@ function Home() {
 
   return (
     <main className="home">
-      <video
-        className="home-background-video"
-        autoPlay
-        muted
-        loop
-        playsInline
-        aria-hidden="true"
-      >
-        <source src="/home_Back.mp4" type="video/mp4" />
-      </video>
+      <RandomBackgroundVideo className="home-background-video" />
       <div className="home-overlay"></div>
       <section className="home-content">
         <img src={logo} alt="Adimari" className="home-logo" />
