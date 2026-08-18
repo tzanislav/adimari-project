@@ -1016,8 +1016,8 @@ function FileServer() {
       <header className="file-server-header">
         <div>
           <p className="file-server-eyebrow">Project workspace</p>
-          <h1>File Server</h1>
-          <p>Private team storage with download-only share links.</p>
+          <h1>File Sharing Server</h1>
+          <p>Upload files and folders and share them with anyone.</p>
         </div>
         <button className="file-server-button" onClick={() => void refresh()} disabled={loading}>Refresh</button>
       </header>

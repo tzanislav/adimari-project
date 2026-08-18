@@ -693,8 +693,8 @@ function FolderExplorer() {
       <header className="file-server-header">
         <div>
           <p className="file-server-eyebrow">Project workspace</p>
-          <h1>Folder Explorer</h1>
-          <p>Browse the published NAS catalog and request files for secure delivery.</p>
+          <h1>Server Folder Explorer</h1>
+          <p>Browse our local server, download and upload files to it.</p>
         </div>
         <div className="file-server-header-actions">
           <button className="file-server-button" type="button" onClick={refreshCurrentView} disabled={isLoadingNodes || isLoadingFolder}>
@@ -705,7 +705,7 @@ function FolderExplorer() {
 
       <section className="folder-explorer-controls" aria-label="NAS storage node">
         <label className="file-server-field">
-          NAS storage node
+          NAS storage node 
           <select value={storageNodeId} onChange={(event) => navigateToFolder(ROOT_PATH, { targetStorageNodeId: event.target.value })} disabled={isLoadingNodes || storageNodes.length === 0}>
             {storageNodes.map((nodeId) => <option key={nodeId} value={nodeId}>{nodeId}</option>)}
           </select>
