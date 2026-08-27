@@ -58,6 +58,12 @@ const projectLinks = [
     href: 'http://ec2-54-76-118-84.eu-west-1.compute.amazonaws.com',
     thumbnail: '/nest.png',
   },
+    {
+    title: 'Hail Detector',
+    description: 'Detect and analyze hail patterns.',
+    href: 'http://54.76.118.84:8001/',
+    thumbnail: '/thunderstorm.png',
+  },
   {
     title: 'Email',
     description: 'Our Email application.',
