@@ -21,6 +21,7 @@ import StairCalculator from './pages/StairCalculator';
 import FileServer from './pages/FileServer';
 import PublicFileDownload from './pages/PublicFileDownload';
 import FolderExplorer from './pages/FolderExplorer';
+import Billing from './pages/Billing';
 
 import './App.css';
 
@@ -99,6 +100,10 @@ function AppContent() {
           <Route
             path="/logtest"
             element={<ProtectedRoute element={<LogTest />} />}
+          />
+          <Route
+            path="/billing"
+            element={<ProtectedRoute element={<Billing />} requiredRole="admin" />}
           />
         </Routes>
         {!isPublicFileDownload && <Footer />}

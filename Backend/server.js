@@ -20,6 +20,9 @@ const clickUpRoutes = require('./routes/clickupRoutes'); // Import clickup route
 const licenseEntryRoutes = require('./routes/licenseEntryRoutes'); // Import license routes
 const activityRoutes = require('./routes/activityRoute'); // Import activity routes
 const adminRoutes = require('./routes/adminRoutes'); // Import admin maintenance routes
+const awsCostRoutes = require('./routes/awsCostRoutes'); // Admin-only AWS Cost Explorer routes
+const openAiCostRoutes = require('./routes/openAiCostRoutes'); // Admin-only OpenAI Costs routes
+const mongoDbAtlasCostRoutes = require('./routes/mongoDbAtlasCostRoutes'); // Admin-only Atlas billing routes
 const { createFileRoutes } = require('./routes/fileRoutes'); // Private S3 file-manager routes
 const { createPublicDownloadRoutes } = require('./routes/publicDownloadRoutes'); // Anonymous share downloads
 const cors = require('cors');
@@ -248,6 +251,9 @@ app.use('/auth', authLimiter, authRoutes);
 app.use('/api/licenses', licenseEntryRoutes);
 app.use('/api/activity', activityRoutes); // Add activity routes
 app.use('/api/admin', authenticate, authorizeRole('admin'), adminRoutes);
+app.use('/api/admin/aws-costs', authenticate, authorizeRole('admin'), awsCostRoutes);
+app.use('/api/admin/openai-costs', authenticate, authorizeRole('admin'), openAiCostRoutes);
+app.use('/api/admin/mongodb-atlas-costs', authenticate, authorizeRole('admin'), mongoDbAtlasCostRoutes);
 
 // Test route for API
 app.get('/api/test', (req, res) => {
