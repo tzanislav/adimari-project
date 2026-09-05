@@ -7,21 +7,42 @@ const serviceColors = ['#ad563b', '#64748b', '#c48f2d', '#6d8f7e', '#8b6f9e', '#
 
 const formatCurrency = (amount, currency = 'USD') => new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency,
+  currency: typeof currency === 'string' && /^[A-Z]{3}$/.test(currency) ? currency : 'USD',
   maximumFractionDigits: 2,
 }).format(Number(amount) || 0);
 
+const getValidDate = (value, dateOnly = false) => {
+  if (!value || typeof value !== 'string') return null;
+  const date = new Date(dateOnly ? `${value}T00:00:00Z` : value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const formatDate = (dateString) => {
-  if (!dateString) return '\u2014';
+  const date = getValidDate(dateString, true);
+  if (!date) return '\u2014';
 
   return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
-  }).format(new Date(`${dateString}T00:00:00Z`));
+  }).format(date);
 };
 
-const formatMonth = (dateString) => new Intl.DateTimeFormat('en-GB', {
-  month: 'short', year: 'numeric', timeZone: 'UTC',
-}).format(new Date(`${dateString}T00:00:00Z`));
+const formatMonth = (dateString) => {
+  const date = getValidDate(dateString, true);
+  if (!date) return 'Unknown month';
+
+  return new Intl.DateTimeFormat('en-GB', {
+    month: 'short', year: 'numeric', timeZone: 'UTC',
+  }).format(date);
+};
+
+const formatUpdatedAt = (dateString) => {
+  const date = getValidDate(dateString);
+  if (!date) return 'Update time unavailable';
+
+  return `Updated ${new Intl.DateTimeFormat('en-GB', {
+    dateStyle: 'medium', timeStyle: 'short',
+  }).format(date)}`;
+};
 
 const percentageChange = (currentValue, previousValue) => {
   const current = Number(currentValue) || 0;
@@ -36,8 +57,11 @@ const describeChange = (change, comparison) => {
 };
 
 const getChartData = (monthlyBreakdown = []) => {
+  const validMonthlyBreakdown = Array.isArray(monthlyBreakdown)
+    ? monthlyBreakdown.filter((month) => month && Array.isArray(month.services))
+    : [];
   const totalsByService = new Map();
-  monthlyBreakdown.forEach((month) => month.services.forEach((service) => {
+  validMonthlyBreakdown.forEach((month) => month.services.forEach((service) => {
     totalsByService.set(service.name, (totalsByService.get(service.name) || 0) + service.amount);
   }));
 
@@ -47,7 +71,7 @@ const getChartData = (monthlyBreakdown = []) => {
     .map(([name]) => name);
   const hasRemainingServices = totalsByService.size > prominentServices.length;
   const serviceNames = hasRemainingServices ? [...prominentServices, 'Other'] : prominentServices;
-  const months = monthlyBreakdown.map((month) => {
+  const months = validMonthlyBreakdown.map((month) => {
     const amounts = new Map(month.services.map((service) => [service.name, service.amount]));
     const knownServiceTotal = prominentServices.reduce((total, name) => total + (amounts.get(name) || 0), 0);
 
@@ -64,8 +88,11 @@ const getChartData = (monthlyBreakdown = []) => {
 };
 
 const getBreakdownRows = (monthlyBreakdown = []) => {
+  const validMonthlyBreakdown = Array.isArray(monthlyBreakdown)
+    ? monthlyBreakdown.filter((month) => month && Array.isArray(month.services))
+    : [];
   const rowsByService = new Map();
-  monthlyBreakdown.forEach((month) => month.services.forEach((service) => {
+  validMonthlyBreakdown.forEach((month) => month.services.forEach((service) => {
     const row = rowsByService.get(service.name) || { name: service.name, total: 0, amounts: new Map() };
     row.total += service.amount;
     row.amounts.set(month.startDate, service.amount);
@@ -229,6 +256,7 @@ function CostBreakdown({ monthlyBreakdown, currency, groupingLabel }) {
 function CostSection({
   id, source, title, loading, error, summary, groupingLabel, hasForecast = false,
 }) {
+  const period = summary?.period || {};
   const monthToDateChange = summary ? percentageChange(summary.monthToDate, summary.previousMonthSamePeriod) : null;
   const forecastChange = summary && hasForecast
     ? percentageChange(summary.forecastedMonthTotal, summary.previousMonthTotal)
@@ -243,7 +271,7 @@ function CostSection({
         </div>
         {summary && (
           <p className="billing-updated-at">
-            Updated {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(summary.generatedAt))}
+            {formatUpdatedAt(summary.generatedAt)}
           </p>
         )}
       </div>
@@ -263,7 +291,7 @@ function CostSection({
               <Trend change={monthToDateChange} comparison="the same point last month" />
             </MetricCard>
             <MetricCard label="Same period last month" value={formatCurrency(summary.previousMonthSamePeriod, summary.currency)}>
-              <p className="billing-metric-detail">{formatDate(summary.period.startDate)} - {formatDate(summary.period.endDate)}</p>
+              <p className="billing-metric-detail">{formatDate(period.startDate)} - {formatDate(period.endDate)}</p>
             </MetricCard>
             {hasForecast ? (
               <MetricCard
@@ -301,7 +329,7 @@ function CostSection({
 function MongoDbAtlasCostSection({ loading, error, summary }) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const historyId = useId();
-  const monthlyHistory = summary?.monthlyHistory || [];
+  const monthlyHistory = Array.isArray(summary?.monthlyHistory) ? summary.monthlyHistory : [];
   const highestMonthlyCost = Math.max(...monthlyHistory.map((month) => month.total), 0);
   const isPendingMonthlyCost = summary?.monthlyCostPeriod?.isPending;
 
@@ -314,7 +342,7 @@ function MongoDbAtlasCostSection({ loading, error, summary }) {
         </div>
         {summary && (
           <p className="billing-updated-at">
-            Updated {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(summary.generatedAt))}
+            {formatUpdatedAt(summary.generatedAt)}
           </p>
         )}
       </div>
