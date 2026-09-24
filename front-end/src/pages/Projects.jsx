@@ -64,6 +64,12 @@ const projectLinks = [
     href: 'http://54.76.118.84:8001/',
     thumbnail: '/thunderstorm.png',
   },
+      {
+    title: 'Stock Market Predictor',
+    description: 'Predict stock market trends.',
+    href: 'http://54.76.118.84:8080/',
+    thumbnail: '/stock.png',
+  },
   {
     title: 'Email',
     description: 'Our Email application.',
