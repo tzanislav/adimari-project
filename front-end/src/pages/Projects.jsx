@@ -40,6 +40,12 @@ const projectLinks = [
     thumbnail: '/man-climbing-stairs.png',
     thumbnailAlt: 'Person climbing a staircase',
   },
+    {
+    title: '3D Scanning',
+    description: 'Explore the 3D scanning application.',
+    href: 'http://54.76.118.84:4174/',
+    thumbnail: '/scan.png',
+  },
   {
     title: 'History Around',
     description: 'Explore the History Around application.',
