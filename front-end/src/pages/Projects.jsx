@@ -1,104 +1,48 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import ProjectLinkCard from '../components/ProjectLinkCard';
 import { useAuth } from '../context/AuthContext';
+import { fetchWithAuth } from '../utils/authHeaders';
 import '../CSS/Projects.css';
 
-const projectLinks = [
-    {
-    title: 'Server Folder Explorer',
-    description: 'Browse our local server, download and upload files to it.',
-    to: '/projects/folder-explorer',
-    thumbnail: '/file.png',
-    thumbnailPlaceholder: 'Files',
-    requiresEditor: true,
-  },
-  {
-    title: 'File Sharing',
-    description: 'Our home made WeTransfer.',
-    to: '/projects/file-server',
-    thumbnail: '/send.png',
-    thumbnailPlaceholder: 'Files',
-    requiresEditor: true,
-  },
-
-  {
-    title: '3D Models',
-    description: 'Browse and manage the library of 3D models.',
-    to: '/items',
-    thumbnail: '/3d.png',
-    thumbnailAlt: '3D cube',
-  },
-  {
-    title: 'Selection',
-    description: 'Browse and manage your existing project selections.',
-    to: '/projects/selection',
-    thumbnail: '/select.png',
-  },
-  {
-    title: 'Stair Calculator',
-    description: 'Plan comfortable stair proportions using the ideal slope formula.',
-    to: '/projects/stair-calculator',
-    thumbnail: '/man-climbing-stairs.png',
-    thumbnailAlt: 'Person climbing a staircase',
-  },
-    {
-    title: '3D Scanning',
-    description: 'Explore the 3D scanning application.',
-    href: 'http://54.76.118.84:4174/',
-    thumbnail: '/scan.png',
-  },
-  {
-    title: 'History Around',
-    description: 'Explore the History Around application.',
-    href: 'https://historyaround.com',
-    thumbnail: '/column.png',
-  },
-  {
-    title: 'Gaussian Splat',
-    description: 'Explore the Gaussian Splat 3D viewer.',
-    href: 'https://3dsplatviewer.com',
-    thumbnail: '/gauss.png',
-  },
-  {
-    title: 'Nesting App',
-    description: 'Open the nesting application and its project workspace.',
-    href: 'http://ec2-54-76-118-84.eu-west-1.compute.amazonaws.com',
-    thumbnail: '/nest.png',
-  },
-    {
-    title: 'Hail Detector',
-    description: 'Detect and analyze hail patterns.',
-    href: 'http://54.76.118.84:8001/',
-    thumbnail: '/thunderstorm.png',
-  },
-      {
-    title: 'Stock Market Predictor',
-    description: 'Predict stock market trends.',
-    href: 'http://54.76.118.84:8080/',
-    thumbnail: '/stock.png',
-  },
-  {
-    title: 'Email',
-    description: 'Our Email application.',
-    href: 'https://adimari.studio:2096/',
-    thumbnail: '/mail.png',
-  },
-  
-];
+const serverUrl = import.meta.env.VITE_SERVER_URL || '';
 
 function Projects() {
   const { user, role } = useAuth();
-  const canManageFiles = Boolean(user) && ['moderator', 'admin'].includes(role);
-  const visibleProjectLinks = projectLinks.filter((project) => !project.requiresEditor || canManageFiles);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const response = await (user ? fetchWithAuth : fetch)(`${serverUrl}/api/project-directory`);
+        if (!response.ok) throw new Error('Could not load projects.');
+        const result = await response.json();
+        if (!cancelled) { setProjects(result); setError(''); }
+      } catch (loadError) {
+        if (!cancelled) setError(loadError.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, role]);
 
   return (
     <main className="project-directory">
       <h1>Projects</h1>
       <p className="project-directory-intro">Choose a project to continue.</p>
-      <div className="project-link-card-grid">
-        {visibleProjectLinks.map((project) => (
-          <ProjectLinkCard key={project.title} {...project} />
-        ))}
-      </div>
+      {loading && <p>Loading projects…</p>}
+      {error && <p role="alert">{error}</p>}
+      {!loading && !error && (
+        <div className="project-link-card-grid">
+          {projects.map((project) => <ProjectLinkCard key={project.id} {...project} />)}
+        </div>
+      )}
+      {role === 'admin' && <Link className="project-directory-edit" to="/projects/manage">Edit projects</Link>}
     </main>
   );
 }

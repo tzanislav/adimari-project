@@ -7,6 +7,9 @@ const { getBackendBindHost } = require('./config/backendNetworkConfig');
 const { getFileServerConfig } = require('./config/fileServerConfig');
 const { createFileStorageService } = require('./services/fileStorageService');
 const { createFolderShareArchiveService } = require('./services/folderShareArchiveService');
+const { createProjectDirectoryStore } = require('./services/projectDirectoryStore');
+const { createProjectDirectoryHealth } = require('./services/projectDirectoryHealth');
+const { createProjectDirectoryRoutes } = require('./routes/projectDirectoryRoutes');
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const brandRoutes = require('./routes/brandRoutes'); // Import brand routes
 const uploadRoutes = require('./routes/upload'); // Import upload route
@@ -42,6 +45,8 @@ const folderShareArchiveService = createFolderShareArchiveService({
   config: fileServerConfig,
   storage: fileStorage,
 });
+const projectDirectoryStore = createProjectDirectoryStore();
+const projectDirectoryHealth = createProjectDirectoryHealth({ store: projectDirectoryStore });
 
 const isDevelopmentMode = process.env.DEV_MODE === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -243,6 +248,7 @@ app.use('/download', publicDownloadLimiter, createPublicDownloadRoutes({
 }));
 app.use('/api/models3d', modelRoutes); 
 app.use('/api/projects', projectRoutes); 
+app.use('/api/project-directory', createProjectDirectoryRoutes({ store: projectDirectoryStore, health: projectDirectoryHealth }));
 app.use('/api/selections', selectRoutes); 
 app.use('/api/items', itemRoutes); 
 app.use('/api/openai', authenticate, automationLimiter, openairoute); 
@@ -281,6 +287,7 @@ const PORT = process.env.PORT || 5001;
 const bindHost = getBackendBindHost();
 const server = http.createServer(app);
 folderShareArchiveService.start();
+projectDirectoryHealth.start();
 server.listen(PORT, bindHost, () => {
   console.log('Server listening on http://' + bindHost + ':' + PORT + ' (loopback only)');
 });

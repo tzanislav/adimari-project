@@ -3,6 +3,7 @@
 /BackEnd/node_modules*
 /Backend/auth/account.json
 /Backend/cache/*.json
+/Backend/data/project-directory/
 
 .env.local
 .env

@@ -30,8 +30,8 @@ server {
     # possible. Self-signed production certificates are not supported.
     include __TLS_OPTIONS_INCLUDE_PATH__;
 
-    # Adimari's own API accepts only small JSON control-plane payloads.
-    client_max_body_size 1m;
+    # Project thumbnails may be up to 2 MiB; JSON requests remain limited in Express.
+    client_max_body_size 3m;
 
     # The NAS File Explorer is served by Adimari but its API is File Sync.
     # Replace __FILE_SYNC_API_UPSTREAM__ with the full upstream origin without

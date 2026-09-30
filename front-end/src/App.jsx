@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Home from './pages/Home'; // Optional component to show a single model
 import Projects from './pages/Projects'; // Optional component to show projects
+import ManageProjects from './pages/ManageProjects';
 import SelectionProjects from './pages/SelectionProjects';
 import ProjectForm from './components/ProjectForm';
 import ShowProject from './pages/ShowProject'; // Optional component to show a single project
@@ -53,6 +54,7 @@ function AppContent() {
             element={<ProtectedRoute element={<ItemForm />} />}
           />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/manage" element={<ProtectedRoute element={<ManageProjects />} requiredRole="admin" />} />
           <Route
             path="/projects/selection"
             element={<ProtectedRoute element={<SelectionProjects />} />}

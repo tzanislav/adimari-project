@@ -24,6 +24,23 @@
     font-size: 1rem;
 }
 
+.project-directory-edit
+{
+    display: inline-block;
+    margin-top: 32px;
+    padding: 10px 16px;
+    color: #333;
+    border: 1px solid #bbb;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.project-directory-edit:hover,
+.project-directory-edit:focus-visible
+{
+    background: #e8e8e8;
+}
+
 .project-link-card-grid
 {
     display: grid;
