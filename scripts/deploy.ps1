@@ -105,18 +105,31 @@ npm ci --omit=dev --prefix Backend
 npm ci --prefix front-end
 npm run build --prefix front-end
 
-# Remove an existing PM2-managed copy first, then only the legacy manual
+# Remove an existing PM2-managed copy first, then only legacy manual Node
 # processes launched from this app's Backend directory. Other Node apps stay up.
 if pm2 describe adimari-backend >/dev/null 2>&1; then
     pm2 delete adimari-backend
 fi
 
-while IFS= read -r pid; do
+for process_file in /proc/[0-9]*/cmdline; do
+    pid="${{process_file#/proc/}}"
+    pid="${{pid%/cmdline}}"
     process_directory="$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
-    if [ "$process_directory" = "$DEPLOY_DIR/Backend" ]; then
-        kill "$pid"
+    if [ "$process_directory" != "$DEPLOY_DIR/Backend" ]; then
+        continue
     fi
-done < <(pgrep -f '^node server\.js$' || true)
+    mapfile -d '' -t process_args < "$process_file" || continue
+    if [ "${{#process_args[@]}}" -lt 2 ]; then
+        continue
+    fi
+    case "${{process_args[0]##*/}}" in
+        node|nodejs) ;;
+        *) continue ;;
+    esac
+    case "${{process_args[1]}}" in
+        server.js|./server.js|"$DEPLOY_DIR/Backend/server.js") kill "$pid" ;;
+    esac
+done
 
 pm2 start server.js --name adimari-backend --cwd "$DEPLOY_DIR/Backend" --time
 pm2 save
@@ -125,7 +138,10 @@ port="$(sed -n 's/^PORT=//p' Backend/.env | tail -n 1)"
 port="${{port:-5001}}"
 
 for attempt in {{1..15}}; do
-    if curl --fail --silent --show-error "http://127.0.0.1:$port/api/test" >/dev/null; then
+    if curl --fail --silent --show-error "http://127.0.0.1:$port/api/test" >/dev/null &&
+        project_content_type="$(curl --fail --silent --show-error --output /dev/null \
+            --write-out '%{{content_type}}' "http://127.0.0.1:$port/api/project-directory")" &&
+        [[ "$project_content_type" == application/json* ]]; then
         # The public NAS explorer uses the same-origin File Sync proxy. A
         # missing Nginx location falls through to the React SPA (HTTP 200),
         # while the protected File Sync API correctly responds with HTTP 401.
