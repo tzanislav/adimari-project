@@ -58,7 +58,7 @@ function TeamStatus() {
     }
 
     return (
-        <div>
+        <main className="team-status-page">
             <div className="team-page-header">
                 <h1>Team Status</h1>
                 <Link to="/team/summary" className="team-summary-link">Team Summary</Link>
@@ -69,7 +69,7 @@ function TeamStatus() {
                 ))}
             </div>
             {shownLog && <TeamLog member={shownLog} handleClose={() => { setShownLog(null) }} />}
-        </div>
+        </main>
     );
 }
 

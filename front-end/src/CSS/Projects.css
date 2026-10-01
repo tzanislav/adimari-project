@@ -6,7 +6,7 @@
 
 .project-directory
 {
-    width: min(100% - 40px, 960px);
+    width: min(92%, 1280px);
     margin: 40px auto 80px;
 }
 

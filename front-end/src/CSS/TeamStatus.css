@@ -1,3 +1,16 @@
+.team-status-page {
+    width: min(92%, 1280px);
+    margin: 40px auto 80px;
+}
+
+.team-status-page .team-page-header {
+    margin: 0 0 16px;
+}
+
+.team-status-page .member {
+    margin: 10px 0;
+}
+
 .member {
     background-color: rgb(255, 255, 255);
     border: 1px solid black;

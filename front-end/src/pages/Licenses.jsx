@@ -1,138 +1,131 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LicenseForm from '../components/LicenseEntryForm';
-import LicenseEntry from "../components/LicenseEntry";
+import LicenseEntry from '../components/LicenseEntry';
+import '../CSS/LicenseEntry.css';
 
 function Licenses() {
+  const { user, role } = useAuth();
+  const [licenses, setLicenses] = useState(null);
+  const [search, setSearch] = useState('');
+  const [currentLicense, setCurrentLicense] = useState(null);
+  const [showEdit, setShowEdit] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [error, setError] = useState('');
 
-    const { user, role } = useAuth();
+  useEffect(() => {
+    if (!user || (role !== 'admin' && role !== 'moderator')) return;
 
-    const [licenses, setLicenses] = useState(null);
-    const [filteredLicenses, setFilteredLicenses] = useState(null);
-    const [currentLicense, setCurrentLicense] = useState(null);
-    const [showEdit, setShowEdit] = useState(false);
-    const [number, setNumber] = useState(0);
-
-    if (!user || (role !== 'admin' && role !== 'moderator')) {
-        // Redirect to login page
-        window.location.href = '/signup';
-    }
-
-    useEffect(() => {
-        const fetchData = async () => {
-            const token = await user.getIdToken();
-            try {
-                const response = await fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/licenses', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error('Failed to fetch licenses.');
-                }
-                const data = await response.json();
-                //Sort by platform
-                data.sort((a, b) => a.platform.localeCompare(b.platform));
-                // The API already applies the role, clearance, and owner filters.
-                setLicenses(data);
-                setFilteredLicenses(data);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            }
-        };
-
-        fetchData();
-    }, [number, user]);
-
-
-
-    const handleEdit = (entry) => {
-        setCurrentLicense(entry);
-        setShowEdit(true);
+    const fetchData = async () => {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch(`${import.meta.env.VITE_SERVER_URL || ''}/api/licenses`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Failed to load licenses.');
+        const data = await response.json();
+        data.sort((a, b) => (a.platform || '').localeCompare(b.platform || ''));
+        setLicenses(data);
+        setError('');
+      } catch (fetchError) {
+        console.error('Error fetching licenses:', fetchError);
+        setError('Licenses could not be loaded. Please try again.');
+      }
     };
 
-    const handleClose = () => {
-        setShowEdit(false);
-    }
+    void fetchData();
+  }, [refreshKey, role, user]);
 
+  if (!user || (role !== 'admin' && role !== 'moderator')) {
+    window.location.href = '/signup';
+    return null;
+  }
 
+  const query = search.trim().toLowerCase();
+  const filteredLicenses = (licenses || []).filter((license) =>
+    [license.platform, license.user, license.usedBy, license.comment]
+      .some((value) => String(value || '').toLowerCase().includes(query))
+  );
+  const platformGroups = filteredLicenses.reduce((groups, license) => {
+    const platform = license.platform || 'Other';
+    const previous = groups[groups.length - 1];
+    if (previous?.platform === platform) previous.entries.push(license);
+    else groups.push({ platform, entries: [license] });
+    return groups;
+  }, []);
+  const openEdit = (entry) => { setCurrentLicense(entry); setShowEdit(true); };
 
-    const handleRefresh = () => {
-        setNumber(number + 1);
-    };
-
-    if (!licenses || !role) {
-        return <div>Loading...</div>
-    }
-
-
-    return (
-        <div className="licenses">
-            <div className="license-header">
-                <h1>Usernames and Passwords</h1>
-                <button onClick={() => handleEdit(false)}>Add New Entry</button>
-            </div>
-
-            <div className="license-container">
-                <div className="search-container">
-                    <input type="text" className="search-box" placeholder="Search by username, used by, platform or comment" onChange={(e) => {
-                        const search = e.target.value.toLowerCase();
-                        setFilteredLicenses(licenses.filter(license =>
-                            license.user.toLowerCase().includes(search) ||
-                            (license.usedBy || '').toLowerCase().includes(search) ||
-                            (license.platform || '').toLowerCase().includes(search) ||
-                            (license.comment || '').toLowerCase().includes(search)
-                        ));
-                    }
-                    } />
-                </div>
-                <table>
-                    <tbody>
-                        {filteredLicenses.map((license, index) => {
-
-
-                            return (
-
-                                <React.Fragment key={license._id}>
-                                    {index === 0 || filteredLicenses[index - 1].platform !== license.platform ? (
-                                        <>
-                                            <tr>
-                                                <td colSpan="8" className="platform-header">{license.platform}</td>
-                                            </tr>
-
-                                            <tr>
-                                                <th>Username</th>
-                                                <th>Password</th>
-                                                <th className = 'license-row-nonEssential' >Used By</th>
-                                                <th className = 'license-row-nonEssential'>Price</th>
-                                                <th className = 'license-row-nonEssential'>Comment</th>
-                                                <th className = 'license-row-nonEssential'>Expires At</th>
-                                                <th>Edit</th>
-                                            </tr>
-
-                                        </>
-                                    ) : null}
-                                    <LicenseEntry entry={license} handleEdit={handleEdit} />
-
-                                </React.Fragment>
-                            );
-                        })}
-
-                    </tbody>
-                </table>
-            </div>
-
-            <div className="license-form">
-                {showEdit &&
-                    <>
-                        <div className="overlay"></div>
-                        <LicenseForm handleRefresh={handleRefresh} id={currentLicense._id} handleClose={handleClose} />
-                    </>
-                }
-            </div>
+  return (
+    <main className="licenses">
+      <header className="license-header">
+        <div>
+          <h1>Licenses</h1>
+          <p>Usernames and passwords</p>
         </div>
-    );
-}
+        <button type="button" className="license-add-button" onClick={() => { setCurrentLicense(null); setShowEdit(true); }}>
+          Add new entry
+        </button>
+      </header>
 
+      <section className="license-container" aria-label="License entries">
+        <div className="license-toolbar">
+          <label className="license-search">
+            <span className="visually-hidden">Search licenses</span>
+            <input
+              type="search"
+              value={search}
+              placeholder="Search platform, username, used by or comment"
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+          {licenses && <span className="license-count">{filteredLicenses.length} {filteredLicenses.length === 1 ? 'entry' : 'entries'}</span>}
+        </div>
+
+        {error && <p className="license-message" role="alert">{error}</p>}
+        {!licenses && !error && <p className="license-message">Loading licenses…</p>}
+        {licenses && filteredLicenses.length === 0 && (
+          <p className="license-message">{search ? 'No licenses match your search.' : 'No licenses yet.'}</p>
+        )}
+        {licenses && filteredLicenses.length > 0 && (
+          <div className="license-table-scroll">
+            <table className="license-table">
+              <thead>
+                <tr>
+                  <th scope="col">Username</th>
+                  <th scope="col" className="license-password-heading">Password</th>
+                  <th scope="col">Used by</th>
+                  <th scope="col">Price</th>
+                  <th scope="col">Comment</th>
+                  <th scope="col">Expires</th>
+                </tr>
+              </thead>
+              {platformGroups.map((group) => (
+                <tbody key={group.platform}>
+                  <tr className="license-platform-row">
+                    <th scope="rowgroup" colSpan="2">{group.platform}<span>{group.entries.length}</span></th>
+                    <th colSpan="4" aria-hidden="true" />
+                  </tr>
+                  {group.entries.map((license) => (
+                    <LicenseEntry key={license._id} entry={license} handleEdit={openEdit} />
+                  ))}
+                </tbody>
+              ))}
+            </table>
+          </div>
+        )}
+      </section>
+
+      {showEdit && (
+        <div className="license-modal-backdrop">
+          <LicenseForm
+            id={currentLicense?._id}
+            handleClose={() => setShowEdit(false)}
+            handleRefresh={() => setRefreshKey((key) => key + 1)}
+          />
+        </div>
+      )}
+    </main>
+  );
+}
 
 export default Licenses;

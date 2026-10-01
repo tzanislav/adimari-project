@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿/* eslint-disable react/prop-types */
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useActiveSelection } from '../context/selectionContext';
 import SuggestionsBox from '../components/SuggestionsBox';
-import '../CSS/EditBrand.css';
 
 function LicenseForm({ handleRefresh, id, handleClose }) {
   const isEditing = Boolean(id);
@@ -14,8 +14,8 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
 
   const [isDeleting, setIsDeleting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [loading, setLoading] = useState(isEditing);
+  const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   // We'll store all licenses to derive suggestions from
@@ -47,6 +47,33 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
   const userRef = useRef(null);
   const platformRef = useRef(null);
   const usedByRef = useRef(null);
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const timer = window.setTimeout(() => dialogRef.current?.querySelector('button, input')?.focus(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      previousFocus?.focus?.();
+    };
+  }, []);
+
+  const handleDialogKeyDown = (event) => {
+    if (event.key === 'Escape' && !saving) {
+      handleClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const controls = [...dialogRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')];
+    if (!controls.length) return;
+    if (event.shiftKey && document.activeElement === controls[0]) {
+      event.preventDefault();
+      controls[controls.length - 1].focus();
+    } else if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) {
+      event.preventDefault();
+      controls[0].focus();
+    }
+  };
 
   // 1) Fetch ALL licenses once, for building suggestions
   useEffect(() => {
@@ -149,7 +176,8 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
       setErrorMessage('You must be logged in');
       return;
     }
-    setLoading(true);
+    setSaving(true);
+    setErrorMessage('');
 
     try {
       const token = await user.getIdToken();
@@ -157,12 +185,10 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
         await axios.put(`${serverUrl}/api/licenses/${id}`, formData, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setSuccessMessage('License updated successfully!');
       } else {
         await axios.post(`${serverUrl}/api/licenses`, formData, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setSuccessMessage('License created successfully!');
       }
       handleRefresh(); // Refresh the list of licenses
       handleClose();
@@ -170,7 +196,7 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
       console.error('Error submitting license form:', error);
       setErrorMessage('Failed to submit license changes.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -180,196 +206,105 @@ function LicenseForm({ handleRefresh, id, handleClose }) {
       setErrorMessage('You must be logged in');
       return;
     }
+    setSaving(true);
+    setErrorMessage('');
     try {
       const token = await user.getIdToken();
       await axios.delete(`${serverUrl}/api/licenses/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setSuccessMessage('License deleted successfully!');
       handleClose();
       handleRefresh(); // Refresh the list of licenses
     } catch (error) {
       console.error('Failed to delete license:', error);
       setErrorMessage('Failed to delete license.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (loading) {
-    return null;
-  }
-
   return (
-    <div className="brand-form form-container">
-      <h2>{isEditing ? 'Edit License' : 'Create License'}</h2>
-      {isDeleting && (
+    <section
+      ref={dialogRef}
+      className="license-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="license-modal-title"
+      onKeyDown={handleDialogKeyDown}
+    >
+      <div className="license-modal-header">
         <div>
-          <p>Are you sure you want to delete this license?</p>
-          <button onClick={handleDelete}>Yes, Delete</button>
-          <button onClick={() => setIsDeleting(false)}>Cancel</button>
+          <h2 id="license-modal-title">{isDeleting ? 'Delete license' : isEditing ? 'Edit license' : 'Add license'}</h2>
+          <p>{isDeleting ? 'This entry will be removed permanently.' : 'Account details and access'}</p>
         </div>
-      )}
+        <button type="button" className="license-modal-close" onClick={handleClose} disabled={saving} aria-label="Close dialog">×</button>
+      </div>
 
-      {!isDeleting && !loading && (
-        <form onSubmit={handleSubmit}>
-          {/* PLATFORM field with suggestions */}
-          <label>
-            Platform*:
-            <input
-              ref={platformRef}
-              type="text"
-              name="platform"
-              value={formData.platform}
-              onChange={handleChange}
-              onBlur={() => handleBlur('platform')}
-              onFocus={() => handleFocus('platform')}
-              autoComplete="off"
-            />
-          </label>
-          <SuggestionsBox
-            suggestions={suggestions.platform}
-            onSuggestionClick={(value) => {
-              setFormData((prev) => ({ ...prev, platform: value }));
-              setSuggestions((prev) => ({ ...prev, platform: [] }));
-            }}
-            onClose={() => setSuggestions((prev) => ({ ...prev, platform: [] }))}
-          />
-          {/* USER field with suggestions */}
-          <label>
-            User*:
-            <input
-              ref={userRef}
-              type="text"
-              name="user"
-              value={formData.user}
-              onChange={handleChange}
-              onBlur={() => handleBlur('user')}
-              onFocus={() => handleFocus('user')}
-              autoComplete="off"
-              required
-            />
-          </label>
-          <SuggestionsBox
-            suggestions={suggestions.user}
-            onSuggestionClick={(value) => {
-              setFormData((prev) => ({ ...prev, user: value }));
-              setSuggestions((prev) => ({ ...prev, user: [] }));
-            }}
-            onClose={() => setSuggestions((prev) => ({ ...prev, user: [] }))}
-          />
-
-          {/* PASSWORD field - no suggestions typically */}
-          <label>
-            Password*:
-            <div className="password-field">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-              />
-              <button
-                type="button"
-                className="password-visibility-toggle"
-                onClick={() => setShowPassword((visible) => !visible)}
-                aria-pressed={showPassword}
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
+      {loading ? <p className="license-modal-loading">Loading license…</p> : isDeleting ? (
+        <div className="license-delete-confirmation">
+          <p>Delete the license for <strong>{formData.user}</strong> on <strong>{formData.platform}</strong>?</p>
+          {errorMessage && <p className="license-modal-error" role="alert">{errorMessage}</p>}
+          <div className="license-modal-actions">
+            <button type="button" className="license-modal-secondary" onClick={() => { setIsDeleting(false); setErrorMessage(''); }} disabled={saving}>Cancel</button>
+            <button type="button" className="license-modal-danger-solid" onClick={handleDelete} disabled={saving}>{saving ? 'Deleting…' : 'Delete license'}</button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="license-modal-form">
+          <div className="license-modal-grid">
+            <div className="license-modal-field">
+              <label htmlFor="license-platform">Platform <span>*</span></label>
+              <input id="license-platform" ref={platformRef} type="text" name="platform" value={formData.platform} onChange={handleChange} onBlur={() => handleBlur('platform')} onFocus={() => handleFocus('platform')} autoComplete="off" required />
+              <SuggestionsBox suggestions={suggestions.platform} onSuggestionClick={(value) => { setFormData((prev) => ({ ...prev, platform: value })); setSuggestions((prev) => ({ ...prev, platform: [] })); }} onClose={() => setSuggestions((prev) => ({ ...prev, platform: [] }))} />
             </div>
-          </label>
-
-          {/* USED BY field with suggestions */}
-          <label>
-            Used By:
-            <input
-              ref={usedByRef}
-              type="text"
-              name="usedBy"
-              value={formData.usedBy}
-              onChange={handleChange}
-              onBlur={() => handleBlur('usedBy')}
-              onFocus={() => handleFocus('usedBy')}
-              autoComplete="off"
-            />
-          </label>
-          <SuggestionsBox
-            suggestions={suggestions.usedBy}
-            onSuggestionClick={(value) => {
-              setFormData((prev) => ({ ...prev, usedBy: value }));
-              setSuggestions((prev) => ({ ...prev, usedBy: [] }));
-            }}
-            onClose={() => setSuggestions((prev) => ({ ...prev, usedBy: [] }))}
-          />
-
-          <label>
-            Comment:
-            <textarea
-              name="comment"
-              value={formData.comment}
-              onChange={handleChange}
-            />
-          </label>
-
-          <label>
-            Price:
-            <input
-              type="number"
-              name="price"
-              value={formData.price}
-              onChange={handleChange}
-            />
-          </label>
-
-          <label>
-            Expires At:
-            <input
-              type="date"
-              name="expiresAt"
-              value={formData.expiresAt}
-              onChange={handleChange}
-            />
-          </label>
-
-          {role === 'admin' ? (
-            <label>
-              Visible to:
-              <select
-                name="clearances"
-                type="text"
-                value={formData.clearances || 'moderator'}
-                onChange={handleChange}
-              >
-                <option value="moderator">Moderators and admins</option>
-                <option value="admin">Admin Only</option>
-              </select>
-            </label>
-          ) : null}
-
-          <div className='buttons-container' style={{ marginTop: '1rem' }}>
-            <button type="submit">
-              {isEditing ? 'Update License' : 'Create License'}
-            </button>
-            <button type="button" onClick={handleClose}>
-              Back
-            </button>
-
-            {isEditing && (
-              <button
-                type="button"
-                style={{ marginLeft: '1rem', backgroundColor: 'red', color: 'white' }}
-                onClick={() => setIsDeleting(true)}
-              >
-                Delete License
-              </button>
+            <div className="license-modal-field">
+              <label htmlFor="license-user">Username <span>*</span></label>
+              <input id="license-user" ref={userRef} type="text" name="user" value={formData.user} onChange={handleChange} onBlur={() => handleBlur('user')} onFocus={() => handleFocus('user')} autoComplete="off" required />
+              <SuggestionsBox suggestions={suggestions.user} onSuggestionClick={(value) => { setFormData((prev) => ({ ...prev, user: value })); setSuggestions((prev) => ({ ...prev, user: [] })); }} onClose={() => setSuggestions((prev) => ({ ...prev, user: [] }))} />
+            </div>
+            <div className="license-modal-field">
+              <label htmlFor="license-password">Password <span>*</span></label>
+              <div className="license-modal-password">
+                <input id="license-password" type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange} required />
+                <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}>{showPassword ? 'Hide' : 'Show'}</button>
+              </div>
+            </div>
+            <div className="license-modal-field">
+              <label htmlFor="license-used-by">Used by</label>
+              <input id="license-used-by" ref={usedByRef} type="text" name="usedBy" value={formData.usedBy} onChange={handleChange} onBlur={() => handleBlur('usedBy')} onFocus={() => handleFocus('usedBy')} autoComplete="off" />
+              <SuggestionsBox suggestions={suggestions.usedBy} onSuggestionClick={(value) => { setFormData((prev) => ({ ...prev, usedBy: value })); setSuggestions((prev) => ({ ...prev, usedBy: [] })); }} onClose={() => setSuggestions((prev) => ({ ...prev, usedBy: [] }))} />
+            </div>
+            <div className="license-modal-field">
+              <label htmlFor="license-price">Price (EUR)</label>
+              <input id="license-price" type="number" name="price" value={formData.price} onChange={handleChange} />
+            </div>
+            <div className="license-modal-field">
+              <label htmlFor="license-expires">Expires at</label>
+              <input id="license-expires" type="date" name="expiresAt" value={formData.expiresAt} onChange={handleChange} />
+            </div>
+            <div className="license-modal-field license-modal-field-wide">
+              <label htmlFor="license-comment">Comment</label>
+              <textarea id="license-comment" name="comment" rows="3" value={formData.comment} onChange={handleChange} />
+            </div>
+            {role === 'admin' && (
+              <div className="license-modal-field license-modal-field-wide">
+                <label htmlFor="license-clearances">Visible to</label>
+                <select id="license-clearances" name="clearances" value={formData.clearances || 'moderator'} onChange={handleChange}>
+                  <option value="moderator">Moderators and admins</option>
+                  <option value="admin">Admins only</option>
+                </select>
+              </div>
             )}
           </div>
-
-          {successMessage && <p style={{ color: 'green' }}>{successMessage}</p>}
-          {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
+          {errorMessage && <p className="license-modal-error" role="alert">{errorMessage}</p>}
+          <div className="license-modal-actions">
+            {isEditing && <button type="button" className="license-modal-danger" onClick={() => { setIsDeleting(true); setErrorMessage(''); }} disabled={saving}>Delete</button>}
+            <button type="button" className="license-modal-secondary" onClick={handleClose} disabled={saving}>Cancel</button>
+            <button type="submit" className="license-modal-primary" disabled={saving}>{saving ? 'Saving…' : isEditing ? 'Save changes' : 'Add license'}</button>
+          </div>
         </form>
       )}
-    </div>
+    </section>
   );
 }
 
